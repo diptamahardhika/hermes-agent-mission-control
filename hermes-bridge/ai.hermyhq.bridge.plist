@@ -20,8 +20,8 @@
 
   <key>EnvironmentVariables</key>
   <dict>
-    <key>DATABASE_URL</key>
-    <string>PASTE_YOUR_DATABASE_URL_HERE</string>
+    <!-- DATABASE_URL is NOT stored here. bridge.mjs loads it from
+         hermes-bridge/.env (gitignored). See bridge.mjs. -->
     <key>HERMES_BOARD</key>
     <string>default</string>
     <key>PATH</key>

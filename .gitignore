@@ -40,6 +40,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# hermes-bridge
+/hermes-bridge/node_modules/
+
+# editor
+*.swp
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

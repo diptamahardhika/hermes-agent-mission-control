@@ -18,6 +18,7 @@ import {
   Workflow,
   Menu,
   X,
+  Github,
 } from "lucide-react";
 
 const navGroups = [
@@ -36,6 +37,7 @@ const navGroups = [
       { href: "/content-os", label: "Pipeline", icon: Workflow },
       { href: "/articles", label: "Articles", icon: FileText },
       { href: "/youtube", label: "YouTube", icon: Play },
+      { href: "/github", label: "GitHub", icon: Github },
     ],
   },
   {
@@ -59,7 +61,7 @@ const navGroups = [
 const mobileTabsRaw = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/x", label: "X", icon: Twitter },
-  { href: "/youtube", label: "YouTube", icon: Play },
+  { href: "/github", label: "GitHub", icon: Github },
   { href: "/ideas", label: "Ideas", icon: Lightbulb },
   { href: "/agents", label: "Agents", icon: Bot },
 ];

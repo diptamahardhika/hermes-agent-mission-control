@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd service for Hermy HQ Next.js dev server.
+  Copy to ~/Library/LaunchAgents/ and load:
+    cp hermes-dashboard.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/hermes-dashboard.plist
+  Logs: /tmp/hermes-dashboard.out.log /tmp/hermes-dashboard.err.log
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.hermyhq.dashboard</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>npm</string>
+    <string>run</string>
+    <string>dev</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/pradiptamahardika/hermes-agent-mission-control</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/hermes-dashboard.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/hermes-dashboard.err.log</string>
+</dict>
+</plist>

@@ -84,6 +84,110 @@ async function hlPost(body: object) {
 }
 
 export async function GET() {
+  const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "";
+  const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
+  const GITHUB_STATUS = process.env.GITHUB_STATUS || "";
+
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    ...(GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {}),
+  };
+
+  function normalizeGithubProfile(p: any) {
+    return {
+      login: p.login,
+      name: p.name,
+      avatarUrl: p.avatar_url ? p.avatar_url.replace("{size}", "120") : "",
+      bio: p.bio,
+      company: p.company,
+      location: p.location,
+      blog: p.blog,
+      twitterUsername: p.twitter_username,
+      followers: p.followers ?? 0,
+      following: p.following ?? 0,
+      publicRepos: p.public_repos ?? 0,
+      publicGists: p.public_gists ?? 0,
+      createdAt: p.created_at || "",
+      updatedAt: p.updated_at || "",
+      isViewer: false,
+    };
+  }
+
+  function buildGithubContributions(result: any) {
+    const cal = result?.status === "fulfilled"
+      ? result.value?.data?.user?.contributionsCollection?.contributionCalendar
+      : null;
+    if (!cal?.weeks) return null;
+
+    const levelRank: Record<string, number> = {
+      NONE: 0, FIRST_QUARTILE: 1, SECOND_QUARTILE: 2, THIRD_QUARTILE: 3, FOURTH_QUARTILE: 4,
+    };
+
+    const allDays: Array<{ date: string; count: number }> = [];
+    const weeks = cal.weeks.map((w: any) => (w.contributionDays || []).map((d: any) => {
+      const count = d.contributionCount || 0;
+      allDays.push({ date: d.date, count });
+      return { date: d.date, count, level: levelRank[d.contributionLevel] ?? (count > 0 ? 1 : 0) };
+    }));
+
+    let currentStreak = 0;
+    const dayCount = new Map(allDays.map(d => [d.date, d.count]));
+    const cursor = new Date();
+    for (;;) {
+      const key = cursor.toISOString().slice(0, 10);
+      const count = dayCount.get(key);
+      if (count === undefined) { cursor.setDate(cursor.getDate() - 1); continue; }
+      if (count > 0) currentStreak++;
+      else break;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
+    let longestStreak = 0;
+    let run = 0;
+    for (const d of allDays) {
+      if (d.count > 0) { run++; if (run > longestStreak) longestStreak = run; }
+      else run = 0;
+    }
+
+    return {
+      totalContributions: cal.totalContributions ?? allDays.reduce((s, d) => s + d.count, 0),
+      currentStreak,
+      longestStreak,
+      weeks: weeks,
+    };
+  }
+
+  const githubProfileUrl = GITHUB_USERNAME
+    ? `https://api.github.com/users/${GITHUB_USERNAME}`
+    : null;
+  const githubPinnedUrl = GITHUB_USERNAME && GITHUB_TOKEN
+    ? `https://api.github.com/users/${GITHUB_USERNAME}/pinned/repos?per_page=6`
+    : null;
+  const githubReposUrl = GITHUB_USERNAME
+    ? `https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=10&type=all`
+    : null;
+  const githubEventsUrl = GITHUB_USERNAME && GITHUB_TOKEN
+    ? `https://api.github.com/users/${GITHUB_USERNAME}/events?per_page=50`
+    : null;
+  const GITHUB_CONTRIB_QUERY = `
+    query($login: String!) {
+      user(login: $login) {
+        contributionsCollection {
+          contributionCalendar {
+            totalContributions
+            weeks {
+              contributionDays {
+                date
+                contributionCount
+                contributionLevel
+              }
+            }
+          }
+        }
+      }
+    }`;
+
   const [
     draftsResult,
     metricsResult,
@@ -95,6 +199,11 @@ export async function GET() {
     xStatsRow,
     ytIdeasResult,
     hermesKanbanResult,
+    githubProfileResult,
+    githubPinnedResult,
+    githubReposResult,
+    githubEventsResult,
+    githubContribResult,
   ] = await Promise.allSettled([
     prisma.draft.findMany({ where: { status: "posted" }, orderBy: { postedAt: "desc" } }),
     prisma.tweetMetric.findMany(),
@@ -110,6 +219,26 @@ export async function GET() {
     prisma.dataStore.findUnique({ where: { key: "x-account-stats" } }),
     prisma.youtubeIdea.findMany({ where: { status: { in: ["pending", "approved"] }, NOT: { status: "rejected" } }, orderBy: { createdAt: "desc" }, take: 3 }),
     Promise.resolve(loadHermesKanban()),
+    GITHUB_USERNAME && githubProfileUrl
+      ? fetch(githubProfileUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json())
+      : Promise.resolve(null),
+    GITHUB_USERNAME && githubPinnedUrl && GITHUB_TOKEN
+      ? fetch(githubPinnedUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json())
+      : Promise.resolve(null),
+    GITHUB_USERNAME && githubReposUrl
+      ? fetch(githubReposUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json())
+      : Promise.resolve(null),
+    GITHUB_USERNAME && githubEventsUrl && GITHUB_TOKEN
+      ? fetch(githubEventsUrl, { headers, next: { revalidate: 600 } }).then(r => r.json())
+      : Promise.resolve(null),
+    GITHUB_TOKEN
+      ? fetch("https://api.github.com/graphql", {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ query: GITHUB_CONTRIB_QUERY, variables: { login: GITHUB_USERNAME } }),
+          next: { revalidate: 3600 },
+        }).then(r => r.json())
+      : Promise.resolve(null),
   ]);
 
   // ─── X Analytics ─────────────────────────────────────────────────────────────
@@ -398,13 +527,28 @@ export async function GET() {
     hlPosition: null,
     allTimePnl: 67.22,
     todayPnl: 67.22,
-    // System
-    processes,
-    hermesKanban,
+    // GitHub
+    github: {
+      profile: githubProfileResult.status === "fulfilled" && githubProfileResult.value && !githubProfileResult.value.message
+        ? normalizeGithubProfile(githubProfileResult.value)
+        : null,
+      pinnedRepos: githubPinnedResult.status === "fulfilled" && Array.isArray(githubPinnedResult.value)
+        ? githubPinnedResult.value
+        : [],
+      recentRepos: githubReposResult.status === "fulfilled" && Array.isArray(githubReposResult.value)
+        ? githubReposResult.value
+        : [],
+      activity: githubEventsResult.status === "fulfilled" && Array.isArray(githubEventsResult.value)
+        ? githubEventsResult.value
+        : null,
+      status: GITHUB_STATUS || null,
+      contributions: buildGithubContributions(githubContribResult),
+    },
     // Legacy
     pendingDrafts: rawPendingDrafts.length,
     tweetIdeas: await prisma.idea.count({ where: { status: { notIn: ["done", "dismissed"] } } }).catch(() => 0),
     videosToFilm: await prisma.youtubeScript.count({ where: { status: { in: ["ready", "to_film", "tofilm", "approved"] } } }).catch(() => 0),
+    processes,
     insight: "",
   }, { headers: { "Cache-Control": "no-store, no-cache" } });
 }

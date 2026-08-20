@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight } from "lucide-react";
+import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
@@ -18,6 +18,57 @@ interface Draft  { id: string; text: string }
 interface YTIdea { title: string; hook: string }
 interface BuildIdea { title: string; description: string; effort: string }
 interface Process { name: string; status: string; uptime: string }
+// ── GitHub types ───────────────────────────────────────────────
+interface GitHubProfile {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  bio: string | null;
+  company: string | null;
+  location: string | null;
+  followers: number;
+  following: number;
+  publicRepos: number;
+  createdAt: string;
+}
+interface GitHubRepo {
+  id: string;
+  name: string;
+  fullName: string;
+  description: string | null;
+  htmlUrl: string;
+  stars: number;
+  forks: number;
+  language: string | null;
+  updatedAt: string;
+  isPrivate: boolean;
+}
+interface GitHubActivity {
+  pushesThisWeek: number;
+  pushesThisMonth: number;
+  reposThisWeek: number;
+  recentEvents: Array<{
+    type: string;
+    repo: string;
+    created_at: string;
+    description?: string;
+  }>;
+}
+interface GitHubContribDay { date: string; count: number; level: number }
+interface GitHubContributions {
+  totalContributions: number;
+  currentStreak: number;
+  longestStreak: number;
+  weeks: GitHubContribDay[][];
+}
+interface GitHubHomeData {
+  profile: GitHubProfile | null;
+  pinnedRepos: GitHubRepo[];
+  recentRepos: GitHubRepo[];
+  activity: GitHubActivity | null;
+  status: string | null;
+  contributions: GitHubContributions | null;
+}
 interface KanbanTask { id: string; title: string; assignee: string; status: string; priority: number }
 interface HermesKanban { board: string; slug: string; total: number; counts: Record<string, number>; tasks: KanbanTask[] }
 interface ScoreComponent { score: number; weight?: number; label: string; detail?: string }
@@ -40,6 +91,7 @@ interface HomeData {
   hermesKanban: HermesKanban;
   xViewsTrend: number[];
   snapshots: { d: string; xf: number; yt: number; pnl: number }[];
+  github: GitHubHomeData;
 }
 
 const EMPTY: HomeData = {
@@ -53,6 +105,7 @@ const EMPTY: HomeData = {
   allTimePnl: 0, todayPnl: 0, processes: [],
   hermesKanban: { board: "Hermes 24/7 Assistant", slug: "hermes-24-7-assistant", total: 0, counts: {}, tasks: [] },
   xViewsTrend: [], snapshots: [],
+  github: { profile: null, pinnedRepos: [], recentRepos: [], activity: null, status: null, contributions: null },
 };
 
 // ── Animated counter ──────────────────────────────────────
@@ -337,6 +390,180 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
   );
 }
 
+// ── GitHub contribution matrix (GitHub-style heatmap) ───────
+const GH_LEVEL_COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
+
+function GitHubContributionMatrix({ weeks }: { weeks: GitHubContribDay[][] }) {
+  return (
+    <div className="flex gap-[3px] w-full">
+      {weeks.map((week, wi) => {
+        const padded = [...week];
+        while (padded.length < 7) padded.unshift({ date: "", count: 0, level: 0 });
+        return (
+          <div key={wi} className="flex flex-col gap-[3px] flex-1 min-w-0">
+            {padded.map((day, di) => (
+              <div
+                key={day.date || `${wi}-${di}`}
+                title={day.date ? `${day.date}: ${day.count} contribution${day.count === 1 ? "" : "s"}` : ""}
+                className="flex-1 w-full aspect-square rounded-[3px] min-h-[3px]"
+                style={{ background: GH_LEVEL_COLORS[day.level] ?? GH_LEVEL_COLORS[0] }}
+              />
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── GitHub profile card for dashboard home ─────────────────────
+function GitHubHomeCard({
+  profile,
+  pinnedRepos,
+  activity,
+  status,
+  contributions,
+}: {
+  profile: GitHubProfile;
+  pinnedRepos: GitHubRepo[];
+  activity: GitHubActivity | null;
+  status: string | null;
+  contributions: GitHubContributions | null;
+}) {
+  return (
+    <div className="panel flex flex-col p-6">
+      {/* Avatar + name */}
+      <div className="flex items-center gap-3 mb-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={profile.avatarUrl}
+          alt={profile.login}
+          className="w-10 h-10 rounded-full border-2 border-[var(--hq-hairline)] object-cover"
+        />
+        <div>
+          <div className="text-[13px] font-semibold text-[var(--hq-text)]">
+            {profile.name || profile.login}
+          </div>
+          <div className="text-[11px] text-[var(--hq-text-ghost)]">
+            @{profile.login} · {profile.publicRepos} repos · {profile.followers} followers
+          </div>
+        </div>
+      </div>
+
+      {/* Contribution matrix */}
+      {contributions && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1">
+              <GitBranch className="w-3.5 h-3.5" style={{ color: "#39d353" }} />
+              <span className="text-[10px] uppercase tracking-wider text-[var(--hq-text-ghost)]">Contributions</span>
+            </div>
+            <div className="flex items-center gap-3 text-[11px]">
+              <span className="num text-[var(--hq-text-dim)]">
+                <span className="text-[var(--accent)] font-semibold">{contributions.currentStreak}</span> day streak
+              </span>
+              <span className="text-[var(--hq-text-ghost)]">·</span>
+              <span className="num text-[var(--hq-text-dim)]">
+                <span className="text-[var(--accent)] font-semibold">{contributions.longestStreak}</span> best
+              </span>
+            </div>
+          </div>
+          <GitHubContributionMatrix weeks={contributions.weeks} />
+          <div className="mt-2 text-[10.5px] text-[var(--hq-text-ghost)]">
+            {contributions.totalContributions} contributions in the last year
+          </div>
+        </div>
+      )}
+
+      {/* Bio */}
+      {profile.bio && (
+        <p className="text-[12px] text-[var(--hq-text-dim)] mb-4 leading-snug">
+          {profile.bio}
+        </p>
+      )}
+
+      {/* Status */}
+      {status && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-2.5 py-1.5">
+          <div className="relative flex w-1.5 h-1.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] animate-ping opacity-50" />
+            <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+          </div>
+          <span className="text-[11.5px] text-[var(--hq-text-dim)]">{status}</span>
+        </div>
+      )}
+
+      {/* Location / company */}
+      {(profile.company || profile.location) && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3 text-[11px] text-[var(--hq-text-ghost)]">
+          {profile.company && <span>{profile.company}</span>}
+          {profile.location && <span>{profile.location}</span>}
+        </div>
+      )}
+
+      {/* Pinned repos */}
+      {pinnedRepos.length > 0 && (
+        <div className="mb-3">
+          <div className="flex items-center gap-1 mb-2">
+            <Star className="w-3.5 h-3.5" style={{ color: "#f0b132" }} />
+            <span className="text-[10px] uppercase tracking-wider text-[var(--hq-text-ghost)]">Pinned</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {pinnedRepos.slice(0, 4).map((repo) => (
+              <a
+                key={repo.id}
+                href={repo.htmlUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-center gap-2 rounded-md border border-[var(--hq-hairline)] bg-white/[0.02] px-2.5 py-1.5 hover:bg-white/[0.04] transition-colors"
+              >
+                <span className="text-[12px] font-medium text-[var(--hq-text)] truncate flex-1">
+                  {repo.name}
+                </span>
+                <span className="text-[10px] text-[var(--hq-text-ghost)]">
+                  {repo.stars} ★
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Activity */}
+      {activity && (
+        <div className="mt-auto pt-3 border-t border-[var(--hq-hairline)]">
+          <div className="flex items-center gap-1 mb-2">
+            <GitBranch className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+            <span className="text-[10px] uppercase tracking-wider text-[var(--hq-text-ghost)]">Activity</span>
+          </div>
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="num text-[var(--accent)] font-semibold">
+              {activity.pushesThisWeek} pushes (7d)
+            </span>
+            <span className="text-[var(--hq-text-ghost)]">·</span>
+            <span className="num text-[var(--hq-text-dim)]">
+              {activity.pushesThisMonth} pushes (30d)
+            </span>
+            <span className="text-[var(--hq-text-ghost)]">·</span>
+            <span className="num text-[var(--hq-text-dim)]">
+              {activity.reposThisWeek} repos touched
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Link */}
+      <a
+        href="/github"
+        className="mt-3 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group"
+      >
+        View full GitHub profile
+        <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </a>
+    </div>
+  );
+}
+
 // ── Agents strip ──────────────────────────────────────────
 function AgentsStrip({ processes }: { processes: Process[] }) {
   if (processes.length === 0) return null;
@@ -531,19 +758,24 @@ export default function Dashboard() {
             />
             <XAnalyticsPanel views={data.xViewsThisWeek} trend={xViewsSeries} totalTweets={data.totalTweets} bestDay={data.bestPostingDay} bestHour={data.bestPostingHourStr} />
           </div>
-          {/* YouTube */}
+          {/* GitHub */}
           <div className="flex flex-col gap-5 hq-rise" style={rise(2)}>
             <MetricCard
-              label="YouTube Subscribers" value={data.ytSubscribers} format={fmtExact}
-              delta={ytd.delta} deltaPct={ytd.deltaPct} deltaLabel={ytd.label} trend={ytd.series}
-              goal={data.ytGoal} goalFormat={fmt}
-              icon={<Youtube className="w-4 h-4" />} accent="#f87171" href="/youtube" loaded={loaded}
+              label="GitHub Contributions"
+              value={data.github?.contributions?.totalContributions ?? 0}
+              format={fmtExact}
+              delta={null} deltaPct={null} deltaLabel={undefined} trend={[]}
+              goal={undefined} goalFormat={undefined}
+              icon={<Github className="w-4 h-4" />} accent="#f0b132" href="/github" loaded={loaded}
             />
-            {(data.topVideo || data.latestVideo) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {data.topVideo && <YouTubeCard video={data.topVideo} label="Top Performing" />}
-                {data.latestVideo && <YouTubeCard video={data.latestVideo} label="Latest" />}
-              </div>
+            {data.github?.profile && (
+              <GitHubHomeCard
+                profile={data.github.profile}
+                pinnedRepos={data.github.pinnedRepos}
+                activity={data.github.activity}
+                status={data.github.status}
+                contributions={data.github.contributions}
+              />
             )}
           </div>
         </div>
