@@ -239,7 +239,7 @@ export function ApprovalInbox({ compact = false }: { compact?: boolean }) {
   const visible = compact ? requests.slice(0, 3) : requests;
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <Eyebrow>Approval inbox</Eyebrow>

@@ -223,14 +223,37 @@ async function gitCommitWiki(msg) {
 }
 
 /* ─────────────── Chief-of-staff daily brief ─────────────── */
+
+// Tolerant JSON parser: LLMs fumble strict JSON (single-quoted keys, trailing
+// commas, stray fences). Repair the common quirks before giving up, and never
+// store the raw JSON blob as the summary text.
+function parseBriefJson(raw) {
+  const obj = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim().match(/\{[\s\S]*\}/)?.[0] ?? raw;
+  const attempts = [
+    (s) => JSON.parse(s),
+    // single-quoted keys -> double-quoted, plus trailing commas
+    (s) => JSON.parse(
+      s.replace(/(^|[,{\[])\s*'([^']+)'\s*:/g, '$1"$2":')
+       .replace(/,(\s*[}\]])/g, "$1")
+    ),
+    (s) => JSON.parse(s.replace(/,(\s*[}\]])/g, "$1")),
+    (s) => JSON.parse(s.replace(/(^|[,{\[])\s*'([^']+)'\s*:/g, '$1"$2":')),
+  ];
+  for (const parse of attempts) {
+    try { const b = parse(obj); if (b && typeof b === "object") return b; } catch { /* try next */ }
+  }
+  // Last resort: pull the readable bits out by regex instead of showing raw JSON.
+  // Tolerate either quote char as the value delimiter (models sometimes close with ').
+  const greeting = raw.match(/"greeting"\s*:\s*["']([^"']*?)["']/)?.[1] ?? null;
+  const summary = raw.match(/"summary"\s*:\s*["']([\s\S]*?)["'](?=\s*[,}\]]|$)/)?.[1] ?? raw.slice(0, 1500);
+  return { greeting, summary, sections: [] };
+}
+
 async function generateBriefing() {
   const raw = (await hermes(["-z", BRIEF_PROMPT], { timeout: RUN_TIMEOUT_MS })).trim();
-  let brief;
-  try {
-    const jsonStr = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const m = jsonStr.match(/\{[\s\S]*\}/);
-    brief = JSON.parse(m ? m[0] : jsonStr);
-  } catch { brief = { summary: raw.slice(0, 1500), sections: [] }; }
+  const brief = parseBriefJson(raw);
+  if (typeof brief.summary !== "string") brief.summary = raw.slice(0, 1500);
+  if (typeof brief.greeting !== "string") delete brief.greeting;
   brief.generatedAt = new Date().toISOString();
   await setStore("hermes-briefing", brief);
   await emit("status", "Daily brief generated", { level: "up" });

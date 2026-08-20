@@ -431,7 +431,7 @@ function GitHubHomeCard({
   contributions: GitHubContributions | null;
 }) {
   return (
-    <div className="panel flex flex-col p-6">
+    <div className="panel flex flex-col p-6 h-full">
       {/* Avatar + name */}
       <div className="flex items-center gap-3 mb-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -747,7 +747,7 @@ export default function Dashboard() {
         </div>
 
         {/* ── Platform stacks: X (with analytics) · YouTube (with video) ─ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
           {/* X */}
           <div className="flex flex-col gap-5 hq-rise" style={rise(1)}>
             <MetricCard
@@ -781,7 +781,7 @@ export default function Dashboard() {
         </div>
 
         {/* ── Brief + Approval inbox (side-by-side on wide) ─ */}
-        <div className="mt-5 grid grid-cols-1 xl:grid-cols-3 gap-5 items-start">
+        <div className="mt-5 grid grid-cols-1 xl:grid-cols-3 gap-5 items-stretch">
           <div className="xl:col-span-2 hq-rise" style={rise(5)}>
             <HermesBriefing />
           </div>

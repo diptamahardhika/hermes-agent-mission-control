@@ -14,6 +14,53 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
+const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "";
+
+async function weeklyGithubContributions() {
+  if (!GITHUB_TOKEN || !GITHUB_USERNAME) return null;
+  try {
+    const res = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: `
+          query($login: String!) {
+            user(login: $login) {
+              contributionsCollection {
+                contributionCalendar {
+                  weeks {
+                    contributionDays {
+                      date
+                      contributionCount
+                    }
+                  }
+                }
+              }
+            }
+          }`,
+        variables: { login: GITHUB_USERNAME },
+      }),
+      next: { revalidate: 600 },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const weeks: any[] = json?.data?.user?.contributionsCollection?.contributionCalendar?.weeks ?? [];
+    const since = Date.now() - 7 * 86_400_000;
+    let count = 0;
+    for (const w of weeks) {
+      for (const d of w.contributionDays ?? []) {
+        if (new Date(d.date + "T00:00:00Z").getTime() >= since) count += d.contributionCount || 0;
+      }
+    }
+    return count;
+  } catch { return null; }
+}
+
 export async function GET() {
   const now = Date.now();
   const weekAgo = new Date(now - 7 * 86_400_000);
@@ -118,8 +165,19 @@ export async function GET() {
 
   const contentScore = Math.min(100, consistencyScore + viralBonus);
 
+  // ── 5. GitHub Contributions (15%) ─────────────────────────
+  const weeklyGithub = await weeklyGithubContributions();
+  const githubScore = weeklyGithub === null ? 10
+    : weeklyGithub >= 100 ? 100
+    : weeklyGithub >= 50  ? 90
+    : weeklyGithub >= 30  ? 80
+    : weeklyGithub >= 15  ? 68
+    : weeklyGithub >= 5   ? 50
+    : weeklyGithub >= 1   ? 30
+    : 10;
+
   // ── Final score ────────────────────────────────────────────
-  const raw   = xScore * 0.40 + ytScore * 0.25 + contentScore * 0.35;
+  const raw   = xScore * 0.35 + ytScore * 0.20 + contentScore * 0.30 + githubScore * 0.15;
   const score = Math.round(Math.min(100, Math.max(0, raw)));
 
   const grade = score >= 90 ? "S" : score >= 80 ? "A" : score >= 70 ? "B" : score >= 60 ? "C" : score >= 50 ? "D" : "F";
@@ -130,14 +188,16 @@ export async function GET() {
     score, grade, label, color,
     period: "last 7 days",
     components: {
-      x:       { score: Math.round(xScore),       weight: 0.40, label: "X Performance",    detail: weeklyViews > 0 ? `${(weeklyViews/1000).toFixed(0)}K views` : "No data" },
-      youtube: { score: Math.round(ytScore),      weight: 0.25, label: "YouTube Growth",   detail: ytGrowth > 0 ? `+${ytGrowth} subs (${ytGrowthPct.toFixed(0)}%)` : "Tracking..." },
-      content: { score: Math.round(contentScore), weight: 0.35, label: "Content Output",   detail: `${weeklyPosts} posts${bestTweetViews > 100000 ? ` · ${(bestTweetViews/1000000).toFixed(1)}M best` : ""}` },
+      x:       { score: Math.round(xScore),       weight: 0.35, label: "X Performance",    detail: weeklyViews > 0 ? `${(weeklyViews/1000).toFixed(0)}K views` : "No data" },
+      youtube: { score: Math.round(ytScore),      weight: 0.20, label: "YouTube Growth",   detail: ytGrowth > 0 ? `+${ytGrowth} subs (${ytGrowthPct.toFixed(0)}%)` : "Tracking..." },
+      github:  { score: Math.round(githubScore),  weight: 0.15, label: "GitHub Activity",  detail: weeklyGithub === null ? "No token" : `${weeklyGithub} contributions (7d)` },
+      content: { score: Math.round(contentScore), weight: 0.30, label: "Content Output",   detail: `${weeklyPosts} posts${bestTweetViews > 100000 ? ` · ${(bestTweetViews/1000000).toFixed(1)}M best` : ""}` },
     },
     inputs: {
       weeklyViews, weeklyPosts, bestTweetViews,
       currentYtSubs, ytSubsWeekAgo, ytGrowth, ytGrowthPct,
       weekPnl, weekPolyPnl, weekHlPnl,
+      weeklyGithub,
     },
     generatedAt: new Date().toISOString(),
   }, { headers: { "Cache-Control": "no-store" } });

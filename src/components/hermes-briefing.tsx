@@ -74,7 +74,7 @@ export function HermesBriefing() {
   const empty = !data || !data.generatedAt || !data.summary;
 
   return (
-    <Panel className="p-6">
+    <Panel className="p-6 h-full">
       <div className="flex items-center justify-between gap-4 mb-3">
         <div className="flex items-center gap-2.5">
           <Sunrise className="w-4 h-4 text-[var(--accent)]" />
