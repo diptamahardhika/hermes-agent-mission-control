@@ -70,6 +70,7 @@ environment variables.
 - Longform + YouTube script studios
 - Client Pulse — a client-health tracking board (bring your own data ingestion)
 - Agents roster, Garden, and Watchlist Radar
+- Homelab — mirrors your homelab-monitor state (servers, services, containers, host resources) into a status dashboard via the bridge
 
 > Some features need your own API keys (YouTube, X/Twitter, OpenAI, etc.). They are
 > all optional and configured via env — the core dashboard runs without them.

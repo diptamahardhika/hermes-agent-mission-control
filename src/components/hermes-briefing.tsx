@@ -41,13 +41,19 @@ export function HermesBriefing() {
   const [pending, setPending] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [genFailed, setGenFailed] = useState(false);
   const genAt = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [b, r] = await Promise.all([
+      const [b, r, g] = await Promise.all([
         fetch("/api/hermes/briefing").then((x) => (x.ok ? x.json() : null)),
         fetch("/api/hermes/requests?status=awaiting_approval&take=1").then((x) => (x.ok ? x.json() : null)),
+        // while generating, watch the latest generate request so a failure
+        // stops the spinner instead of spinning forever
+        generating
+          ? fetch("/api/hermes/requests?kind=briefing.generate&take=1").then((x) => (x.ok ? x.json() : null))
+          : Promise.resolve(null),
       ]);
       if (b) {
         setData(b);
@@ -55,6 +61,10 @@ export function HermesBriefing() {
         if (generating && b.generatedAt && b.generatedAt !== genAt.current) setGenerating(false);
       }
       if (r) setPending(r.pending ?? 0);
+      if (g?.requests?.[0]?.status === "failed") {
+        setGenerating(false);
+        setGenFailed(true);
+      }
     } catch { /* ignore */ }
     setLoaded(true);
   }, [generating]);
@@ -68,6 +78,7 @@ export function HermesBriefing() {
   const generate = async () => {
     genAt.current = data?.generatedAt ?? null;
     setGenerating(true);
+    setGenFailed(false);
     try { await fetch("/api/hermes/briefing", { method: "POST" }); } catch { /* ignore */ }
   };
 
@@ -100,9 +111,9 @@ export function HermesBriefing() {
       {empty ? (
         <div className="py-6 text-center">
           <p className="text-[14px] text-[var(--text-2)]">
-            {generating ? "Hermes is writing your brief… (~1 min)" : loaded ? "No brief yet." : "Loading…"}
+            {generating ? "Hermes is writing your brief… (~1 min)" : loaded ? (genFailed ? "Hermes couldn't write a brief that time — try again." : "No brief yet.") : "Loading…"}
           </p>
-          {!generating && loaded && (
+          {!generating && loaded && !genFailed && (
             <p className="mt-1 text-[12.5px] text-[var(--text-3)]">
               It auto-generates each morning — or hit Generate to get one now.
             </p>

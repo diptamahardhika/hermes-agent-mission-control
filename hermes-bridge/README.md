@@ -41,6 +41,23 @@ website  ◀──read HermesTask/────   Postgres  ◀──mirror──
 | `BRIDGE_POLL_MS` | `5000` | how often to check for new requests |
 | `BRIDGE_MIRROR_MS` | `30000` | how often to mirror kanban/cron/health |
 | `BRIDGE_RUN_TIMEOUT_MS` | `240000` | max time for one agent run |
+| `HERMES_BRIEFS_DIR` | `~/.hermes/briefs` | where the daily-brief kanban worker writes `brief.json` |
+| `HOMELAB_MONITOR_URL` | — (optional) | base URL of your homelab-monitor instance (e.g. `http://10.0.0.5:9876`). When set, the bridge mirrors servers/services/containers/system into Postgres and the `/homelab` dashboard reads it |
+| `HOMELAB_MONITOR_TOKEN` | — | the `AUTH_TOKEN` from your homelab-monitor compose file (sent as `Authorization: Bearer`) |
+
+## Daily brief (scheduled kanban op)
+The chief-of-staff brief is a scheduled Hermes cron job, not a bridge timer:
+
+1. `~/.hermes/scripts/daily-brief.sh` creates a `Daily brief <date>` kanban card
+   (assigned to `default`, `--goal`, `--workspace dir:$HERMES_BRIEFS_DIR`) and
+   dispatches it. Prompt: `~/.hermes/scripts/daily-brief-prompt.txt` — the worker
+   writes the brief JSON to `brief.json` in that workspace, then completes the card.
+2. Cron job: `hermes cron create "0 8 * * *" --script daily-brief.sh --no-agent --name "Daily brief"`
+3. `mirrorBrief()` (in `mirrorTick`) watches for the newest done `Daily brief*`
+   card, reads `$HERMES_BRIEFS_DIR/brief.json`, and writes the parsed brief to the
+   `hermes-briefing` DataStore row the dashboard reads.
+
+The website's Generate button still uses `generateBriefing()` directly (`hermes -z`).
 
 ## Notes / assumptions
 - CLI arg shapes (`hermes kanban create <title>`, `hermes cron create <schedule> <prompt>`) are best-effort for Hermes v0.17.x — if your build differs, tweak `runRequest()` in `bridge.mjs`.

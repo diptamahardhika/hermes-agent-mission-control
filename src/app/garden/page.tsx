@@ -42,12 +42,20 @@ export default function GardenPage() {
     if (!silent) setLoading(true);
     try {
       const res = await fetch('/api/garden');
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? `Garden API error (${res.status})`);
+      }
       const data: GardenBlob = await res.json();
+      if (!data || !Array.isArray(data.plants)) throw new Error('Unexpected data format from garden storage');
       if (data.lastUpdated !== lastUpdatedRef.current) {
         lastUpdatedRef.current = data.lastUpdated;
         setBlob(data);
       }
-    } catch { setError('Failed to load garden'); }
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load garden');
+    }
     if (!silent) setLoading(false);
   }
 
@@ -65,9 +73,14 @@ export default function GardenPage() {
       plants: blob.plants.filter(p => p.id !== id),
     };
     setSaving(true);
-    await fetch('/api/garden', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
-    setBlob(updated);
-    lastUpdatedRef.current = updated.lastUpdated;
+    const res = await fetch('/api/garden', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
+    if (res.ok) {
+      const saved: GardenBlob = await res.json();
+      setBlob(saved);
+      lastUpdatedRef.current = saved.lastUpdated;
+    } else {
+      setError('Failed to save — please try again');
+    }
     setSaving(false);
   }
 
@@ -84,9 +97,14 @@ export default function GardenPage() {
       plants: [...blob.plants, newPlant],
     };
     setSaving(true);
-    await fetch('/api/garden', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
-    setBlob(updated);
-    lastUpdatedRef.current = updated.lastUpdated;
+    const res = await fetch('/api/garden', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
+    if (res.ok) {
+      const saved: GardenBlob = await res.json();
+      setBlob(saved);
+      lastUpdatedRef.current = saved.lastUpdated;
+    } else {
+      setError('Failed to save — please try again');
+    }
     setForm({ ...EMPTY_FORM });
     setShowForm(false);
     setSaving(false);
@@ -115,7 +133,10 @@ export default function GardenPage() {
   if (error || !blob || !Array.isArray(blob.plants)) {
     return (
       <div className="w-full mx-auto p-6">
-        <EmptyState title={error ?? 'Unexpected data format — please reload.'} />
+        <EmptyState
+          title={error ?? 'Unexpected data format — please reload.'}
+          hint="Couldn't reach the garden storage. Check the database connection and try again."
+        />
       </div>
     );
   }
@@ -142,7 +163,7 @@ export default function GardenPage() {
           <div className="eyebrow mb-2.5">🌿 Shared Garden</div>
           <h1 className="text-[32px] font-semibold tracking-[-0.025em] leading-none text-[var(--text)]">Our Garden</h1>
           <p className="num text-[var(--text-4)] text-[12px] mt-3">
-            Syncs with Marwa every 30s · {blob.plants.length} plants
+            Auto-saves · {blob.plants.length} plants
           </p>
         </div>
         <Button variant="primary" onClick={() => setShowForm(true)}>

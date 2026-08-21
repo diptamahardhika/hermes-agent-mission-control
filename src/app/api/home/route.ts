@@ -115,10 +115,19 @@ export async function GET() {
   }
 
   function buildGithubContributions(result: any) {
-    const cal = result?.status === "fulfilled"
-      ? result.value?.data?.user?.contributionsCollection?.contributionCalendar
-      : null;
+    const col = result?.status === "fulfilled" ? result.value?.data?.user?.contributionsCollection : null;
+    const cal = col?.contributionCalendar;
     if (!cal?.weeks) return null;
+
+    // GitHub precomputes `contributionCalendar.totalContributions` and it can lag
+    // the live total by a while. The per-type counters are computed fresh per
+    // query, so sum those when available.
+    const freshTotal =
+      (col.totalCommitContributions || 0) +
+      (col.totalIssueContributions || 0) +
+      (col.totalPullRequestContributions || 0) +
+      (col.totalPullRequestReviewContributions || 0) +
+      (col.totalRepositoryContributions || 0);
 
     const levelRank: Record<string, number> = {
       NONE: 0, FIRST_QUARTILE: 1, SECOND_QUARTILE: 2, THIRD_QUARTILE: 3, FOURTH_QUARTILE: 4,
@@ -151,7 +160,7 @@ export async function GET() {
     }
 
     return {
-      totalContributions: cal.totalContributions ?? allDays.reduce((s, d) => s + d.count, 0),
+      totalContributions: freshTotal > 0 ? freshTotal : cal.totalContributions ?? allDays.reduce((s, d) => s + d.count, 0),
       currentStreak,
       longestStreak,
       weeks: weeks,
@@ -184,6 +193,11 @@ export async function GET() {
               }
             }
           }
+          totalCommitContributions
+          totalIssueContributions
+          totalPullRequestContributions
+          totalPullRequestReviewContributions
+          totalRepositoryContributions
         }
       }
     }`;
@@ -236,7 +250,7 @@ export async function GET() {
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({ query: GITHUB_CONTRIB_QUERY, variables: { login: GITHUB_USERNAME } }),
-          next: { revalidate: 3600 },
+          cache: "no-store",
         }).then(r => r.json())
       : Promise.resolve(null),
   ]);
@@ -493,6 +507,45 @@ export async function GET() {
     }).catch(() => {});
   } catch { /* non-fatal */ }
 
+  // ─── Homelab (mirrored into DataStore by the bridge) ─────────────────────────
+  let homelab = {
+    connected: false, checkedAt: "",
+    counts: { servers: 0, serversUp: 0, services: 0, servicesUp: 0, containers: 0, runningContainers: 0 },
+    system: null as {
+      hostname: string; os: string; uptime: string;
+      cpu_usage_percent: number; memory_used_percent: number; disk_used_percent: number;
+    } | null,
+  };
+  try {
+    const row = await prisma.dataStore.findUnique({ where: { key: "homelab-monitor" } });
+    const d = row?.data as any;
+    const o = d?.overview;
+    if (o) {
+      const servers = Array.isArray(o.servers) ? o.servers : [];
+      const services = Array.isArray(o.services) ? o.services : [];
+      const containers = Array.isArray(o.containers) ? o.containers : [];
+      const sys = o.system || null;
+      homelab = {
+        connected: true,
+        checkedAt: o.checked_at || d.syncedAt || "",
+        counts: {
+          servers: servers.length,
+          serversUp: servers.filter((s: any) => s.alive).length,
+          services: services.length,
+          servicesUp: services.filter((s: any) => s.status === "up").length,
+          containers: containers.length,
+          runningContainers: containers.filter((c: any) => c.state === "running").length,
+        },
+        system: sys ? {
+          hostname: sys.hostname, os: sys.os, uptime: sys.uptime,
+          cpu_usage_percent: sys.cpu_usage_percent ?? 0,
+          memory_used_percent: sys.memory_used_percent ?? 0,
+          disk_used_percent: sys.disk_used_percent ?? 0,
+        } : null,
+      };
+    }
+  } catch { /* non-fatal */ }
+
   return NextResponse.json({
     // X
     xFollowers: xStats.xFollowers,
@@ -544,6 +597,8 @@ export async function GET() {
       status: GITHUB_STATUS || null,
       contributions: buildGithubContributions(githubContribResult),
     },
+    // Homelab
+    homelab,
     // Legacy
     pendingDrafts: rawPendingDrafts.length,
     tweetIdeas: await prisma.idea.count({ where: { status: { notIn: ["done", "dismissed"] } } }).catch(() => 0),

@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   Github,
+  Server,
 } from "lucide-react";
 
 const navGroups = [
@@ -50,6 +51,7 @@ const navGroups = [
     name: "System",
     items: [
       { href: "/agents", label: "Agents", icon: Bot },
+      { href: "/homelab", label: "Homelab", icon: Server },
       { href: "/memory-wiki", label: "Memory Wiki", icon: BookOpen },
       { href: "/ideas", label: "Ideas", icon: Lightbulb },
       { href: "/garden", label: "Garden", icon: Flower2 },

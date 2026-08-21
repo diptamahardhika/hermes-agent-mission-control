@@ -40,16 +40,23 @@ const BOARD = process.env.HERMES_BOARD || "default";
 const POLL_MS = Number(process.env.BRIDGE_POLL_MS || 5000);
 const MIRROR_MS = Number(process.env.BRIDGE_MIRROR_MS || 30000);
 const RUN_TIMEOUT_MS = Number(process.env.BRIDGE_RUN_TIMEOUT_MS || 240000);
+const HOMELAB_URL = process.env.HOMELAB_MONITOR_URL || "";
+const HOMELAB_TOKEN = process.env.HOMELAB_MONITOR_TOKEN || "";
 const WIKI_DIR = process.env.HERMES_WIKI || path.join(os.homedir(), ".hermes", "wiki");
-const BRIEF_HOUR = Number(process.env.BRIEF_HOUR || 8);   // local hour to auto-generate the daily brief
-const BRIEF_PROMPT =
-  "You are the operator's chief of staff. Produce today's brief. Read your memory wiki open-loops " +
-  "(~/.hermes/wiki), the kanban board, and recent activity. Output ONLY valid JSON (no prose, no code fences) " +
-  'in exactly this shape: {"greeting":"one warm line","summary":"2-3 sentences on where things stand",' +
-  '"sections":[{"label":"Needs your decision","items":["..."]},{"label":"Top priorities","items":["..."]},' +
-  '{"label":"Recently shipped","items":["..."]},{"label":"Next actions","items":["..."]}]}. ' +
-  "Keep every item short, concrete, and specific. Omit a section if it has nothing.";
-let lastBriefDate = null;
+const BRIEFS_DIR = process.env.HERMES_BRIEFS_DIR || path.join(os.homedir(), ".hermes", "briefs");
+// NB: a function, not a const — the timestamp must be computed per run.
+// As a const it froze at process start and every brief greeted with the
+// bridge's boot time ("Good evening …" at 9am, every single run).
+function briefPrompt() {
+  return "You are the operator's chief of staff. Produce today's brief. Read your memory wiki open-loops " +
+    "(~/.hermes/wiki), the kanban board, and recent activity. Output ONLY valid JSON (no prose, no code fences) " +
+    'in exactly this shape: {"greeting":"one warm line","summary":"2-3 sentences on where things stand",' +
+    '"sections":[{"label":"Needs your decision","items":["..."]},{"label":"Top priorities","items":["..."]},' +
+    '{"label":"Recently shipped","items":["..."]},{"label":"Next actions","items":["..."]}]}. ' +
+    "Keep every item short, concrete, and specific. Omit a section if it has nothing. " +
+    `The current date and time is ${new Date().toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} (operator's local time). ` +
+    "Use this to greet with the correct time of day (good morning / good afternoon / good evening) and to describe recent activity accurately.";
+}
 
 const DB_URL = process.env.DATABASE_URL || "";
 if (!DB_URL) { console.error("DATABASE_URL is required (use the direct postgres:// URL, not a prisma:// Accelerate URL)"); process.exit(1); }
@@ -64,9 +71,17 @@ const pool = new pg.Pool({ connectionString: DB_URL, max: 4, ssl: isLocal ? unde
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 const q = (text, params) => pool.query(text, params);
 
-async function hermes(args, { timeout = 30000 } = {}) {
-  const { stdout } = await execFileP(HERMES, args, { timeout, maxBuffer: 8 * 1024 * 1024 });
-  return stdout;
+// The hermes CLI owns a single session slot; concurrent invocations fight over
+// it and fail ("Command failed: hermes ..."). Serialize every call through a
+// chain so mirrors + queue runs never overlap.
+let hermesChain = Promise.resolve();
+function hermes(args, { timeout = 30000 } = {}) {
+  const run = hermesChain.then(async () => {
+    const { stdout } = await execFileP(HERMES, args, { timeout, maxBuffer: 8 * 1024 * 1024 });
+    return stdout;
+  });
+  hermesChain = run.catch(() => {});
+  return run;
 }
 
 async function emit(kind, title, { detail = null, agent = "hermes", level = "info", meta = null } = {}) {
@@ -250,21 +265,85 @@ function parseBriefJson(raw) {
 }
 
 async function generateBriefing() {
-  const raw = (await hermes(["-z", BRIEF_PROMPT], { timeout: RUN_TIMEOUT_MS })).trim();
+  const raw = (await hermes(["-z", briefPrompt()], { timeout: RUN_TIMEOUT_MS })).trim();
   const brief = parseBriefJson(raw);
-  if (typeof brief.summary !== "string") brief.summary = raw.slice(0, 1500);
+  // A real brief always has sections; raw prose (LLM flake) never does. Storing
+  // garbage over a good brief is worse than keeping the old one, so reject it.
+  const valid =
+    typeof brief.summary === "string" && brief.summary.trim().length > 0 &&
+    Array.isArray(brief.sections) && brief.sections.length > 0;
+  if (!valid) {
+    log("brief output not valid JSON; keeping previous brief. head:", raw.slice(0, 200));
+    throw new Error("brief output was not valid JSON — previous brief kept");
+  }
   if (typeof brief.greeting !== "string") delete brief.greeting;
-  brief.generatedAt = new Date().toISOString();
+  // DB clock, not local: the Mac's clock can be briefly wrong after wake and a
+  // skewed generatedAt poisons "x ago" labels and mirrorBrief's dedupe.
+  brief.generatedAt = (await q("SELECT to_char(now() AT TIME ZONE 'GMT', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS t")).rows[0].t;
   await setStore("hermes-briefing", brief);
   await emit("status", "Daily brief generated", { level: "up" });
 }
-async function maybeDailyBrief() {
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  if (now.getHours() >= BRIEF_HOUR && lastBriefDate !== today) {
-    lastBriefDate = today;
-    try { await generateBriefing(); } catch (e) { log("daily brief err", e.message); }
+
+// Mirror the newest completed "Daily brief" kanban card into the
+// hermes-briefing store the dashboard reads. The worker writes the brief JSON
+// to <HERMES_BRIEFS_DIR>/brief.json (a dir: workspace, so it survives the
+// task); HermesTask.result is not reliably populated.
+async function mirrorBrief() {
+  const { rows } = await q(
+    `SELECT title FROM "HermesTask"
+     WHERE title LIKE 'Daily brief%' AND status='done'
+     ORDER BY "updatedAt" DESC LIMIT 1`
+  );
+  if (!rows.length) return;
+  const file = path.join(BRIEFS_DIR, "brief.json");
+  let raw = "", mtime = null;
+  try {
+    const st = fs.statSync(file);
+    raw = fs.readFileSync(file, "utf8");
+    mtime = st.mtime.toISOString();
+  } catch { return; }
+  const brief = parseBriefJson(raw);
+  if (typeof brief.summary !== "string") brief.summary = raw.slice(0, 1500);
+  if (typeof brief.greeting !== "string") delete brief.greeting;
+  const prevRow = (await q(
+    `SELECT data, EXTRACT(EPOCH FROM "updatedAt") AS updated_epoch
+     FROM "DataStore" WHERE key='hermes-briefing'`
+  )).rows[0] ?? {};
+  const prev = prevRow.data ?? {};
+  // Compare against the DB write time (absolute epoch), never the embedded
+  // generatedAt — a locally-skewed generatedAt used to block fresh briefs.
+  if (prevRow.updated_epoch && new Date(mtime).getTime() / 1000 <= Number(prevRow.updated_epoch)) return;
+  if (prev.summary === brief.summary && prev.greeting === brief.greeting && prev.generatedAt === mtime) return;
+  brief.generatedAt = mtime;
+  await setStore("hermes-briefing", brief);
+  await emit("status", "Daily brief synced from kanban", { level: "up" });
+}
+
+/* ─────────────── Homelab Monitor (optional: mirror homelab-monitor state) ─────────────── */
+async function homelabGet(path) {
+  if (!HOMELAB_URL) return null;
+  const headers = {};
+  if (HOMELAB_TOKEN) headers.Authorization = `Bearer ${HOMELAB_TOKEN}`;
+  const res = await fetch(`${HOMELAB_URL}${path}`, { headers, signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`homelab ${path}: HTTP ${res.status}`);
+  return res.json();
+}
+
+async function mirrorHomelab() {
+  if (!HOMELAB_URL) return;
+  const [overview, sysHistory, history] = await Promise.allSettled([
+    homelabGet("/api/overview"),
+    homelabGet("/api/system/history?hours=24"),
+    homelabGet("/api/history"),
+  ]);
+  const data = { syncedAt: new Date().toISOString() };
+  if (overview.status === "fulfilled") data.overview = overview.value;
+  if (sysHistory.status === "fulfilled") data.systemHistory = sysHistory.value;
+  if (history.status === "fulfilled") data.history = history.value;
+  if (overview.status !== "fulfilled" && sysHistory.status !== "fulfilled") {
+    throw new Error("homelab monitor unreachable");
   }
+  await setStore("homelab-monitor", data);
 }
 
 /* ─────────────── PUSH: run website requests via Hermes ─────────────── */
@@ -299,7 +378,6 @@ async function runRequest(r) {
       result = `wrote ${rel}`;
     } else if (r.kind === "briefing.generate") {
       await generateBriefing();
-      lastBriefDate = new Date().toISOString().slice(0, 10);
       result = "brief updated";
     } else {
       throw new Error(`unknown kind ${r.kind}`);
@@ -329,7 +407,8 @@ async function mirrorTick() {
   try { await mirrorHealth(); } catch (e) { log("mirrorHealth err", e.message); }
   try { await mirrorWiki(); } catch (e) { log("mirrorWiki err", e.message); }
   try { await mirrorCost(); } catch (e) { log("mirrorCost err", e.message); }
-  try { await maybeDailyBrief(); } catch (e) { log("maybeDailyBrief err", e.message); }
+  try { await mirrorBrief(); } catch (e) { log("mirrorBrief err", e.message); }
+  try { await mirrorHomelab(); } catch (e) { log("mirrorHomelab err", e.message); }
 }
 
 async function main() {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch } from "lucide-react";
+import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
@@ -92,6 +92,12 @@ interface HomeData {
   xViewsTrend: number[];
   snapshots: { d: string; xf: number; yt: number; pnl: number }[];
   github: GitHubHomeData;
+  homelab: {
+    connected: boolean;
+    checkedAt: string;
+    counts: { servers: number; serversUp: number; services: number; servicesUp: number; containers: number; runningContainers: number };
+    system: { hostname: string; os: string; uptime: string; cpu_usage_percent: number; memory_used_percent: number; disk_used_percent: number } | null;
+  };
 }
 
 const EMPTY: HomeData = {
@@ -106,6 +112,11 @@ const EMPTY: HomeData = {
   hermesKanban: { board: "Hermes 24/7 Assistant", slug: "hermes-24-7-assistant", total: 0, counts: {}, tasks: [] },
   xViewsTrend: [], snapshots: [],
   github: { profile: null, pinnedRepos: [], recentRepos: [], activity: null, status: null, contributions: null },
+  homelab: {
+    connected: false, checkedAt: "",
+    counts: { servers: 0, serversUp: 0, services: 0, servicesUp: 0, containers: 0, runningContainers: 0 },
+    system: null,
+  },
 };
 
 // ── Animated counter ──────────────────────────────────────
@@ -211,7 +222,7 @@ function IdeasPanel({ sageDrafts, ytIdeas, buildIdeas }: {
   ];
 
   return (
-    <div className="panel flex flex-col p-6 h-full">
+    <div className="panel flex flex-col p-6">
       <div className="flex items-center justify-between mb-4">
         <span className="eyebrow">Top Ideas</span>
         <div className="flex gap-1 rounded-lg border border-[var(--hq-hairline)] p-0.5">
@@ -273,7 +284,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 // ── Top tweets ────────────────────────────────────────────
 function TopTweetsPanel({ tweets }: { tweets: Tweet[] }) {
   return (
-    <div className="panel flex flex-col p-6 h-full">
+    <div className="panel flex flex-col p-6">
       <div className="flex items-center gap-2 mb-4">
         <Twitter className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
         <span className="eyebrow">Top Tweets · 7d</span>
@@ -308,7 +319,7 @@ function XAnalyticsPanel({ views, trend, totalTweets, bestDay, bestHour }: {
   views: number; trend: number[]; totalTweets: number; bestDay: string; bestHour: string;
 }) {
   return (
-    <div className="panel flex flex-col p-6 h-full">
+    <div className="panel flex flex-col p-6">
       <div className="flex items-center gap-2 mb-4">
         <Twitter className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
         <span className="eyebrow">X Analytics</span>
@@ -431,7 +442,7 @@ function GitHubHomeCard({
   contributions: GitHubContributions | null;
 }) {
   return (
-    <div className="panel flex flex-col p-6 h-full">
+    <div className="panel flex flex-col p-6">
       {/* Avatar + name */}
       <div className="flex items-center gap-3 mb-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -564,6 +575,119 @@ function GitHubHomeCard({
   );
 }
 
+// ── Homelab card for dashboard home ─────────────────────────
+function HomelabHomeCard({ homelab }: { homelab: HomeData["homelab"] }) {
+  const c = homelab.counts;
+  const sys = homelab.system;
+  const allUp = c.servers > 0 && c.serversUp === c.servers && c.servicesUp === c.services;
+
+  const bar = (pct: number, color: string) => (
+    <div className="h-[4px] flex-1 rounded-full bg-white/[0.06] overflow-hidden">
+      <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: color, transition: "width 1s var(--ease)" }} />
+    </div>
+  );
+
+  return (
+    <div className="panel flex flex-col p-6 flex-1">
+      {/* Status header */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="relative flex w-2 h-2">
+          <span className={`absolute inline-flex h-full w-full rounded-full animate-ping opacity-50 ${allUp ? "bg-emerald-400" : "bg-rose-400"}`} />
+          <span className={`relative inline-flex w-2 h-2 rounded-full ${allUp ? "bg-emerald-400" : "bg-rose-400"}`} />
+        </span>
+        <span className="eyebrow">Homelab</span>
+        <span className="ml-auto num text-[10px] text-[var(--hq-text-ghost)]">
+          {homelab.checkedAt ? `${timeAgo(homelab.checkedAt)}` : ""}
+        </span>
+      </div>
+
+      {!homelab.connected ? (
+        <>
+          <p className="text-[13px] text-[var(--hq-text-dim)]">Not connected</p>
+          <p className="text-[11px] text-[var(--hq-text-ghost)] mt-1 leading-snug">
+            Set HOMELAB_MONITOR_URL on the bridge to start mirroring.
+          </p>
+        </>
+      ) : (
+        <>
+          {/* Status + host */}
+          <div className="mb-4">
+            <div className="text-[15px] font-semibold text-[var(--hq-text)] tracking-tight">
+              {allUp ? "All systems operational" : "Incidents detected"}
+            </div>
+            <div className="num text-[11px] text-[var(--hq-text-ghost)] mt-0.5">
+              {sys ? `${sys.hostname} · up ${sys.uptime}` : ""}
+            </div>
+          </div>
+
+          {/* Servers + services big numbers */}
+          <div className="grid grid-cols-2 gap-2.5 mb-3">
+            <div className="rounded-lg border border-[var(--hq-hairline)] bg-white/[0.02] px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Server className="w-3.5 h-3.5 text-[var(--hq-text-ghost)] shrink-0" />
+                <span className="eyebrow !text-[9px]">Servers</span>
+              </div>
+              <div className="num text-[20px] font-semibold mt-1" style={{ color: allUp ? "var(--hq-up)" : "var(--hq-down)" }}>
+                {c.serversUp}<span className="text-[13px] text-[var(--hq-text-ghost)] font-normal">/{c.servers}</span>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--hq-hairline)] bg-white/[0.02] px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Box className="w-3.5 h-3.5 text-[var(--hq-text-ghost)] shrink-0" />
+                <span className="eyebrow !text-[9px]">Services</span>
+              </div>
+              <div className="num text-[20px] font-semibold mt-1" style={{ color: c.servicesUp === c.services ? "var(--hq-up)" : "var(--hq-warn)" }}>
+                {c.servicesUp}<span className="text-[13px] text-[var(--hq-text-ghost)] font-normal">/{c.services}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Host resources */}
+          {sys && (
+            <div className="space-y-2.5 mt-auto">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[var(--hq-text-ghost)]">
+                    <Cpu className="w-3 h-3" /> CPU
+                  </span>
+                  <span className="num text-[10.5px] text-[var(--hq-text-dim)]">{sys.cpu_usage_percent.toFixed(0)}%</span>
+                </div>
+                {bar(sys.cpu_usage_percent, "#38bdf8")}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[var(--hq-text-ghost)]">
+                    <MemoryStick className="w-3 h-3" /> RAM
+                  </span>
+                  <span className="num text-[10.5px] text-[var(--hq-text-dim)]">{sys.memory_used_percent.toFixed(0)}%</span>
+                </div>
+                {bar(sys.memory_used_percent, "#a78bfa")}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[var(--hq-text-ghost)]">
+                    <HardDrive className="w-3 h-3" /> Disk
+                  </span>
+                  <span className="num text-[10.5px] text-[var(--hq-text-dim)]">{sys.disk_used_percent.toFixed(0)}%</span>
+                </div>
+                {bar(sys.disk_used_percent, "#34d399")}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <a
+        href="/homelab"
+        className="mt-3 pt-3 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group border-t border-[var(--hq-hairline)]"
+      >
+        Open Homelab dashboard
+        <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </a>
+    </div>
+  );
+}
+
 // ── Agents strip ──────────────────────────────────────────
 function AgentsStrip({ processes }: { processes: Process[] }) {
   if (processes.length === 0) return null;
@@ -595,7 +719,7 @@ function HermesKanbanPanel({ kanban }: { kanban: HermesKanban }) {
   };
   const entries = Object.entries(kanban.counts || {});
   return (
-    <div className="panel flex flex-col p-6 h-full">
+    <div className="panel flex flex-col p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="min-w-0">
           <span className="eyebrow">Hermes Board</span>
@@ -746,27 +870,17 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ── Platform stacks: X (with analytics) · YouTube (with video) ─ */}
+        {/* ── Platform stacks: GitHub · Homelab · X ─ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-          {/* X */}
-          <div className="flex flex-col gap-5 hq-rise" style={rise(1)}>
-            <MetricCard
-              label="X Followers" value={data.xFollowers} format={fmtExact}
-              delta={xd.delta} deltaPct={xd.deltaPct} deltaLabel={xd.label} trend={xd.series}
-              goal={data.xGoal} goalFormat={fmt}
-              icon={<Twitter className="w-4 h-4" />} accent="#38bdf8" href="/x" loaded={loaded}
-            />
-            <XAnalyticsPanel views={data.xViewsThisWeek} trend={xViewsSeries} totalTweets={data.totalTweets} bestDay={data.bestPostingDay} bestHour={data.bestPostingHourStr} />
-          </div>
           {/* GitHub */}
-          <div className="flex flex-col gap-5 hq-rise" style={rise(2)}>
+          <div className="flex flex-col gap-5 hq-rise" style={rise(1)}>
             <MetricCard
               label="GitHub Contributions"
               value={data.github?.contributions?.totalContributions ?? 0}
               format={fmtExact}
               delta={null} deltaPct={null} deltaLabel={undefined} trend={[]}
               goal={undefined} goalFormat={undefined}
-              icon={<Github className="w-4 h-4" />} accent="#f0b132" href="/github" loaded={loaded}
+              icon={<Github className="w-4 h-4" />} accent="#f0b132" href="/github" loaded={loaded} fill={false}
             />
             {data.github?.profile && (
               <GitHubHomeCard
@@ -777,6 +891,28 @@ export default function Dashboard() {
                 contributions={data.github.contributions}
               />
             )}
+          </div>
+          {/* Homelab */}
+          <div className="flex flex-col gap-5 hq-rise" style={rise(2)}>
+            <MetricCard
+              label="Homelab"
+              value={data.homelab?.connected ? data.homelab.counts.serversUp : 0}
+              format={(n) => data.homelab?.connected ? `${n}/${data.homelab.counts.servers}` : "—"}
+              delta={null} deltaPct={null} deltaLabel={undefined} trend={[]}
+              goal={undefined} goalFormat={undefined}
+              icon={<Server className="w-4 h-4" />} accent="#34d399" href="/homelab" loaded={loaded} fill={false}
+            />
+            <HomelabHomeCard homelab={data.homelab} />
+          </div>
+          {/* X — full width, after Homelab */}
+          <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-5 hq-rise" style={rise(3)}>
+            <MetricCard
+              label="X Followers" value={data.xFollowers} format={fmtExact}
+              delta={xd.delta} deltaPct={xd.deltaPct} deltaLabel={xd.label} trend={xd.series}
+              goal={data.xGoal} goalFormat={fmt}
+              icon={<Twitter className="w-4 h-4" />} accent="#38bdf8" href="/x" loaded={loaded}
+            />
+            <XAnalyticsPanel views={data.xViewsThisWeek} trend={xViewsSeries} totalTweets={data.totalTweets} bestDay={data.bestPostingDay} bestHour={data.bestPostingHourStr} />
           </div>
         </div>
 

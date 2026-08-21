@@ -2,10 +2,9 @@
  * Momentum Score — Weekly Performance Score (last 7 days)
  *
  * Components:
- *   X Performance   35%  — Weekly tweet views + engagement
- *   YouTube Growth  20%  — New subscribers this week
- *   Trading         20%  — Win rate (not P&L — skill > luck)
- *   Content Output  25%  — Posts made + quality this week
+ *   GitHub          50%   — Contributions this week
+ *   X Performance   30%   — Weekly tweet views + engagement
+ *   Content Output  20%   — Posts made + quality this week
  */
 
 import { NextResponse } from "next/server";
@@ -96,44 +95,7 @@ export async function GET() {
     : weeklyViews >= 1_000    ? 25
     : 10;
 
-  // ── 2. YouTube Growth (20%) ────────────────────────────────
-  const currentYtSubs = parseInt(process.env.YT_SUBSCRIBERS || "0");
-  let ytGrowth    = parseInt(process.env.YT_WEEK_NEW_SUBS || "0");
-  let ytSubsWeekAgo = ytGrowth > 0 ? currentYtSubs - ytGrowth : currentYtSubs;
-
-  if (ytGrowth === 0) {
-    try {
-      const row = await prisma.dataStore.findUnique({ where: { key: "score-snapshots" } });
-      const snapshots = (row?.data as any[]) ?? [];
-      const target = new Date(weekAgo).toISOString().slice(0, 10);
-      const past = snapshots.filter((s: any) => s.date <= target).sort((a: any, b: any) => b.date.localeCompare(a.date));
-      if (past.length > 0) {
-        ytSubsWeekAgo = past[0].ytSubscribers;
-        ytGrowth = Math.max(0, currentYtSubs - ytSubsWeekAgo);
-      }
-    } catch { /* ignore */ }
-  }
-
-  const ytGrowthPct = ytSubsWeekAgo > 0 ? (ytGrowth / ytSubsWeekAgo) * 100 : 0;
-
-  const ytScoreFromGrowth = ytGrowth >= 1000 ? 100
-    : ytGrowth >= 500 ? 90
-    : ytGrowth >= 200 ? 80
-    : ytGrowth >= 100 ? 70
-    : ytGrowth >= 50  ? 58
-    : ytGrowth >= 20  ? 45
-    : ytGrowth >= 5   ? 30
-    : ytGrowth >= 1   ? 15
-    : 5;
-
-  const ytGrowthBonus = ytGrowthPct >= 200 ? 15
-    : ytGrowthPct >= 100 ? 10
-    : ytGrowthPct >= 50  ? 5
-    : 0;
-
-  const ytScore = Math.min(100, ytScoreFromGrowth + ytGrowthBonus);
-
-  // ── 3. Trading P&L (20%) ──────────────────────────────────
+  // ── 2. Trading P&L (dead) ─────────────────────────────────
   const weekPolyPnl = parseFloat(process.env.POLY_WEEK_PNL || "0");
   const weekHlPnl   = parseFloat(process.env.HL_WEEK_PNL   || "0");
   const weekPnl     = weekPolyPnl + weekHlPnl;
@@ -150,7 +112,7 @@ export async function GET() {
     : weekPnl >= -100 ? 12
     : 5;
 
-  // ── 4. Content Output (25%) ───────────────────────────────
+  // ── 3. Content Output (20%) ───────────────────────────────
   const consistencyScore = weeklyPosts >= 7 ? 100
     : weeklyPosts >= 5 ? 88
     : weeklyPosts >= 3 ? 75
@@ -165,7 +127,7 @@ export async function GET() {
 
   const contentScore = Math.min(100, consistencyScore + viralBonus);
 
-  // ── 5. GitHub Contributions (15%) ─────────────────────────
+  // ── 4. GitHub Contributions (50%) ─────────────────────────
   const weeklyGithub = await weeklyGithubContributions();
   const githubScore = weeklyGithub === null ? 10
     : weeklyGithub >= 100 ? 100
@@ -177,7 +139,7 @@ export async function GET() {
     : 10;
 
   // ── Final score ────────────────────────────────────────────
-  const raw   = xScore * 0.35 + ytScore * 0.20 + contentScore * 0.30 + githubScore * 0.15;
+  const raw   = xScore * 0.30 + contentScore * 0.20 + githubScore * 0.50;
   const score = Math.round(Math.min(100, Math.max(0, raw)));
 
   const grade = score >= 90 ? "S" : score >= 80 ? "A" : score >= 70 ? "B" : score >= 60 ? "C" : score >= 50 ? "D" : "F";
@@ -188,14 +150,12 @@ export async function GET() {
     score, grade, label, color,
     period: "last 7 days",
     components: {
-      x:       { score: Math.round(xScore),       weight: 0.35, label: "X Performance",    detail: weeklyViews > 0 ? `${(weeklyViews/1000).toFixed(0)}K views` : "No data" },
-      youtube: { score: Math.round(ytScore),      weight: 0.20, label: "YouTube Growth",   detail: ytGrowth > 0 ? `+${ytGrowth} subs (${ytGrowthPct.toFixed(0)}%)` : "Tracking..." },
-      github:  { score: Math.round(githubScore),  weight: 0.15, label: "GitHub Activity",  detail: weeklyGithub === null ? "No token" : `${weeklyGithub} contributions (7d)` },
-      content: { score: Math.round(contentScore), weight: 0.30, label: "Content Output",   detail: `${weeklyPosts} posts${bestTweetViews > 100000 ? ` · ${(bestTweetViews/1000000).toFixed(1)}M best` : ""}` },
+      x:       { score: Math.round(xScore),       weight: 0.30, label: "X Performance",    detail: weeklyViews > 0 ? `${(weeklyViews/1000).toFixed(0)}K views` : "No data" },
+      github:  { score: Math.round(githubScore),  weight: 0.50, label: "GitHub Activity",  detail: weeklyGithub === null ? "No token" : `${weeklyGithub} contributions (7d)` },
+      content: { score: Math.round(contentScore), weight: 0.20, label: "Content Output",   detail: `${weeklyPosts} posts${bestTweetViews > 100000 ? ` · ${(bestTweetViews/1000000).toFixed(1)}M best` : ""}` },
     },
     inputs: {
       weeklyViews, weeklyPosts, bestTweetViews,
-      currentYtSubs, ytSubsWeekAgo, ytGrowth, ytGrowthPct,
       weekPnl, weekPolyPnl, weekHlPnl,
       weeklyGithub,
     },

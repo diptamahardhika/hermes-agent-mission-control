@@ -44,12 +44,13 @@ export interface MetricCardProps {
   href?: string;
   loaded?: boolean;
   className?: string;
+  fill?: boolean;
 }
 
 export function MetricCard({
   label, value, format = (n) => n.toLocaleString("en-US"),
   delta = null, deltaPct = null, deltaLabel, trend, goal, goalFormat,
-  icon, accent = "#a1a1aa", href, loaded = true, className = "",
+  icon, accent = "#a1a1aa", href, loaded = true, className = "", fill = true,
 }: MetricCardProps) {
   const counted = useCountUp(value, 1600, loaded);
 
@@ -63,7 +64,7 @@ export function MetricCard({
   const pct = goal && goal > 0 ? Math.min((value / goal) * 100, 100) : null;
 
   const inner = (
-    <div className={`panel panel-interactive flex flex-col p-6 h-full ${className}`}>
+    <div className={`panel panel-interactive flex flex-col p-6 ${fill ? "h-full" : ""} ${className}`}>
       {/* label row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
@@ -117,5 +118,5 @@ export function MetricCard({
     </div>
   );
 
-  return href ? <a href={href} className="block h-full">{inner}</a> : inner;
+  return href ? <a href={href} className={`block ${fill ? "h-full" : ""}`}>{inner}</a> : inner;
 }
