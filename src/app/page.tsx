@@ -478,7 +478,7 @@ function AIModelNewsPanel() {
             </div>
             <div>
               <div className="eyebrow mb-1 !text-[9.5px]">
-                Free Models{news.totalFree != null && <span className="num text-[var(--hq-text-ghost)] font-normal"> · {news.totalFree} live</span>}
+                FREE MODELS{news.totalFree != null && <span className="num text-[var(--hq-text-ghost)] font-normal"> · {news.totalFree} live</span>}
               </div>
               {news.freeModels.length
                 ? news.freeModels.map(m => <Row key={m.id} m={m} />)
