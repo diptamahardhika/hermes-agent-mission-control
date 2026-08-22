@@ -1159,8 +1159,8 @@ export default function Dashboard() {
         <div className="mt-14">
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="hq-rise" style={rise(6)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
             <div className="hq-rise" style={rise(6)}><AIModelNewsPanel /></div>
+            <div className="hq-rise" style={rise(6)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
           </div>
         </div>
 
