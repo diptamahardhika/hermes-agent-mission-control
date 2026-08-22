@@ -4,7 +4,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   Fragment,
 } from "react";
@@ -45,10 +44,10 @@ type MemStatus = "active" | "superseded" | "archived";
 interface Entry {
   id: string;
   path: string;
-  type: MemType;
+  type: string; // free-form: the bridge mirrors whatever the wiki files declare
   title: string;
   status: MemStatus;
-  confidence: number | null;
+  confidence: number | string | null;
   provenance: string | null;
   tags: string[];
   links: string[];
@@ -80,9 +79,9 @@ const TYPES: MemType[] = [
 
 type Tone = "neutral" | "up" | "down" | "warn" | "accent";
 function typeTone(t: string): Tone {
-  if (t === "decision") return "accent";
+  if (t === "decision" || t === "snapshot") return "accent";
   if (t === "lesson") return "warn";
-  if (t === "project") return "up";
+  if (t === "project" || t === "person") return "up";
   return "neutral";
 }
 
@@ -125,9 +124,22 @@ async function getJSON<T>(url: string): Promise<T | null> {
 }
 
 // ── Confidence dot ────────────────────────────────────────
-function confidenceMeta(c: number): { label: string; color: string } {
-  // Accept 0–1 or 0–100 scales.
-  const v = c > 1 ? c / 100 : c;
+// Wiki spec allows word scale (high | medium | low); mirror may also carry
+// numbers on 0–1 or 0–100 scales. Normalize all three.
+function confidenceValue(c: number | string): number {
+  if (typeof c === "string") {
+    const w = c.trim().toLowerCase();
+    if (w === "high") return 0.9;
+    if (w === "medium") return 0.6;
+    if (w === "low") return 0.3;
+    const n = Number(w);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return c > 1 ? c / 100 : c;
+}
+
+function confidenceMeta(c: number | string): { label: string; color: string } {
+  const v = confidenceValue(c);
   if (v >= 0.75) return { label: "high confidence", color: "var(--up)" };
   if (v >= 0.4) return { label: "medium confidence", color: "var(--warn)" };
   return { label: "low confidence", color: "var(--down)" };
@@ -669,7 +681,13 @@ export default function MemoryWikiPage() {
   }, [load]);
 
   const chips = useMemo(() => {
-    return TYPES.filter((t) => (typeCounts[t] ?? 0) > 0).map((t) => ({
+    // Canonical types first (declared order), then any extra types the wiki
+    // actually contains — so every pill color has a matching filter chip.
+    const known = TYPES.filter((t) => (typeCounts[t] ?? 0) > 0);
+    const extra = Object.keys(typeCounts)
+      .filter((t) => !TYPES.includes(t as MemType) && (typeCounts[t] ?? 0) > 0)
+      .sort();
+    return [...known, ...extra].map((t) => ({
       type: t,
       count: typeCounts[t] ?? 0,
     }));

@@ -167,14 +167,20 @@ async function mirrorHealth() {
 function parseEntry(md) {
   const m = md.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   const fm = {}; let body = md;
+  const unq = (s) => {
+    const t = s.trim();
+    if (t.length >= 2 && ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))))
+      return t.slice(1, -1).trim();
+    return t;
+  };
   if (m) {
     body = m[2];
     for (const line of m[1].split("\n")) {
       const kv = line.match(/^([A-Za-z_]+):\s*(.*)$/);
       if (!kv) continue;
       const v = kv[2].trim();
-      if (v.startsWith("[") && v.endsWith("]")) fm[kv[1]] = v.slice(1, -1).split(",").map((s) => s.trim()).filter(Boolean);
-      else fm[kv[1]] = v === "null" || v === "" ? null : v;
+      if (v.startsWith("[") && v.endsWith("]")) fm[kv[1]] = v.slice(1, -1).split(",").map((s) => unq(s)).filter(Boolean);
+      else fm[kv[1]] = v === "null" || v === "" ? null : unq(v);
     }
   }
   return { fm, body: body.trim() };
