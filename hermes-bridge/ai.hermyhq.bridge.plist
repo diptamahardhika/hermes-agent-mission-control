@@ -24,6 +24,10 @@
          hermes-bridge/.env (gitignored). See bridge.mjs. -->
     <key>HERMES_BOARD</key>
     <string>default</string>
+    <!-- Briefs routinely run 2-10 min (slower when Hermes falls back to free
+         models). The 600s default killed healthy runs at exactly 10 min. -->
+    <key>BRIDGE_RUN_TIMEOUT_MS</key>
+    <string>900000</string>
     <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/YOU/.local/bin</string>
   </dict>
