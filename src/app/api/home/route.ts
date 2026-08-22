@@ -114,7 +114,29 @@ export async function GET() {
     };
   }
 
-  function buildGithubContributions(result: any) {
+  // GitHub's contribution pipeline lags reality by minutes-to-hours (a merged
+  // PR can take hours to register on the calendar). The REST events feed is
+  // near-instant, so estimate today's contributions from it — used ONLY to
+  // fill a zero day; once the calendar reports, its number wins.
+  function estimateTodayContributions(eventsResult: { status: string; value?: unknown }): number {
+    const events = eventsResult?.status === "fulfilled" && Array.isArray(eventsResult.value)
+      ? (eventsResult.value as Array<{ type?: string; created_at?: string; payload?: Record<string, unknown> }>)
+      : [];
+    const today = new Date().toISOString().slice(0, 10);
+    let n = 0;
+    for (const ev of events) {
+      if ((ev.created_at || "").slice(0, 10) !== today) continue;
+      if (ev.type === "PushEvent") n += 1;
+      else if (ev.type === "PullRequestEvent") {
+        const a = ev.payload?.action;
+        if (a === "opened" || a === "merged") n += 1;
+      } else if (ev.type === "IssuesEvent" && ev.payload?.action === "opened") n += 1;
+      else if (ev.type === "CreateEvent" && ev.payload?.ref_type === "repository") n += 1;
+    }
+    return n;
+  }
+
+  function buildGithubContributions(result: any, todayBoost: number) {
     const col = result?.status === "fulfilled" ? result.value?.data?.user?.contributionsCollection : null;
     const cal = col?.contributionCalendar;
     if (!cal?.weeks) return null;
@@ -140,6 +162,22 @@ export async function GET() {
       return { date: d.date, count, level: levelRank[d.contributionLevel] ?? (count > 0 ? 1 : 0) };
     }));
 
+    // Patch today's cell if GitHub hasn't credited it yet — must run BEFORE
+    // streak math so a lagging zero doesn't break the streak.
+    let boosted = false;
+    if (todayBoost > 0) {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const cell = allDays.find(d => d.date === todayKey);
+      if (!cell || cell.count === 0) {
+        boosted = true;
+        if (cell) cell.count = todayBoost;
+        for (const week of weeks) {
+          const c = week.find(d => d.date === todayKey);
+          if (c && c.count === 0) { c.count = todayBoost; c.level = Math.max(c.level, 1); }
+        }
+      }
+    }
+
     let currentStreak = 0;
     const dayCount = new Map(allDays.map(d => [d.date, d.count]));
     const cursor = new Date();
@@ -160,7 +198,7 @@ export async function GET() {
     }
 
     return {
-      totalContributions: freshTotal > 0 ? freshTotal : cal.totalContributions ?? allDays.reduce((s, d) => s + d.count, 0),
+      totalContributions: (freshTotal > 0 ? freshTotal : cal.totalContributions ?? allDays.reduce((s, d) => s + d.count, 0)) + (boosted ? todayBoost : 0),
       currentStreak,
       longestStreak,
       weeks: weeks,
@@ -243,7 +281,7 @@ export async function GET() {
       ? fetch(githubReposUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json())
       : Promise.resolve(null),
     GITHUB_USERNAME && githubEventsUrl && GITHUB_TOKEN
-      ? fetch(githubEventsUrl, { headers, next: { revalidate: 600 } }).then(r => r.json())
+      ? fetch(githubEventsUrl, { headers, cache: "no-store" }).then(r => r.json())
       : Promise.resolve(null),
     GITHUB_TOKEN
       ? fetch("https://api.github.com/graphql", {
@@ -595,7 +633,7 @@ export async function GET() {
         ? githubEventsResult.value
         : null,
       status: GITHUB_STATUS || null,
-      contributions: buildGithubContributions(githubContribResult),
+      contributions: buildGithubContributions(githubContribResult, estimateTodayContributions(githubEventsResult)),
     },
     // Homelab
     homelab,
