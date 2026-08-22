@@ -529,6 +529,14 @@ async function runRequest(r) {
 }
 
 async function processQueue() {
+  // Reclaim orphans: a bridge restart (or crash) mid-run leaves the row stuck
+  // at 'running' forever — nothing ever picks it up again. Anything running
+  // longer than the run timeout cannot still be alive, so fail it.
+  await q(
+    `UPDATE "AgentRequest" SET status='failed', error=$2, "finishedAt"=now(), "updatedAt"=now()
+     WHERE status='running' AND "startedAt" < now() - make_interval(secs => $1)`,
+    [Math.ceil(RUN_TIMEOUT_MS / 1000) + 60, `[${HOST}] reclaimed: run exceeded timeout (bridge likely restarted mid-run)`]
+  );
   // Atomic claim: the subquery locks candidate rows (SKIP LOCKED), so when two
   // bridges poll the same DB each request is claimed by exactly one runner —
   // no double hermes runs, and startedAt marks who moved first.
