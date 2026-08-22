@@ -412,7 +412,7 @@ interface ModelCard {
   contextLength: number | null; free: boolean;
   createdAt: number | null; inputs: string[]; tags: string[];
 }
-interface AINewsData { newModels: ModelCard[]; freeModels: ModelCard[]; totalFree: number; fetchedAt: string | null }
+interface AINewsData { newModels: ModelCard[]; freeModels: ModelCard[]; totalFree: number; news: { title: string; url: string; source: string; publishedAt: number | null }[]; fetchedAt: string | null }
 
 function AIModelNewsPanel() {
   const [news, setNews] = useState<AINewsData | null>(null);
@@ -460,26 +460,47 @@ function AIModelNewsPanel() {
     <div className="panel flex flex-col p-6">
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
-        <span className="eyebrow">AI Models · Newest &amp; Free</span>
-        {news?.totalFree != null && (
-          <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">{news.totalFree} free live</span>
-        )}
+        <span className="eyebrow">AI Models &amp; News</span>
       </div>
       {!news ? (
-        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">Loading OpenRouter catalog…</div>
-      ) : news.newModels.length === 0 && news.freeModels.length === 0 ? (
-        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">No catalog data available right now.</div>
+        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">Loading OpenRouter catalog &amp; AI news…</div>
+      ) : news.newModels.length === 0 && news.freeModels.length === 0 && news.news.length === 0 ? (
+        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">No catalog or news data available right now.</div>
       ) : (
-        <div className="space-y-4">
-          <div>
-            <div className="eyebrow mb-1 !text-[9.5px]">New releases · 30 days</div>
-            {(news.newModels.length ? news.newModels : []).map(m => <Row key={m.id} m={m} />)}
-            {!news.newModels.length && <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">None in the last 30 days.</div>}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-x-8 gap-y-4">
+          {/* Left: model lists */}
+          <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <div>
+              <div className="eyebrow mb-1 !text-[9.5px]">New releases · 30 days</div>
+              {news.newModels.length
+                ? news.newModels.map(m => <Row key={m.id} m={m} />)
+                : <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">None in the last 30 days.</div>}
+            </div>
+            <div>
+              <div className="eyebrow mb-1 !text-[9.5px]">
+                Free Models{news.totalFree != null && <span className="num text-[var(--hq-text-ghost)] font-normal"> · {news.totalFree} live</span>}
+              </div>
+              {news.freeModels.length
+                ? news.freeModels.map(m => <Row key={m.id} m={m} />)
+                : <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">No free models listed.</div>}
+            </div>
           </div>
-          <div>
-            <div className="eyebrow mb-1 !text-[9.5px]">Free to use</div>
-            {news.freeModels.map(m => <Row key={m.id} m={m} />)}
-            {!news.freeModels.length && <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">No free models listed.</div>}
+          {/* Right: AI news headlines */}
+          <div className="lg:col-span-2 lg:border-l lg:border-[var(--hq-hairline)] lg:pl-6">
+            <div className="eyebrow mb-1 !text-[9.5px]">AI News</div>
+            {news.news.length
+              ? news.news.map((n, i) => (
+                  <a
+                    key={`${n.url}-${i}`}
+                    href={n.url}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-baseline gap-2 py-1.5 border-b border-[var(--hq-hairline)] last:border-0 group"
+                  >
+                    <span className="text-[11px] text-[var(--hq-text-dim)] leading-snug line-clamp-2 flex-1 group-hover:text-[var(--hq-text)] transition-colors">{n.title}</span>
+                    <span className="shrink-0 text-[9px] uppercase tracking-wide text-[var(--hq-text-ghost)]">{n.source}</span>
+                  </a>
+                ))
+              : <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">No headlines fetched.</div>}
           </div>
         </div>
       )}
@@ -1155,11 +1176,18 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* ── AI model news ───────────────────────────────── */}
+        <div className="mt-14">
+          <SectionLabel>AI Models</SectionLabel>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="lg:col-span-2 hq-rise" style={rise(6)}><AIModelNewsPanel /></div>
+          </div>
+        </div>
+
         {/* ── Signal ──────────────────────────────────────── */}
         <div className="mt-14">
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="hq-rise" style={rise(6)}><AIModelNewsPanel /></div>
             <div className="hq-rise" style={rise(6)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
           </div>
         </div>
