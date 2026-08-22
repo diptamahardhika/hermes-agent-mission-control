@@ -183,7 +183,7 @@ export default function GitHubPage() {
         .then((r) => r.ok ? r.json() : null)
         .then((d) => { if (d?.profile) setData(d as GitHubData); })
         .catch(() => {});
-    }, 5 * 60 * 1000);
+    }, 60 * 1000);
     return () => clearInterval(iv);
   }, []);
 
@@ -401,7 +401,7 @@ export default function GitHubPage() {
 
       {/* ── Footer note ──────────────────────────────────────── */}
       <div className="mt-8 text-center text-[11px] text-[var(--hq-text-ghost)]">
-        Data from GitHub API · refreshes every 5 min
+        Data from GitHub API · refreshes every minute
       </div>
     </div>
   );

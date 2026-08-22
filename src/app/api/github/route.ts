@@ -75,9 +75,14 @@ export async function GET() {
       GITHUB_TOKEN
         ? fetch(`https://api.github.com/users/${GITHUB_USERNAME}/pinned/repos?per_page=6`, { headers: headers(), next: { revalidate: 3600 } })
         : Promise.resolve(null),
-      fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=10&type=all`, { headers: headers(), next: { revalidate: 3600 } }),
+      // Authenticated /user/repos includes private repos (the public
+      // /users/:login/repos endpoint hides them entirely) and sort=pushed
+      // reflects actual work, not metadata touches.
       GITHUB_TOKEN
-        ? fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events?per_page=50`, { headers: headers(), next: { revalidate: 600 } })
+        ? fetch(`https://api.github.com/user/repos?type=owner&sort=pushed&per_page=100`, { headers: headers(), cache: "no-store" })
+        : fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=10&type=all`, { headers: headers(), next: { revalidate: 3600 } }),
+      GITHUB_TOKEN
+        ? fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events?per_page=50`, { headers: headers(), cache: "no-store" })
         : Promise.resolve(null),
     ]);
 
@@ -147,45 +152,89 @@ export async function GET() {
 
     // ── Activity summary (from public events) ───────────────────────
     let activity: ActivitySummary | null = null;
+    let lastWorkedRepo = "";
     if (eventsRes.status === "fulfilled" && eventsRes.value && eventsRes.value.ok) {
       const events: any[] = await eventsRes.value.json();
+
+      // Latest "working on" = freshest push or merged PR within 14 days,
+      // derived live instead of a static env string. Events arrive
+      // newest-first, so the first match is the most recent.
+      const workedCutoff = Date.now() - 14 * 86400000;
+      for (const ev of events) {
+        const t = new Date(ev.created_at).getTime();
+        if (!(t >= workedCutoff)) continue;
+        const isWork =
+          ev.type === "PushEvent" ||
+          (ev.type === "PullRequestEvent" && ev.payload?.action === "merged");
+        if (isWork) {
+          lastWorkedRepo = String(ev.repo?.name || "").split("/").pop() || "";
+          break;
+        }
+      }
       const now = new Date();
       const weekStart = new Date(now.getTime() - 7 * 86400000);
       const monthStart = new Date(now.getTime() - 30 * 86400000);
 
       let pushesThisWeek = 0;
       let pushesThisMonth = 0;
-      let reposThisWeek = new Set<string>();
+      const reposThisWeek = new Set<string>();
 
       const recentEvents: ActivitySummary["recentEvents"] = [];
 
+      // NB: GitHub strips commit details (payload.commits/size) from event
+      // payloads, so a PushEvent carries no count — count each push as one.
       for (const ev of events) {
         const createdAt = new Date(ev.created_at);
         const repoName = ev.repo?.name || "";
-        const commitCount = ev.type === "PushEvent" ? ev.payload?.commits?.length || 0 : 0;
 
-        // Count pushes this week / month
         if (ev.type === "PushEvent") {
           if (createdAt >= weekStart) {
-            pushesThisWeek += commitCount;
+            pushesThisWeek += 1;
             reposThisWeek.add(repoName);
           }
           if (createdAt >= monthStart) {
-            pushesThisMonth += commitCount;
+            pushesThisMonth += 1;
           }
         }
 
         // Collect recent notable events
         if (recentEvents.length < 8) {
-          const eventLabel = ({
-            PushEvent: `Pushed ${commitCount || 1} commit${commitCount !== 1 ? "s" : ""}`,
-            CreateEvent: `Created ${ev.payload?.ref_type || "resource"}`,
-            PullRequestEvent: `${ev.payload?.action || "PR"} ${ev.payload?.pull_request?.title || ""}`,
-            IssuesEvent: `${ev.payload?.action || "issue"}`,
-            ReleaseEvent: `Released ${ev.payload?.release?.tag_name || ""}`,
-            WatchEvent: "Starred",
-            ForkEvent: "Forked",
-          } as Record<string, string | undefined>)[ev.type];
+          const branch =
+            typeof ev.payload?.ref === "string"
+              ? ev.payload.ref.replace(/^refs\/heads\//, "")
+              : "";
+          const nCommits = Array.isArray(ev.payload?.commits)
+            ? ev.payload.commits.length
+            : Number(ev.payload?.size) || 0;
+          const prNum = ev.payload?.pull_request?.number;
+          const prTitle: string = ev.payload?.pull_request?.title || "";
+          const issueNum = ev.payload?.issue?.number;
+          const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+          let eventLabel: string | undefined;
+          switch (ev.type) {
+            case "PushEvent":
+              eventLabel = `Pushed${branch ? ` ${branch}` : ""}${nCommits ? ` · ${nCommits} commit${nCommits !== 1 ? "s" : ""}` : ""}`;
+              break;
+            case "CreateEvent":
+              eventLabel = `Created ${ev.payload?.ref_type || "resource"}${branch && ev.payload?.ref_type !== "repository" ? ` ${branch}` : ""}`;
+              break;
+            case "PullRequestEvent":
+              eventLabel = `${cap(ev.payload?.action || "updated")} PR${prNum ? ` #${prNum}` : ""}${prTitle ? ` · ${prTitle}` : ""}`;
+              break;
+            case "IssuesEvent":
+              eventLabel = `${cap(ev.payload?.action || "updated")} issue${issueNum ? ` #${issueNum}` : ""}`;
+              break;
+            case "ReleaseEvent":
+              eventLabel = `Released ${ev.payload?.release?.tag_name || ""}`;
+              break;
+            case "WatchEvent":
+              eventLabel = "Starred";
+              break;
+            case "ForkEvent":
+              eventLabel = "Forked";
+              break;
+          }
 
           if (eventLabel) {
             recentEvents.push({
@@ -212,7 +261,12 @@ export async function GET() {
         pinnedRepos,
         recentRepos,
         activity,
-        status: GITHUB_STATUS || null,
+        status:
+          lastWorkedRepo
+            ? `Working on ${lastWorkedRepo}`
+            : recentRepos[0]?.name
+              ? `Working on ${recentRepos[0].name}`
+              : GITHUB_STATUS || null,
         fetchedAt: new Date().toISOString(),
       },
       { headers: { "Cache-Control": "no-store, no-cache" } }
