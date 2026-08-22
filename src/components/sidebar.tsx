@@ -91,15 +91,8 @@ export function Sidebar() {
     <div className="flex items-center gap-2.5">
       <div className="w-8 h-8 rounded-[10px] bg-gradient-to-br from-[#14161c] to-[#0a0b0d] border border-white/10 flex items-center justify-center relative shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
         <svg viewBox="0 0 64 64" className="w-5 h-5" aria-hidden>
-          <defs>
-            <linearGradient id="logo-hgrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#5EEAD4"/>
-              <stop offset="0.55" stopColor="#38BDF8"/>
-              <stop offset="1" stopColor="#818CF8"/>
-            </linearGradient>
-          </defs>
           <path d="M20 18 v28 M44 18 v28 M20 32 h24"
-                stroke="url(#logo-hgrad)" strokeWidth={9} strokeLinecap="round" fill="none"/>
+                stroke="#38BDF8" strokeWidth={9} strokeLinecap="round" fill="none"/>
         </svg>
         <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#34D399] shadow-[0_0_6px_rgba(52,211,153,0.8)]"/>
       </div>
