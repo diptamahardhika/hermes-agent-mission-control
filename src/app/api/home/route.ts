@@ -172,7 +172,7 @@ export async function GET() {
         boosted = true;
         if (cell) cell.count = todayBoost;
         for (const week of weeks) {
-          const c = week.find(d => d.date === todayKey);
+          const c = week.find((d: any) => d.date === todayKey);
           if (c && c.count === 0) { c.count = todayBoost; c.level = Math.max(c.level, 1); }
         }
       }

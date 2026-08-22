@@ -307,7 +307,7 @@ function EntryCard({
               <Pill tone="neutral">{entry.status}</Pill>
             )}
             {entry.confidence != null && (
-              <ConfidenceDot value={entry.confidence} />
+              <ConfidenceDot value={Number(entry.confidence)} />
             )}
           </div>
           <h3 className="text-[15px] font-medium text-[var(--text)] leading-snug truncate">
@@ -424,7 +424,7 @@ function draftFrom(e: Entry): Draft {
     id: e.id,
     path: e.path,
     title: e.title,
-    type: e.type,
+    type: e.type as MemType,
     tags: e.tags.join(", "),
     status: e.status,
     confidence: e.confidence != null ? String(e.confidence) : "",
