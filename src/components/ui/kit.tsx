@@ -151,6 +151,7 @@ export function Button({
   type = "button",
   disabled,
   className = "",
+  suppressHydrationWarning,
 }: {
   children: React.ReactNode;
   variant?: "primary" | "ghost";
@@ -160,6 +161,7 @@ export function Button({
   type?: "button" | "submit";
   disabled?: boolean;
   className?: string;
+  suppressHydrationWarning?: boolean;
 }) {
   const pad = size === "sm" ? "px-3 py-1.5 text-[12px]" : "px-4 py-2 text-[13px]";
   const cls = `inline-flex items-center justify-center gap-1.5 font-medium ${pad} ${
@@ -167,7 +169,7 @@ export function Button({
   } ${disabled ? "opacity-40 pointer-events-none" : ""} ${className}`;
   if (href) return <a href={href} className={cls}>{children}</a>;
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className={cls}>
+    <button type={type} onClick={onClick} disabled={disabled} className={cls} suppressHydrationWarning={suppressHydrationWarning}>
       {children}
     </button>
   );

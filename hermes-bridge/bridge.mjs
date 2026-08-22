@@ -36,10 +36,14 @@ for (const line of fs.existsSync(path.join(__dirname, ".env")) ? fs.readFileSync
 
 const execFileP = promisify(execFile);
 const HERMES = process.env.HERMES_BIN || "hermes";
+const HOST = os.hostname();
 const BOARD = process.env.HERMES_BOARD || "default";
 const POLL_MS = Number(process.env.BRIDGE_POLL_MS || 5000);
 const MIRROR_MS = Number(process.env.BRIDGE_MIRROR_MS || 30000);
-const RUN_TIMEOUT_MS = Number(process.env.BRIDGE_RUN_TIMEOUT_MS || 240000);
+// NB: briefs routinely run 4-8 min (worse when the credential pool is dry and
+// Hermes falls back to a free model). The original 240s default killed every
+// long brief with a bare "Command failed" — raise it and override via env.
+const RUN_TIMEOUT_MS = Number(process.env.BRIDGE_RUN_TIMEOUT_MS || 600000);
 const HOMELAB_URL = process.env.HOMELAB_MONITOR_URL || "";
 const HOMELAB_TOKEN = process.env.HOMELAB_MONITOR_TOKEN || "";
 const WIKI_DIR = process.env.HERMES_WIKI || path.join(os.homedir(), ".hermes", "wiki");
@@ -53,7 +57,8 @@ function briefPrompt() {
     'in exactly this shape: {"greeting":"one warm line","summary":"2-3 sentences on where things stand",' +
     '"sections":[{"label":"Needs your decision","items":["..."]},{"label":"Top priorities","items":["..."]},' +
     '{"label":"Recently shipped","items":["..."]},{"label":"Next actions","items":["..."]}]}. ' +
-    "Keep every item short, concrete, and specific. Omit a section if it has nothing. " +
+    "Keep every item short, concrete, and specific. " +
+    "Always include all four sections in this exact order — use an empty items array for a section with nothing. " +
     `The current date and time is ${new Date().toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} (operator's local time). ` +
     "Use this to greet with the correct time of day (good morning / good afternoon / good evening) and to describe recent activity accurately.";
 }
@@ -142,14 +147,99 @@ async function mirrorCrons() {
   } catch (e) { log("cron list failed:", e.message.split("\n")[0]); }
 }
 
-async function mirrorCost() {
-  for (const args of [["insights", "--days", "7"], ["insights"]]) {
-    try {
-      const out = await hermes(args, { timeout: 15000 });
-      await setStore("hermes-cost", { summary: out.slice(0, 4000), syncedAt: new Date().toISOString() });
-      return;
-    } catch { /* try next arg shape */ }
+// Parse the fixed-text output of `hermes insights` into structured usage data.
+// The CLI has no --json flag (verified), so this regexes the Overview block and
+// the Models Used table. Returns nulls for anything not found — never guesses.
+export function parseInsights(text) {
+  const num = (s) => Number(String(s).replace(/,/g, ""));
+  const grab = (re) => { const m = text.match(re); return m ? num(m[1]) : null; };
+  const data = {
+    sessions: grab(/Sessions:\s*([\d,]+)/),
+    messages: grab(/Messages:\s*([\d,]+)/),
+    toolCalls: grab(/Tool calls:\s*([\d,]+)/),
+    inputTokens: grab(/Input tokens:\s*([\d,]+)/),
+    outputTokens: grab(/Output tokens:\s*([\d,]+)/),
+    totalTokens: grab(/Total tokens:\s*([\d,]+)/),
+    byModel: [],
+  };
+  const modelsIdx = text.indexOf("Models Used");
+  if (modelsIdx !== -1) {
+    const seg = text.slice(modelsIdx);
+    const table = seg.includes("\n\n") ? seg.slice(0, seg.indexOf("\n\n")) : seg;
+    for (const line of table.split("\n")) {
+      // e.g. "  solar-pro4:free     129   136,714,672"
+      const m = line.match(/^\s{2}(\S.*?)\s{2,}(\d+)\s+([\d,]+)\s*$/);
+      if (m) data.byModel.push({ model: m[1].trim(), sessions: num(m[2]), tokens: num(m[3]) });
+    }
   }
+  return data;
+}
+
+async function mirrorCost() {
+  let out = null;
+  for (const args of [["insights", "--days", "7"], ["insights"]]) {
+    try { out = await hermes(args, { timeout: 15000 }); break; } catch { /* try next arg shape */ }
+  }
+  if (!out) return;
+  const parsed = parseInsights(out);
+
+  // Per-model input/output split, read directly from Hermes's local state.db
+  // (session_model_usage). The insights CLI only prints totals per model.
+  try {
+    const { stdout } = await execFileP("sqlite3", [
+      path.join(os.homedir(), ".hermes", "state.db"),
+      `SELECT model, SUM(input_tokens), SUM(output_tokens) FROM session_model_usage
+       WHERE last_seen > strftime('%s','now') - 7*86400 GROUP BY model ORDER BY SUM(input_tokens)+SUM(output_tokens) DESC;`,
+    ], { timeout: 10000 });
+    const byModelMap = new Map(parsed.byModel.map((m) => [m.model, m]));
+    for (const line of stdout.trim().split("\n")) {
+      const [model, inTok, outTok] = line.split("|");
+      if (!model || !/^\d+$/.test(inTok ?? "") || !/^\d+$/.test(outTok ?? "")) continue;
+      // Insights names are display aliases (e.g. "solar-pro4:free" for
+      // "upstage/solar-pro4:free") — match on suffix.
+      let entry = byModelMap.get(model);
+      if (!entry) {
+        for (const [k, v] of byModelMap) {
+          if (k === model || model.endsWith("/" + k)) { entry = v; break; }
+        }
+      }
+      if (entry) {
+        entry.inputTokens = Number(inTok);
+        entry.outputTokens = Number(outTok);
+      } else {
+        const e = { model, sessions: 0, tokens: Number(inTok) + Number(outTok), inputTokens: Number(inTok), outputTokens: Number(outTok) };
+        parsed.byModel.push(e);
+        byModelMap.set(model, e);
+      }
+    }
+    parsed.byModel.sort((a, b) => (b.tokens ?? 0) - (a.tokens ?? 0));
+  } catch (e) { log("model token split unavailable:", e.message?.split("\n")[0]); }
+
+  await setStore("hermes-cost", { summary: out.slice(0, 4000), ...parsed, syncedAt: new Date().toISOString() });
+
+  // Daily snapshot ring buffer: each sync stamps today's trailing-7-day totals.
+  // Day-over-day deltas between snapshots approximate daily usage and power the
+  // home dashboard's spend sparkline. Only stamp when we actually parsed tokens,
+  // so a parse failure can't poison the history with zeros.
+  if (parsed.totalTokens == null) return;
+  const today = new Date().toISOString().slice(0, 10);
+  let days = [];
+  try {
+    const histRow = await q(`SELECT data FROM "DataStore" WHERE key='hermes-cost-history'`);
+    const d = histRow.rows[0]?.data;
+    const obj = typeof d === "string" ? JSON.parse(d) : d;
+    if (Array.isArray(obj?.days)) days = obj.days;
+  } catch { /* fresh history */ }
+  const entry = {
+    date: today,
+    totalTokens: parsed.totalTokens,
+    inputTokens: parsed.inputTokens,
+    outputTokens: parsed.outputTokens,
+    sessions: parsed.sessions,
+  };
+  const i = days.findIndex((d) => d.date === today);
+  if (i >= 0) days[i] = entry; else days.push(entry);
+  await setStore("hermes-cost-history", { days: days.slice(-60) });
 }
 
 async function mirrorHealth() {
@@ -247,7 +337,8 @@ async function gitCommitWiki(msg) {
 
 // Tolerant JSON parser: LLMs fumble strict JSON (single-quoted keys, trailing
 // commas, stray fences). Repair the common quirks before giving up, and never
-// store the raw JSON blob as the summary text.
+// store the raw JSON blob as the summary text. Returns { brief, parsed } —
+// `parsed` is false only when NO JSON object could be recovered (raw prose).
 function parseBriefJson(raw) {
   const obj = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim().match(/\{[\s\S]*\}/)?.[0] ?? raw;
   const attempts = [
@@ -257,37 +348,63 @@ function parseBriefJson(raw) {
       s.replace(/(^|[,{\[])\s*'([^']+)'\s*:/g, '$1"$2":')
        .replace(/,(\s*[}\]])/g, "$1")
     ),
+    // single-quoted keys, then ANY remaining single-quoted tokens (values,
+    // array items) -> double-quoted. Apostrophes inside double-quoted text
+    // can't match (need a closing quote), so prose survives; if an attempt
+    // throws we just fall through to the next one.
+    (s) => JSON.parse(
+      s.replace(/(^|[,{\[])\s*'([^']+)'\s*:/g, '$1"$2":')
+       .replace(/'([^'\n]*)'/g, (m, v) => '"' + v.replace(/"/g, '\\"') + '"')
+       .replace(/,(\s*[}\]])/g, "$1")
+    ),
     (s) => JSON.parse(s.replace(/,(\s*[}\]])/g, "$1")),
     (s) => JSON.parse(s.replace(/(^|[,{\[])\s*'([^']+)'\s*:/g, '$1"$2":')),
   ];
   for (const parse of attempts) {
-    try { const b = parse(obj); if (b && typeof b === "object") return b; } catch { /* try next */ }
+    try { const b = parse(obj); if (b && typeof b === "object") return { brief: b, parsed: true }; } catch { /* try next */ }
   }
   // Last resort: pull the readable bits out by regex instead of showing raw JSON.
   // Tolerate either quote char as the value delimiter (models sometimes close with ').
   const greeting = raw.match(/"greeting"\s*:\s*["']([^"']*?)["']/)?.[1] ?? null;
   const summary = raw.match(/"summary"\s*:\s*["']([\s\S]*?)["'](?=\s*[,}\]]|$)/)?.[1] ?? raw.slice(0, 1500);
-  return { greeting, summary, sections: [] };
+  return { brief: { greeting, summary, sections: [] }, parsed: false };
 }
 
 async function generateBriefing() {
-  const raw = (await hermes(["-z", briefPrompt()], { timeout: RUN_TIMEOUT_MS })).trim();
-  const brief = parseBriefJson(raw);
-  // A real brief always has sections; raw prose (LLM flake) never does. Storing
-  // garbage over a good brief is worse than keeping the old one, so reject it.
-  const valid =
-    typeof brief.summary === "string" && brief.summary.trim().length > 0 &&
-    Array.isArray(brief.sections) && brief.sections.length > 0;
-  if (!valid) {
-    log("brief output not valid JSON; keeping previous brief. head:", raw.slice(0, 200));
-    throw new Error("brief output was not valid JSON — previous brief kept");
+  // Weak/fallback models fumble structured output; a single flake used to fail
+  // the whole dispatch. Briefs are idempotent, so retry — worst case we keep
+  // the previous brief (never store garbage over a good one).
+  const attempts = Number(process.env.BRIDGE_BRIEF_ATTEMPTS || 3);
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    if (attempt > 1) await new Promise((r) => setTimeout(r, 2000));
+    let raw = "";
+    try {
+      raw = (await hermes(["-z", briefPrompt()], { timeout: RUN_TIMEOUT_MS })).trim();
+    } catch (e) {
+      log(`brief attempt ${attempt}/${attempts}: cli error`, (e.message || e).toString().split("\n")[0].slice(0, 160));
+      continue;
+    }
+    const { brief, parsed } = parseBriefJson(raw);
+    // A strict/repaired JSON object IS a brief even with zero sections (every
+    // section legitimately empty). Only raw prose with no recoverable JSON
+    // stays invalid — storing that over a good brief is worse than keeping it.
+    const valid = parsed && typeof brief.summary === "string" && brief.summary.trim().length > 0;
+    if (valid) {
+      if (typeof brief.greeting !== "string") delete brief.greeting;
+      // DB clock, not local: the Mac's clock can be briefly wrong after wake and a
+      // skewed generatedAt poisons "x ago" labels and mirrorBrief's dedupe.
+      brief.generatedAt = (await q("SELECT to_char(now() AT TIME ZONE 'GMT', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS t")).rows[0].t;
+      await setStore("hermes-briefing", brief);
+      await emit("status", "Daily brief generated", { level: "up" });
+      if (attempt > 1) log(`brief generated on attempt ${attempt}/${attempts}`);
+      return;
+    }
+    // Keep the full payload for post-mortem — the head alone hid why valid-looking
+    // output failed validation.
+    try { fs.writeFileSync(path.join(os.tmpdir(), "hermes-brief-failed.json"), raw); } catch { /* best effort */ }
+    log(`brief attempt ${attempt}/${attempts}: output not valid JSON; head:`, raw.slice(0, 800));
   }
-  if (typeof brief.greeting !== "string") delete brief.greeting;
-  // DB clock, not local: the Mac's clock can be briefly wrong after wake and a
-  // skewed generatedAt poisons "x ago" labels and mirrorBrief's dedupe.
-  brief.generatedAt = (await q("SELECT to_char(now() AT TIME ZONE 'GMT', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS t")).rows[0].t;
-  await setStore("hermes-briefing", brief);
-  await emit("status", "Daily brief generated", { level: "up" });
+  throw new Error(`brief output was not valid JSON after ${attempts} attempts — previous brief kept`);
 }
 
 // Mirror the newest completed "Daily brief" kanban card into the
@@ -308,7 +425,7 @@ async function mirrorBrief() {
     raw = fs.readFileSync(file, "utf8");
     mtime = st.mtime.toISOString();
   } catch { return; }
-  const brief = parseBriefJson(raw);
+  const { brief } = parseBriefJson(raw);
   if (typeof brief.summary !== "string") brief.summary = raw.slice(0, 1500);
   if (typeof brief.greeting !== "string") delete brief.greeting;
   const prevRow = (await q(
@@ -354,8 +471,10 @@ async function mirrorHomelab() {
 
 /* ─────────────── PUSH: run website requests via Hermes ─────────────── */
 async function runRequest(r) {
-  await q(`UPDATE "AgentRequest" SET status='running', "startedAt"=now(), "updatedAt"=now() WHERE id=$1`, [r.id]);
-  await emit("run", `Started: ${r.title}`, { level: "info", meta: { requestId: r.id, kind: r.kind } });
+  const t0 = Date.now();
+  // Status is already 'running' — processQueue claims rows atomically
+  // (FOR UPDATE SKIP LOCKED) so two bridges can never double-run a request.
+  await emit("run", `Started: ${r.title}`, { level: "info", meta: { requestId: r.id, kind: r.kind, host: HOST } });
   try {
     let result = "";
     if (r.kind === "oneshot" || r.kind === "chat") {
@@ -390,18 +509,38 @@ async function runRequest(r) {
     }
     await q(`UPDATE "AgentRequest" SET status='done', result=$2, "finishedAt"=now(), "updatedAt"=now() WHERE id=$1`,
       [r.id, result.slice(0, 8000)]);
-    await emit("run", `Done: ${r.title}`, { level: "up", detail: result.slice(0, 400), meta: { requestId: r.id } });
+    await emit("run", `Done: ${r.title}`, { level: "up", detail: result.slice(0, 400), meta: { requestId: r.id, host: HOST } });
+    log(`request done: ${r.id} ${r.kind} in ${Math.round((Date.now() - t0) / 1000)}s`);
   } catch (e) {
-    const msg = (e.stderr || e.message || "error").toString().split("\n")[0].slice(0, 600);
+    // The old code stored `e.stderr || e.message`, which for a timeout kill is
+    // the generic "Command failed: hermes -z <700-char prompt>" — the actual
+    // cause (signal/exit/duration/output) never fit in the 600-char budget.
+    const durS = Math.round((Date.now() - t0) / 1000);
+    const bits = [];
+    if (e.killed || e.signal) bits.push(`killed by ${e.signal || "signal"}${e.timeout ? ` after ${Math.round(e.timeout / 1000)}s` : ""}`);
+    else if (e.code != null && e.code !== 0) bits.push(`exit ${e.code}`);
+    const tail = (s) => (s || "").toString().trim().split("\n").slice(-3).join(" | ").slice(0, 300);
+    const body = tail(e.stderr) || tail(e.stdout) || (e.message || "error").split("\n")[0];
+    const msg = `[${HOST}] ${r.kind} failed after ${durS}s: ${bits.length ? bits.join(", ") + " — " : ""}${body}`.slice(0, 600);
     await q(`UPDATE "AgentRequest" SET status='failed', error=$2, "finishedAt"=now(), "updatedAt"=now() WHERE id=$1`, [r.id, msg]);
-    await emit("run", `Failed: ${r.title}`, { level: "down", detail: msg, meta: { requestId: r.id } });
+    await emit("run", `Failed: ${r.title}`, { level: "down", detail: msg, meta: { requestId: r.id, host: HOST } });
     log("request failed:", r.id, msg);
   }
 }
 
 async function processQueue() {
+  // Atomic claim: the subquery locks candidate rows (SKIP LOCKED), so when two
+  // bridges poll the same DB each request is claimed by exactly one runner —
+  // no double hermes runs, and startedAt marks who moved first.
   const { rows } = await q(
-    `SELECT * FROM "AgentRequest" WHERE status IN ('queued','approved') ORDER BY "createdAt" ASC LIMIT 3`
+    `UPDATE "AgentRequest" SET status='running', "startedAt"=now(), "updatedAt"=now()
+     WHERE id IN (
+       SELECT id FROM "AgentRequest"
+       WHERE status IN ('queued','approved')
+       ORDER BY "createdAt" ASC LIMIT 3
+       FOR UPDATE SKIP LOCKED
+     )
+     RETURNING *`
   );
   for (const r of rows) await runRequest(r);
 }
@@ -418,8 +557,8 @@ async function mirrorTick() {
 }
 
 async function main() {
-  log(`hermes-bridge up · board=${BOARD} · poll=${POLL_MS}ms · mirror=${MIRROR_MS}ms`);
-  await emit("status", "Bridge connected", { level: "up" });
+  log(`hermes-bridge up · host=${HOST} · board=${BOARD} · poll=${POLL_MS}ms · mirror=${MIRROR_MS}ms · run-timeout=${RUN_TIMEOUT_MS}ms`);
+  await emit("status", "Bridge connected", { level: "up", meta: { host: HOST } });
   await mirrorTick();
   setInterval(() => mirrorTick().catch((e) => log("mirror loop", e.message)), MIRROR_MS);
   // queue loop
