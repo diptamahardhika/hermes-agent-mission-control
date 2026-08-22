@@ -471,7 +471,7 @@ function AIModelNewsPanel() {
           {/* Left: model lists */}
           <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div>
-              <div className="eyebrow mb-1 !text-[9.5px]">New releases · 30 days</div>
+              <div className="eyebrow mb-1 !text-[9.5px]">NEW RELEASES · 30 DAYS</div>
               {news.newModels.length
                 ? news.newModels.map(m => <Row key={m.id} m={m} />)
                 : <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">None in the last 30 days.</div>}
@@ -487,7 +487,7 @@ function AIModelNewsPanel() {
           </div>
           {/* Right: AI news headlines */}
           <div className="lg:col-span-2 lg:border-l lg:border-[var(--hq-hairline)] lg:pl-6">
-            <div className="eyebrow mb-1 !text-[9.5px]">AI News</div>
+            <div className="eyebrow mb-1 !text-[9.5px]">AI NEWS</div>
             {news.news.length
               ? news.news.map((n, i) => (
                   <a
