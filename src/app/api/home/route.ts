@@ -584,6 +584,50 @@ export async function GET() {
     }
   } catch { /* non-fatal */ }
 
+  // ─── Agent compute spend (mirrored by the bridge from `hermes insights`) ─────
+  let spend: {
+    syncedAt: string | null;
+    totalTokens: number | null;
+    inputTokens: number | null;
+    outputTokens: number | null;
+    sessions: number | null;
+    toolCalls: number | null;
+    byModel: { model: string; sessions: number; tokens: number }[];
+    days: { date: string; tokens: number }[];
+  } = {
+    syncedAt: null, totalTokens: null, inputTokens: null, outputTokens: null,
+    sessions: null, toolCalls: null, byModel: [], days: [],
+  };
+  try {
+    const [costRow, histRow] = await Promise.all([
+      prisma.dataStore.findUnique({ where: { key: "hermes-cost" } }),
+      prisma.dataStore.findUnique({ where: { key: "hermes-cost-history" } }),
+    ]);
+    const c = (costRow?.data ?? {}) as Record<string, unknown>;
+    const rawDays = ((histRow?.data as { days?: { date: string; totalTokens?: number | null }[] } | null)?.days ?? []);
+    // Day-over-day deltas of the bridge's daily snapshots ≈ daily usage.
+    const days = rawDays.map((d, i) => {
+      const prev = i > 0 ? rawDays[i - 1] : undefined;
+      const tokens =
+        prev?.totalTokens != null && d.totalTokens != null
+          ? Math.max(0, d.totalTokens - prev.totalTokens)
+          : 0;
+      return { date: d.date, tokens };
+    });
+    spend = {
+      syncedAt: (c.syncedAt as string) ?? null,
+      totalTokens: (c.totalTokens as number) ?? null,
+      inputTokens: (c.inputTokens as number) ?? null,
+      outputTokens: (c.outputTokens as number) ?? null,
+      sessions: (c.sessions as number) ?? null,
+      toolCalls: (c.toolCalls as number) ?? null,
+      byModel: Array.isArray(c.byModel)
+        ? (c.byModel as { model: string; sessions: number; tokens: number }[])
+        : [],
+      days,
+    };
+  } catch { /* non-fatal */ }
+
   return NextResponse.json({
     // X
     xFollowers: xStats.xFollowers,
@@ -637,6 +681,8 @@ export async function GET() {
     },
     // Homelab
     homelab,
+    // Agent compute spend
+    spend,
     // Legacy
     pendingDrafts: rawPendingDrafts.length,
     tweetIdeas: await prisma.idea.count({ where: { status: { notIn: ["done", "dismissed"] } } }).catch(() => 0),

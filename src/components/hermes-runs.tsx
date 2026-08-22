@@ -34,6 +34,8 @@ interface ModelUsage {
   tokens?: number;
   cost?: number;
   calls?: number;
+  inputTokens?: number;
+  outputTokens?: number;
 }
 
 interface Cost {
@@ -41,6 +43,8 @@ interface Cost {
   byModel?: ModelUsage[];
   totalCost?: number | null;
   totalTokens?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
   syncedAt?: string | null;
 }
 
@@ -172,9 +176,18 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
     );
   }
 
-  // Bars are relative to the largest per-model magnitude (tokens, else cost, else calls).
-  const magnitude = (m: ModelUsage) => m.tokens ?? m.cost ?? m.calls ?? 0;
-  const max = byModel.reduce((mx, m) => Math.max(mx, magnitude(m)), 0) || 1;
+  // Sorted most→least usage, always — independent of how the store happens to
+  // hold the rows. Bars use a sqrt scale: linear widths vanish next to the
+  // dominant model (60%+ of total), sqrt keeps every model visible while
+  // preserving the ranking read.
+  const hasSplit = byModel.some((m) => m.inputTokens != null && m.outputTokens != null);
+  const modelTotal = (m: ModelUsage) =>
+    m.inputTokens != null && m.outputTokens != null
+      ? m.inputTokens + m.outputTokens
+      : m.tokens ?? m.cost ?? m.calls ?? 0;
+  const sorted = [...byModel].sort((a, b) => (modelTotal(b) ?? 0) - (modelTotal(a) ?? 0));
+  const max = byModel.reduce((mx, m) => Math.max(mx, modelTotal(m) ?? 0), 0) || 1;
+  const grand = byModel.reduce((s, m) => s + (modelTotal(m) ?? 0), 0) || 1;
 
   return (
     <Panel className="p-5">
@@ -205,34 +218,90 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
         </p>
       )}
 
+      {cost?.inputTokens != null && cost?.outputTokens != null && cost.inputTokens + cost.outputTokens > 0 && (
+        <div className="mt-4">
+          <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
+            <div style={{ width: `${Math.round((cost.inputTokens / (cost.inputTokens + cost.outputTokens)) * 100)}%`, background: "#a78bfa" }} />
+            <div style={{ width: `${100 - Math.round((cost.inputTokens / (cost.inputTokens + cost.outputTokens)) * 100)}%`, background: "#38bdf8" }} />
+          </div>
+          <div className="flex items-center justify-between mt-1.5 text-[10px] num text-[var(--hq-text-ghost)]">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#a78bfa" }} />
+              in {fmtTokens(cost.inputTokens)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              out {fmtTokens(cost.outputTokens)}
+              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#38bdf8" }} />
+            </span>
+          </div>
+        </div>
+      )}
+
       {byModel.length > 0 && (
-        <div className="mt-5 pt-4 border-t border-[var(--line)] flex flex-col gap-2.5">
-          <Eyebrow>By model</Eyebrow>
-          {byModel.map((m) => {
-            const val = magnitude(m);
-            const pct = Math.max(3, Math.round((val / max) * 100));
+        <div className="mt-5 pt-4 border-t border-[var(--line)] flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <Eyebrow>By model</Eyebrow>
+            {hasSplit && (
+              <span className="num text-[10px] text-[var(--text-3)] inline-flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#a78bfa" }} />
+                  in
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#38bdf8" }} />
+                  out
+                </span>
+                <span className="opacity-60">· √ scale</span>
+              </span>
+            )}
+          </div>
+          {sorted.map((m) => {
+            const split = m.inputTokens != null && m.outputTokens != null && m.inputTokens + m.outputTokens > 0;
+            const total = modelTotal(m) ?? 0;
+            const widthPct = Math.max(2, Math.round(Math.sqrt(total / max) * 100));
+            const sharePct = Math.round((total / grand) * 100);
+            const inPct = split ? Math.round((m.inputTokens! / (m.inputTokens! + m.outputTokens!)) * 100) : 100;
             return (
               <div key={m.model} className="flex items-center gap-3">
-                <span className="text-[12px] text-[var(--text-2)] w-40 shrink-0 truncate">
+                <span className="text-[12px] text-[var(--text-2)] w-36 shrink-0 truncate">
                   {m.model}
                 </span>
                 <div className="flex-1 h-[6px] rounded-full bg-[var(--surface-2)] overflow-hidden">
                   <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${pct}%`,
-                      background: "color-mix(in srgb, var(--accent) 70%, transparent)",
-                    }}
-                  />
+                    className="flex h-full rounded-full overflow-hidden transition-all duration-700 ease-out"
+                    style={{ width: `${widthPct}%` }}
+                  >
+                    {split ? (
+                      <>
+                        <div className="h-full" style={{ width: `${inPct}%`, background: "#a78bfa", opacity: 0.9 }} />
+                        <div className="h-full" style={{ width: `${100 - inPct}%`, background: "#38bdf8", opacity: 0.85 }} />
+                      </>
+                    ) : (
+                      <div
+                        className="h-full w-full"
+                        style={{
+                          // Neutral: total known, in/out split unknown.
+                          background: "color-mix(in srgb, var(--text-2) 50%, transparent)",
+                        }}
+                      />
+                    )}
+                  </div>
                 </div>
-                <span className="num text-[11px] text-[var(--text-3)] shrink-0 w-24 text-right">
-                  {m.tokens != null
+                <span className="num text-[11px] text-[var(--text-3)] shrink-0 w-44 text-right tabular-nums whitespace-nowrap">
+                  {split ? (
+                    <>
+                      <span style={{ color: "#a78bfa" }}>in</span> {fmtTokens(m.inputTokens!)}
+                      {" "}
+                      <span style={{ color: "#38bdf8" }}>out</span> {fmtTokens(m.outputTokens!)}
+                    </>
+                  ) : m.tokens != null
                     ? `${fmtTokens(m.tokens)} tok`
                     : m.cost != null
                       ? fmtUsd(m.cost)
                       : m.calls != null
                         ? `${m.calls} calls`
                         : "—"}
+                  <span className="text-[var(--text-2)] ml-2">{sharePct}%</span>
                 </span>
               </div>
             );

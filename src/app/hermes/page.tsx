@@ -233,7 +233,7 @@ function DispatchBar({ onDone }: { onDone: () => void }) {
 
   return (
     <Panel className="p-5">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3" suppressHydrationWarning>
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -242,13 +242,15 @@ function DispatchBar({ onDone }: { onDone: () => void }) {
           }}
           placeholder="Ask or tell Hermes to do something…"
           className="flex-1 min-w-0 bg-transparent text-[14px] text-[var(--text)] placeholder:text-[var(--text-3)] px-3.5 py-2.5 rounded-[10px] border border-[var(--line)] focus:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] outline-none transition-colors"
+          suppressHydrationWarning
         />
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0" suppressHydrationWarning>
           <button
             type="button"
             onClick={() => setSide((s) => !s)}
             aria-pressed={side}
             className="flex items-center gap-2 select-none"
+            suppressHydrationWarning
           >
             <span
               className="relative inline-flex h-[18px] w-[32px] rounded-full transition-colors"
@@ -268,7 +270,7 @@ function DispatchBar({ onDone }: { onDone: () => void }) {
               side-effecting?
             </span>
           </button>
-          <Button variant="primary" onClick={submit} disabled={busy || !text.trim()}>
+          <Button variant="primary" onClick={submit} disabled={busy || !text.trim()} suppressHydrationWarning>
             <Send className="w-3.5 h-3.5" />
             Dispatch
           </Button>
@@ -782,6 +784,34 @@ export default function HermesPage() {
     return () => clearInterval(iv);
   }, [load]);
 
+  // The page scrolls inside <main class="overflow-auto">, not the window, so
+  // native #hash navigation lands at the top. Async-fed sections above #runs
+  // also change height after mount, which shifts the target — so keep
+  // correcting the scroll until the element's position settles.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+    let lastTop = -1;
+    let stableTicks = 0;
+    let first = true;
+    const t = setInterval(() => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      if (lastTop >= 0 && Math.abs(top - lastTop) < 2 && stableTicks >= 2) {
+        clearInterval(t);
+        return;
+      }
+      if (lastTop >= 0 && Math.abs(top - lastTop) >= 2) stableTicks = 0;
+      el.scrollIntoView({ behavior: first ? "smooth" : "auto", block: "start" });
+      first = false;
+      if (lastTop >= 0 && Math.abs(top - lastTop) < 2) stableTicks++;
+      lastTop = top;
+    }, 300);
+    const stop = setTimeout(() => clearInterval(t), 5000);
+    return () => { clearInterval(t); clearTimeout(stop); };
+  }, []);
+
   const manualRefresh = async () => {
     setRefreshing(true);
     await load();
@@ -901,7 +931,7 @@ export default function HermesPage() {
         </section>
 
         {/* Observability — runs & usage */}
-        <section className="mt-12">
+        <section id="runs" className="mt-12 scroll-mt-24">
           <HermesRuns />
         </section>
       </div>

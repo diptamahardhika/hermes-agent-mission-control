@@ -45,12 +45,15 @@ export interface MetricCardProps {
   loaded?: boolean;
   className?: string;
   fill?: boolean;
+  /** Optional mini-visualizations rendered below the big value. */
+  children?: React.ReactNode;
 }
 
 export function MetricCard({
   label, value, format = (n) => n.toLocaleString("en-US"),
   delta = null, deltaPct = null, deltaLabel, trend, goal, goalFormat,
   icon, accent = "#a1a1aa", href, loaded = true, className = "", fill = true,
+  children,
 }: MetricCardProps) {
   const counted = useCountUp(value, 1600, loaded);
 
@@ -88,6 +91,9 @@ export function MetricCard({
       <div className="mt-5 num font-semibold leading-[0.95] tracking-[-0.02em] text-[52px] text-[var(--hq-text)]">
         {format(counted)}
       </div>
+
+      {/* custom mini-viz slot */}
+      {children}
 
       {/* sparkline */}
       {series && (

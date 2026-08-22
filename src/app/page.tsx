@@ -73,6 +73,16 @@ interface KanbanTask { id: string; title: string; assignee: string; status: stri
 interface HermesKanban { board: string; slug: string; total: number; counts: Record<string, number>; tasks: KanbanTask[] }
 interface ScoreComponent { score: number; weight?: number; label: string; detail?: string }
 interface ScoreData { score: number; grade: string; label: string; color: string; period?: string; components: Record<string, ScoreComponent> }
+interface SpendData {
+  syncedAt: string | null;
+  totalTokens: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  sessions: number | null;
+  toolCalls: number | null;
+  byModel: { model: string; sessions: number; tokens: number }[];
+  days: { date: string; tokens: number }[];
+}
 
 interface HomeData {
   xFollowers: number; xGoal: number; xHandle: string;
@@ -98,6 +108,7 @@ interface HomeData {
     counts: { servers: number; serversUp: number; services: number; servicesUp: number; containers: number; runningContainers: number };
     system: { hostname: string; os: string; uptime: string; cpu_usage_percent: number; memory_used_percent: number; disk_used_percent: number } | null;
   };
+  spend: SpendData;
 }
 
 const EMPTY: HomeData = {
@@ -116,6 +127,10 @@ const EMPTY: HomeData = {
     connected: false, checkedAt: "",
     counts: { servers: 0, serversUp: 0, services: 0, servicesUp: 0, containers: 0, runningContainers: 0 },
     system: null,
+  },
+  spend: {
+    syncedAt: null, totalTokens: null, inputTokens: null, outputTokens: null,
+    sessions: null, toolCalls: null, byModel: [], days: [],
   },
 };
 
@@ -344,6 +359,110 @@ function XAnalyticsPanel({ views, trend, totalTweets, bestDay, bestHour }: {
       <a href="/x" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
         Open X dashboard <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
       </a>
+    </div>
+  );
+}
+
+// ── Agent compute spend panel ─────────────────────────────
+function SpendPanel({ spend }: { spend: SpendData }) {
+  const series = spend.days.map(d => d.tokens);
+  const topModel = [...spend.byModel].sort((a, b) => b.tokens - a.tokens)[0];
+  return (
+    <div className="panel flex flex-col p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Cpu className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
+        <span className="eyebrow">Agent Compute · 7d</span>
+        {spend.syncedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">synced {timeAgo(spend.syncedAt)}</span>}
+      </div>
+      <div className="space-y-4">
+        <div>
+          <div className="eyebrow mb-2 !text-[9.5px]">Total tokens · 7d</div>
+          <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
+            {spend.totalTokens != null ? fmtExact(spend.totalTokens) : "—"}
+          </div>
+          {series.some(v => v > 0) && <Sparkline data={series} color="#a78bfa" area idSeed="spend" className="h-9 mt-3" />}
+        </div>
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div>
+            <div className="eyebrow mb-1.5 !text-[9.5px]">Sessions</div>
+            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{spend.sessions != null ? fmtExact(spend.sessions) : "—"}</div>
+          </div>
+          <div>
+            <div className="eyebrow mb-1.5 !text-[9.5px]">Tool calls</div>
+            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{spend.toolCalls != null ? fmtExact(spend.toolCalls) : "—"}</div>
+          </div>
+        </div>
+        {topModel && (
+          <div className="text-[12px] text-[var(--hq-text-dim)]">
+            Top model <span className="text-[var(--hq-text)] font-medium">{topModel.model}</span>
+            <span className="num text-[var(--hq-text-ghost)]"> · {fmt(topModel.tokens)} tok</span>
+          </div>
+        )}
+      </div>
+      <a href="/hermes#runs" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
+        Open Hermes hub <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </a>
+    </div>
+  );
+}
+
+// ── Spend card mini-viz: model share + input/output split ─
+function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; total: number | null }) {
+  const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 3);
+  if (!top.length || !total) return null;
+  return (
+    <div className="mt-4 space-y-1.5">
+      {top.map(m => {
+        const pct = Math.round((m.tokens / total) * 100);
+        return (
+          <div key={m.model} className="flex items-center gap-2">
+            <span className="text-[11px] text-[var(--hq-text-dim)] truncate w-32 shrink-0">{m.model}</span>
+            <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: "#a78bfa", opacity: 0.9 }} />
+            </div>
+            <span className="num text-[10px] text-[var(--hq-text-ghost)] w-8 text-right shrink-0">{pct}%</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TokenIOSplit({ input, output }: { input: number | null; output: number | null }) {
+  if (input == null || output == null || input + output === 0) return null;
+  const inPct = Math.round((input / (input + output)) * 100);
+  return (
+    <div className="mt-auto pt-3">
+      <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
+        <div style={{ width: `${inPct}%`, background: "#a78bfa" }} />
+        <div style={{ width: `${100 - inPct}%`, background: "#38bdf8" }} />
+      </div>
+      <div className="flex items-center justify-between mt-1.5 text-[10px] num text-[var(--hq-text-ghost)]">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#a78bfa" }} />
+          in {fmt(input)}
+        </span>
+        <span className="flex items-center gap-1.5">
+          out {fmt(output)}
+          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#38bdf8" }} />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Daily-usage history tracker (fades out once the sparkline has data) ──
+function HistoryBuilding({ days }: { days: SpendData["days"] }) {
+  const live = days.filter(d => d.tokens > 0).length;
+  if (live >= 2) return null;
+  const n = Math.min(days.length, 7);
+  return (
+    <div className="mt-4 flex items-center gap-2 text-[10px] num text-[var(--hq-text-ghost)]">
+      {[0, 1, 2, 3, 4, 5, 6].map(i => (
+        <span key={i} className="h-1 flex-1 rounded-full transition-colors duration-700"
+          style={{ background: i < n ? "rgba(167,139,250,0.55)" : "rgba(255,255,255,0.07)" }} />
+      ))}
+      <span className="shrink-0 ml-1.5">daily trend · day {n}/7</span>
     </div>
   );
 }
@@ -870,7 +989,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ── Platform stacks: GitHub · Homelab · X ─ */}
+        {/* ── Platform stacks: GitHub · Homelab · Agent compute ─ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
           {/* GitHub */}
           <div className="flex flex-col gap-5 hq-rise" style={rise(1)}>
@@ -904,24 +1023,31 @@ export default function Dashboard() {
             />
             <HomelabHomeCard homelab={data.homelab} />
           </div>
-          {/* X — full width, after Homelab */}
+          {/* Agent compute — full width, after Homelab */}
           <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-5 hq-rise" style={rise(3)}>
             <MetricCard
-              label="X Followers" value={data.xFollowers} format={fmtExact}
-              delta={xd.delta} deltaPct={xd.deltaPct} deltaLabel={xd.label} trend={xd.series}
-              goal={data.xGoal} goalFormat={fmt}
-              icon={<Twitter className="w-4 h-4" />} accent="#38bdf8" href="/x" loaded={loaded}
-            />
-            <XAnalyticsPanel views={data.xViewsThisWeek} trend={xViewsSeries} totalTweets={data.totalTweets} bestDay={data.bestPostingDay} bestHour={data.bestPostingHourStr} />
+              label="Agent Tokens · 7d"
+              value={data.spend.totalTokens ?? 0}
+              format={fmt}
+              delta={null} deltaPct={null} deltaLabel={undefined}
+              trend={data.spend.days.map(d => d.tokens)}
+              goal={undefined} goalFormat={undefined}
+              icon={<Cpu className="w-4 h-4" />} accent="#a78bfa" href="/hermes#runs" loaded={loaded}
+            >
+              <ModelShareBars byModel={data.spend.byModel} total={data.spend.totalTokens} />
+              <HistoryBuilding days={data.spend.days} />
+              <TokenIOSplit input={data.spend.inputTokens} output={data.spend.outputTokens} />
+            </MetricCard>
+            <SpendPanel spend={data.spend} />
           </div>
         </div>
 
         {/* ── Brief + Approval inbox (side-by-side on wide) ─ */}
         <div className="mt-5 grid grid-cols-1 xl:grid-cols-3 gap-5 items-stretch">
-          <div className="xl:col-span-2 hq-rise" style={rise(5)}>
+          <div className="xl:col-span-2 hq-rise" style={rise(4)}>
             <HermesBriefing />
           </div>
-          <div className="xl:col-span-1 hq-rise" style={rise(6)}>
+          <div className="xl:col-span-1 hq-rise" style={rise(5)}>
             <ApprovalInbox compact />
           </div>
         </div>
@@ -930,14 +1056,30 @@ export default function Dashboard() {
         <div className="mt-14">
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="hq-rise" style={rise(4)}><TopTweetsPanel tweets={data.topTweets} /></div>
-            <div className="hq-rise" style={rise(5)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
+            <div className="hq-rise" style={rise(6)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
           </div>
         </div>
 
         {/* ── Agents strip ────────────────────────────────── */}
         <div className="mt-14">
           <AgentsStrip processes={data.processes} />
+        </div>
+
+        {/* ── X / Twitter stats — pinned to the very bottom ── */}
+        <div className="mt-14">
+          <SectionLabel>X · Twitter</SectionLabel>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-5 hq-rise" style={rise(7)}>
+              <MetricCard
+                label="X Followers" value={data.xFollowers} format={fmtExact}
+                delta={xd.delta} deltaPct={xd.deltaPct} deltaLabel={xd.label} trend={xd.series}
+                goal={data.xGoal} goalFormat={fmt}
+                icon={<Twitter className="w-4 h-4" />} accent="#38bdf8" href="/x" loaded={loaded}
+              />
+              <XAnalyticsPanel views={data.xViewsThisWeek} trend={xViewsSeries} totalTweets={data.totalTweets} bestDay={data.bestPostingDay} bestHour={data.bestPostingHourStr} />
+            </div>
+            <div className="lg:col-span-2 hq-rise" style={rise(8)}><TopTweetsPanel tweets={data.topTweets} /></div>
+          </div>
         </div>
       </div>
     </>
