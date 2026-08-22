@@ -89,9 +89,18 @@ export function Sidebar() {
 
   const Logo = () => (
     <div className="flex items-center gap-2.5">
-      <div className="w-8 h-8 rounded-[10px] bg-gradient-to-br from-[#14161c] to-[#0a0b0d] border border-white/10 flex items-center justify-center relative shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
-        <span className="font-bold text-[15px] leading-none tracking-tight text-[#38BDF8]" aria-hidden>H</span>
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#34D399] shadow-[0_0_6px_rgba(52,211,153,0.8)]"/>
+      <div className="w-8 h-8 rounded-[10px] bg-gradient-to-b from-[#1c2029] to-[#0a0b0d] border border-white/15 flex items-center justify-center relative shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_4px_12px_rgba(0,0,0,0.5)]">
+        <span
+          className="font-bold text-[17px] leading-none tracking-tight bg-clip-text text-transparent"
+          style={{
+            backgroundImage: "linear-gradient(135deg, #5EEAD4 0%, #38BDF8 55%, #818CF8 100%)",
+            filter: "drop-shadow(0 0 6px rgba(56,189,248,0.45))",
+          }}
+          aria-hidden
+        >
+          H
+        </span>
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#34D399] shadow-[0_0_6px_rgba(52,211,153,0.9)]"/>
       </div>
       <span className="font-semibold text-[var(--text)] tracking-[-0.01em] text-[15px]">Hermy HQ</span>
     </div>
