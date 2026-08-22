@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive } from "lucide-react";
+import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
@@ -406,6 +406,90 @@ function SpendPanel({ spend }: { spend: SpendData }) {
   );
 }
 
+// ── AI model news panel ────────────────────────────────────
+interface ModelCard {
+  id: string; name: string; provider: string;
+  contextLength: number | null; free: boolean;
+  createdAt: number | null; inputs: string[]; tags: string[];
+}
+interface AINewsData { newModels: ModelCard[]; freeModels: ModelCard[]; totalFree: number; fetchedAt: string | null }
+
+function AIModelNewsPanel() {
+  const [news, setNews] = useState<AINewsData | null>(null);
+  useEffect(() => {
+    fetch("/api/ai-news").then(r => r.ok ? r.json() : null).then(d => { if (d) setNews(d); }).catch(() => {});
+    const iv = setInterval(() => {
+      fetch("/api/ai-news").then(r => r.ok ? r.json() : null).then(d => { if (d) setNews(d); }).catch(() => {});
+    }, 3600_000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const ctx = (n: number | null) => (n ? (n >= 1_000_000 ? `${(n / 1_048_576).toFixed(0)}M` : `${Math.round(n / 1024)}K`) : "—");
+
+  const TAG_COLORS: Record<string, string> = {
+    coding: "#38bdf8", vision: "#f0b132", reasoning: "#a78bfa",
+    agents: "#34d399", fast: "#fb7185", "long-ctx": "#2dd4bf", audio: "#f97316",
+  };
+  const Tag = ({ t }: { t: string }) => (
+    <span
+      className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+      style={{ color: TAG_COLORS[t] || "var(--hq-text-dim)", background: `${TAG_COLORS[t] || "#888"}1a` }}
+    >
+      {t}
+    </span>
+  );
+
+  const Row = ({ m }: { m: ModelCard }) => (
+    <a
+      href={`https://openrouter.ai/${m.id}`}
+      target="_blank" rel="noopener noreferrer"
+      className="flex items-center gap-1.5 py-1.5 border-b border-[var(--hq-hairline)] last:border-0 group"
+    >
+      <span className="text-[11px] text-[var(--hq-text-dim)] truncate flex-1 group-hover:text-[var(--hq-text)] transition-colors">{m.name}</span>
+      <span className="shrink-0 flex gap-1">
+        {m.tags.slice(0, 3).map(t => <Tag key={t} t={t} />)}
+      </span>
+      {m.free && (
+        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full text-[#34d399] bg-[#34d399]/10">free</span>
+      )}
+      <span className="num shrink-0 text-[10px] text-[var(--hq-text-ghost)]">{ctx(m.contextLength)}</span>
+    </a>
+  );
+
+  return (
+    <div className="panel flex flex-col p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Sparkles className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
+        <span className="eyebrow">AI Models · Newest &amp; Free</span>
+        {news?.totalFree != null && (
+          <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">{news.totalFree} free live</span>
+        )}
+      </div>
+      {!news ? (
+        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">Loading OpenRouter catalog…</div>
+      ) : news.newModels.length === 0 && news.freeModels.length === 0 ? (
+        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">No catalog data available right now.</div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <div className="eyebrow mb-1 !text-[9.5px]">New releases · 30 days</div>
+            {(news.newModels.length ? news.newModels : []).map(m => <Row key={m.id} m={m} />)}
+            {!news.newModels.length && <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">None in the last 30 days.</div>}
+          </div>
+          <div>
+            <div className="eyebrow mb-1 !text-[9.5px]">Free to use</div>
+            {news.freeModels.map(m => <Row key={m.id} m={m} />)}
+            {!news.freeModels.length && <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">No free models listed.</div>}
+          </div>
+        </div>
+      )}
+      <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors">
+        Full catalog on OpenRouter <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </a>
+    </div>
+  );
+}
+
 // ── Spend card mini-viz: model share + input/output split ─
 function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; total: number | null }) {
   const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 3);
@@ -553,12 +637,16 @@ function GitHubHomeCard({
   activity,
   status,
   contributions,
+  onRefresh,
+  refreshing,
 }: {
   profile: GitHubProfile;
   pinnedRepos: GitHubRepo[];
   activity: GitHubActivity | null;
   status: string | null;
   contributions: GitHubContributions | null;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   return (
     <div className="panel flex flex-col p-6">
@@ -587,6 +675,15 @@ function GitHubHomeCard({
             <div className="flex items-center gap-1">
               <GitBranch className="w-3.5 h-3.5" style={{ color: "#39d353" }} />
               <span className="text-[10px] uppercase tracking-wider text-[var(--hq-text-ghost)]">Contributions</span>
+              <button
+                onClick={() => onRefresh?.()}
+                title="Refresh from GitHub"
+                className="ml-1 p-1 rounded hover:bg-white/[0.06] text-[var(--hq-text-ghost)] hover:text-[var(--hq-text-dim)] transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={refreshing ? "animate-spin" : ""} aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" />
+                </svg>
+              </button>
             </div>
             <div className="flex items-center gap-3 text-[11px]">
               <span className="num text-[var(--hq-text-dim)]">
@@ -930,14 +1027,18 @@ export default function Dashboard() {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  useEffect(() => {
+  const [refreshing, setRefreshing] = useState(false);
+  const loadHome = () => {
+    setRefreshing(true);
     fetch("/api/home")
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) { setData(d); setTimeout(() => setLoaded(true), 100); } })
-      .catch(() => {});
-    const iv = setInterval(() => {
-      fetch("/api/home").then(r => r.ok ? r.json() : null).then(d => { if (d) setData(d); }).catch(() => {});
-    }, 60_000);
+      .catch(() => {})
+      .finally(() => setTimeout(() => setRefreshing(false), 500));
+  };
+  useEffect(() => {
+    loadHome();
+    const iv = setInterval(loadHome, 30_000);
     return () => clearInterval(iv);
   }, []);
 
@@ -1008,6 +1109,8 @@ export default function Dashboard() {
                 activity={data.github.activity}
                 status={data.github.status}
                 contributions={data.github.contributions}
+                onRefresh={loadHome}
+                refreshing={refreshing}
               />
             )}
           </div>
@@ -1057,6 +1160,7 @@ export default function Dashboard() {
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="hq-rise" style={rise(6)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
+            <div className="hq-rise" style={rise(6)}><AIModelNewsPanel /></div>
           </div>
         </div>
 
