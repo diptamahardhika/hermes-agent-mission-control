@@ -14,7 +14,7 @@ function shJson<T = any>(sql: string): Promise<T[]> {
     .catch(() => []);
 }
 
-const PROPOSAL_SQL = `
+const COMMENT_SQL = `
   SELECT c.id, c.task_id, c.author, c.body, c.created_at, t.title AS task_title, t.status AS task_status
   FROM task_comments c
   JOIN tasks t ON t.id = c.task_id
@@ -22,13 +22,42 @@ const PROPOSAL_SQL = `
     AND length(c.body) > 100
   ORDER BY c.created_at DESC;`;
 
+// Agents report results in task_runs.summary (not task_comments). Surface a
+// run as a proposal when the task asked for ideas/recommendations (reviews,
+// UX proposals, audits) — routine reports stay off the proposal board.
+const RUN_SQL = `
+  SELECT 'run-' || r.id AS id, r.task_id, r.profile AS author, r.summary AS body,
+         coalesce(r.ended_at, r.started_at) AS created_at,
+         t.title AS task_title, t.status AS task_status
+  FROM task_runs r
+  JOIN tasks t ON t.id = r.task_id
+  WHERE r.status = 'done'
+    AND length(coalesce(r.summary,'')) > 100
+    AND r.id = (SELECT MAX(r2.id) FROM task_runs r2 WHERE r2.task_id = r.task_id)
+    AND (
+      lower(t.title) LIKE '%propos%' OR lower(t.title) LIKE '%sugges%'
+      OR lower(t.title) LIKE '%recommend%' OR lower(t.title) LIKE '%improv%'
+      OR lower(t.title) LIKE '%review%' OR lower(t.title) LIKE '%ux%'
+      OR lower(coalesce(t.body,'')) LIKE '%propose%' OR lower(coalesce(t.body,'')) LIKE '%suggest%'
+      OR lower(coalesce(t.body,'')) LIKE '%recommend%' OR lower(coalesce(t.body,'')) LIKE '%improvement%'
+    )
+  ORDER BY created_at DESC;`;
+
+function epochToIso(v: unknown): string {
+  // sqlite epochs are seconds; guard against null/garbage so a bad row can
+  // never crash serialization again (RangeError: Invalid time value)
+  const n = Number(v);
+  const secs = Number.isFinite(n) && n > 0 ? n : Math.floor(Date.now() / 1000);
+  return new Date(secs * 1000).toISOString();
+}
+
 function firstLine(body: string): string {
   const flat = body.replace(/\n+/g, " ").trim();
   return (flat.split(/\.(?=\s)/)[0] || flat).trim();
 }
 
 function toProposal(row: any, persisted?: any, followUp?: { status: string; result: string | null } | null) {
-  const createdAt = new Date(row.created_at * 1000).toISOString();
+  const createdAt = epochToIso(row.created_at);
   return {
     id: String(row.id),
     taskId: row.task_id,
@@ -48,10 +77,20 @@ function toProposal(row: any, persisted?: any, followUp?: { status: string; resu
 
 export async function GET() {
   try {
-    const [persisted, rows] = await Promise.all([
+    const [persisted, commentRows, runRows] = await Promise.all([
       prisma.agentProposal.findMany(),
-      shJson(PROPOSAL_SQL),
+      shJson(COMMENT_SQL),
+      shJson(RUN_SQL),
     ]);
+
+    // Merge: comments first (explicit proposals), then run summaries, deduped
+    // by taskId (a task contributes at most one proposal — newest wins).
+    const byTask = new Map<string, any>();
+    for (const row of [...commentRows, ...runRows]) {
+      const prev = byTask.get(row.task_id);
+      if (!prev || Number(row.created_at) > Number(prev.created_at)) byTask.set(row.task_id, row);
+    }
+    const rows = [...byTask.values()];
 
     const stateByTask = new Map(persisted.map((p) => [p.taskId, p]));
 
@@ -124,7 +163,7 @@ export async function POST(request: Request) {
     // Find the proposal — create the Postgres row on demand if missing
     let proposal = await prisma.agentProposal.findUnique({ where: { taskId: proposalId } });
     if (!proposal) {
-      const rows = await shJson(PROPOSAL_SQL.replace("ORDER BY c.created_at DESC;", `AND c.task_id = '${proposalId.replace(/'/g, "")}';`));
+      const rows = await shJson(COMMENT_SQL.replace("ORDER BY c.created_at DESC;", `AND c.task_id = '${proposalId.replace(/'/g, "")}';`));
       if (!rows.length) {
         return NextResponse.json({ error: "proposal not found" }, { status: 404 });
       }

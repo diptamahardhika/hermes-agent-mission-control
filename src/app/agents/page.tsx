@@ -287,15 +287,6 @@ export default function AgentsPage() {
     return () => clearInterval(interval);
   }, [loadProposals]);
 
-  async function handleApprove(taskId: string) {
-    await fetch("/api/agent-proposals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "approve", proposalId: taskId }),
-    });
-    loadProposals();
-  }
-
   async function handleReject(taskId: string) {
     await fetch("/api/agent-proposals", {
       method: "POST",
@@ -421,7 +412,6 @@ export default function AgentsPage() {
                   <ProposalCard
                     key={p.taskId}
                     proposal={p}
-                    onApprove={handleApprove}
                     onReject={handleReject}
                     onCreateTask={handleCreateTask}
                   />

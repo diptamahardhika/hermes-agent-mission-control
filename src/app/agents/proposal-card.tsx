@@ -37,12 +37,10 @@ function followUpBadge(p: Proposal): { label: string; color: string } | null {
 
 function ProposalCard({
   proposal,
-  onApprove,
   onReject,
   onCreateTask,
 }: {
   proposal: Proposal;
-  onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onCreateTask: (id: string) => void;
 }) {
@@ -115,24 +113,10 @@ function ProposalCard({
         {proposal.status === "pending" && (
           <div className="flex gap-2 mt-1">
             <button onClick={() => onCreateTask(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full btn-primary">
-              Accept + Create task
-            </button>
-            <button onClick={() => onApprove(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full btn-primary" style={{ background: "color-mix(in srgb, var(--up) 12%, transparent)", color: "var(--up)", border: "1px solid color-mix(in srgb, var(--up) 30%, transparent)" }}>
-              Approve
+              ✓ Implement — create task for {proposal.agent}
             </button>
             <button onClick={() => onReject(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--text-3)", border: "1px solid var(--line)" }}>
               Dismiss
-            </button>
-          </div>
-        )}
-
-        {proposal.status === "approved" && (
-          <div className="flex gap-2 mt-1">
-            <button onClick={() => onCreateTask(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full btn-primary">
-              Create task now
-            </button>
-            <button onClick={() => onReject(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--text-3)", border: "1px solid var(--line)" }}>
-              Undo approval
             </button>
           </div>
         )}
