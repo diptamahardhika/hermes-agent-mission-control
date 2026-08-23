@@ -10,6 +10,32 @@ const YT_API_KEY = process.env.YOUTUBE_API_KEY;
 const YT_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID || "";
 const HERMES_KANBAN_BOARD = process.env.HERMES_BOARD || "default";
 
+// ─── Poll-interval aligned cache (R3 upgrade) ────────────────────────────────
+// These Maps survive across requests on the same Node.js process (Vercel
+// serverlessInstance / local dev / PM2). A cached value is served when its
+// age is under the TTL; otherwise the fetcher runs and the cache updates.
+// TTLs are set to align with the client's 30s poll: 30s means "refresh with
+// every poll", 60s means "refresh every other poll", 300s means "refresh
+// once every 10 polls". This drops external API calls ~80–95% on a warm
+// process while keeping the 30s poll responsive.
+
+const HL_CACHE = new Map<string, { data: unknown; expires: number }>();
+const YT_CACHE = new Map<string, { data: unknown; expires: number }>();
+const GH_CACHE = new Map<string, { data: unknown; expires: number }>();
+
+async function ttlFetch<T>(
+  cache: Map<string, { data: T; expires: number }>,
+  key: string,
+  fetcher: () => Promise<T>,
+  ttlMs: number,
+): Promise<T> {
+  const existing = cache.get(key);
+  if (existing && Date.now() < existing.expires) return existing.data;
+  const data = await fetcher();
+  cache.set(key, { data, expires: Date.now() + ttlMs });
+  return data;
+}
+
 const HERMES_KANBAN_DEMO_TASKS = [
   { id: "demo-1", title: "Research Hermes outliers and keywords", assignee: "nova", status: "done", priority: 100 },
   { id: "demo-2", title: "Create Notion To Film trigger", assignee: "hermes", status: "done", priority: 95 },
@@ -91,8 +117,25 @@ export async function GET() {
   const headers = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
-    ...(GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {}),
+    ...(GITHUB_TOKEN ? { Authorization: `*** ${GITHUB_TOKEN}` } : {}),
   };
+
+  // ─── Batch-fetch ALL DataStore keys upfront (R2c) ───────────────────────────
+  // One SQL round-trip replaces everywhere the route used `findUnique`/`findMany`
+  // on the generic DataStore table (pixel-ideas, polymarket-pnl, metric-snapshots,
+  // homelab-monitor, hermes-cost, hermes-cost-history, x-account-stats).
+  const DS_KEYS = [
+    "x-account-stats", "pixel-ideas", "polymarket-pnl", "metric-snapshots",
+    "homelab-monitor", "hermes-cost", "hermes-cost-history",
+  ];
+  let store: Record<string, unknown> = {};
+  try {
+    const rows = await prisma.dataStore.findMany({
+      where: { key: { in: DS_KEYS } },
+      select: { key: true, data: true },
+    });
+    store = rows.reduce<Record<string, unknown>>((acc, r) => { acc[r.key] = r.data; return acc; }, {});
+  } catch { /* non-fatal — individual paths have env-var fallbacks */ }
 
   function normalizeGithubProfile(p: any) {
     return {
@@ -276,39 +319,67 @@ export async function GET() {
     githubEventsResult,
     githubContribResult,
   ] = await Promise.allSettled([
-    prisma.draft.findMany({ where: { status: "posted" }, orderBy: { postedAt: "desc" } }),
-    prisma.tweetMetric.findMany(),
+    prisma.draft.findMany({ where: { status: "posted" }, orderBy: { postedAt: "desc" }, take: 50 }),
+    prisma.tweetMetric.findMany({ take: 500, where: { tweetId: { not: null } } }),
     prisma.draft.findMany({ where: { status: "pending" }, orderBy: { createdAt: "desc" }, take: 10 }),
-    Promise.all([
-      hlPost({ type: "clearinghouseState", user: HL_WALLET }),
-      hlPost({ type: "allMids" }),
-      hlPost({ type: "userFills", user: HL_WALLET }),
-    ]),
-    fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${YT_CHANNEL_ID}&maxResults=5&order=viewCount&type=video&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
-    fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${YT_CHANNEL_ID}&maxResults=3&order=date&type=video&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
-    fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${YT_CHANNEL_ID}&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
-    prisma.dataStore.findUnique({ where: { key: "x-account-stats" } }),
+    // Hyperliquid: 1-minute in-route TTL cache (R3a) — 3 POST calls per poll
+    // cuts to one every 60s on a warm process. Falls back to live fetch on miss.
+    ttlFetch(HL_CACHE, "hl-triple", async () => {
+      return Promise.all([
+        hlPost({ type: "clearinghouseState", user: HL_WALLET }),
+        hlPost({ type: "allMids" }),
+        hlPost({ type: "userFills", user: HL_WALLET }),
+      ]);
+    }, 60_000),
+    // YouTube: 5-minute in-route TTL cache (R3b) — 3 separate Google API calls
+    // per poll drop to one every 300s while warm.
+    ttlFetch(YT_CACHE, "yt-top", async () =>
+      fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${YT_CHANNEL_ID}&maxResults=5&order=viewCount&type=video&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
+    300_000),
+    ttlFetch(YT_CACHE, "yt-latest", async () =>
+      fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${YT_CHANNEL_ID}&maxResults=3&order=date&type=video&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
+    300_000),
+    ttlFetch(YT_CACHE, "yt-channel", async () =>
+      fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${YT_CHANNEL_ID}&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
+    300_000),
+    Promise.resolve(store["x-account-stats"] ? { data: store["x-account-stats"] } : null),
     prisma.youtubeIdea.findMany({ where: { status: { in: ["pending", "approved"] }, NOT: { status: "rejected" } }, orderBy: { createdAt: "desc" }, take: 3 }),
     Promise.resolve(loadHermesKanban()),
+    // GitHub profile: 5-minute TTL (R3c) — fetches from api.github.com.
     GITHUB_USERNAME && githubProfileUrl
-      ? fetch(githubProfileUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json())
+      ? ttlFetch(GH_CACHE, "github-profile", async () =>
+          fetch(githubProfileUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json()),
+        300_000).then(r => r as any)
       : Promise.resolve(null),
+    // GitHub pinned repos: 5-minute TTL (R3c).
     GITHUB_USERNAME && githubPinnedUrl && GITHUB_TOKEN
-      ? fetch(githubPinnedUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json())
+      ? ttlFetch(GH_CACHE, "github-pinned", async () =>
+          fetch(githubPinnedUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json()),
+        300_000).then(r => r as any)
       : Promise.resolve(null),
+    // GitHub repos: 5-minute TTL (R3c).
     GITHUB_USERNAME && githubReposUrl
-      ? fetch(githubReposUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json())
+      ? ttlFetch(GH_CACHE, "github-repos", async () =>
+          fetch(githubReposUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json()),
+        300_000).then(r => r as any)
       : Promise.resolve(null),
+    // GitHub events: 5-minute TTL (R3c). Events feed is near-instant, so caching
+    // 5 min is safe — the contribution patching uses it only for recent-day boosts.
     GITHUB_USERNAME && githubEventsUrl && GITHUB_TOKEN
-      ? fetch(githubEventsUrl, { headers, cache: "no-store" }).then(r => r.json())
+      ? ttlFetch(GH_CACHE, "github-events", async () =>
+          fetch(githubEventsUrl, { headers, cache: "no-store" }).then(r => r.json()),
+        300_000).then(r => r as any)
       : Promise.resolve(null),
+    // GitHub GraphQL contributions: 5-minute TTL (R3c) — single GraphQL call.
     GITHUB_TOKEN
-      ? fetch("https://api.github.com/graphql", {
-          method: "POST",
-          headers: { ...headers, "Content-Type": "application/json" },
-          body: JSON.stringify({ query: GITHUB_CONTRIB_QUERY, variables: { login: GITHUB_USERNAME } }),
-          cache: "no-store",
-        }).then(r => r.json())
+      ? ttlFetch(GH_CACHE, "github-contrib", async () =>
+          fetch("https://api.github.com/graphql", {
+            method: "POST",
+            headers: { ...headers, "Content-Type": "application/json" },
+            body: JSON.stringify({ query: GITHUB_CONTRIB_QUERY, variables: { login: GITHUB_USERNAME } }),
+            cache: "no-store",
+          }).then(r => r.json()),
+        300_000).then(r => r as any)
       : Promise.resolve(null),
   ]);
 
@@ -435,19 +506,16 @@ export async function GET() {
 
   const hermesKanban = hermesKanbanResult.status === "fulfilled" ? hermesKanbanResult.value : { board: "Hermes 24/7 Assistant Video", slug: HERMES_KANBAN_BOARD, total: 0, counts: {}, tasks: [] };
 
-  // ─── Build ideas (Pixel) from DataStore ────────────────────────────────────
+  // ─── Build ideas (Pixel) from DataStore (batched, R2c) ─────────────────────
   let topBuildIdeas: { title: string; description: string; effort: string }[] = [];
-  try {
-    const row = await prisma.dataStore.findUnique({ where: { key: "pixel-ideas" } });
-    if (row?.data) {
-      const ideas = row.data as Array<{ title: string; description: string; effort: string; status: string }>;
-      topBuildIdeas = ideas.filter(i => i.status === "pending").slice(0, 3).map(i => ({
-        title: i.title,
-        description: i.description?.slice(0, 100) || "",
-        effort: i.effort || "medium",
-      }));
-    }
-  } catch { /* ignore */ }
+  const pixelIdeas = store["pixel-ideas"] as Array<{ title: string; description: string; effort: string; status: string }> | undefined;
+  if (pixelIdeas?.length) {
+    topBuildIdeas = pixelIdeas.filter(i => i.status === "pending").slice(0, 3).map(i => ({
+      title: i.title,
+      description: i.description?.slice(0, 100) || "",
+      effort: i.effort || "medium",
+    }));
+  }
 
   // ─── YouTube ─────────────────────────────────────────────────────────────────
   type YTItem = { id?: { videoId?: string }; snippet?: { title?: string; thumbnails?: { high?: { url?: string } }; publishedAt?: string } };
@@ -484,16 +552,11 @@ export async function GET() {
   let todayPnl = parseFloat(process.env.POLY_TODAY_PNL || "0");
   let polyWinRate = parseFloat(process.env.POLY_WIN_RATE || "0");
 
-  // Try DataStore for richer PnL data
-  try {
-    const row = await prisma.dataStore.findUnique({ where: { key: "polymarket-pnl" } });
-    if (row?.data) {
-      const pnl = row.data as any;
-      if (pnl.allTimePnl) allTimePnl = pnl.allTimePnl;
-      if (pnl.todayPnl) todayPnl = pnl.todayPnl;
-      if (pnl.winRate) polyWinRate = pnl.winRate;
-    }
-  } catch {}
+  // DataStore was batch-fetched upfront (R2c); read from store.
+  const polyPnl = store["polymarket-pnl"] as any;
+  if (polyPnl?.allTimePnl) allTimePnl = polyPnl.allTimePnl;
+  if (polyPnl?.todayPnl) todayPnl = polyPnl.todayPnl;
+  if (polyPnl?.winRate) polyWinRate = polyPnl.winRate;
 
   // ─── Hyperliquid ─────────────────────────────────────────────────────────────
   let hlBalance = 0;
@@ -541,30 +604,30 @@ export async function GET() {
   // ─── Daily metric snapshots (rolling history for deltas + sparklines) ────────
   // Stored in the generic DataStore (no schema migration). Honest by design:
   // history starts accumulating today; deltas render once we have 2+ days.
+  // DataStore was batch-fetched upfront (R2c); read from store.
   type Snap = { d: string; xf: number; yt: number; pnl: number };
   let snapshots: Snap[] = [];
-  try {
-    const snapRow = await prisma.dataStore.findUnique({ where: { key: "metric-snapshots" } });
-    snapshots = Array.isArray(snapRow?.data) ? (snapRow!.data as Snap[]) : [];
-    const today = new Date().toISOString().slice(0, 10);
-    const totalPnlNow = allTimePnl + hlAllTimePnl;
-    const point: Snap = {
-      d: today,
-      xf: xStats.xFollowers,
-      yt: ytSubscribers,
-      pnl: Math.round(totalPnlNow * 100) / 100,
-    };
-    const idx = snapshots.findIndex(s => s.d === today);
-    if (idx >= 0) snapshots[idx] = point; else snapshots.push(point);
-    snapshots = snapshots.slice(-60); // ~2 months of daily history
-    prisma.dataStore.upsert({
-      where: { key: "metric-snapshots" },
-      update: { data: snapshots },
-      create: { key: "metric-snapshots", data: snapshots },
-    }).catch(() => {});
-  } catch { /* non-fatal */ }
+  const snapData = store["metric-snapshots"] as Snap[] | undefined;
+  snapshots = Array.isArray(snapData) ? snapData : [];
+  const today = new Date().toISOString().slice(0, 10);
+  const totalPnlNow = allTimePnl + hlAllTimePnl;
+  const point: Snap = {
+    d: today,
+    xf: xStats.xFollowers,
+    yt: ytSubscribers,
+    pnl: Math.round(totalPnlNow * 100) / 100,
+  };
+  const idx = snapshots.findIndex(s => s.d === today);
+  if (idx >= 0) snapshots[idx] = point; else snapshots.push(point);
+  snapshots = snapshots.slice(-60); // ~2 months of daily history
+  prisma.dataStore.upsert({
+    where: { key: "metric-snapshots" },
+    update: { data: snapshots },
+    create: { key: "metric-snapshots", data: snapshots },
+  }).catch(() => {});
 
   // ─── Homelab (mirrored into DataStore by the bridge) ─────────────────────────
+  // DataStore was batch-fetched upfront (R2c); read from store.
   let homelab = {
     connected: false, checkedAt: "",
     counts: { servers: 0, serversUp: 0, services: 0, servicesUp: 0, containers: 0, runningContainers: 0 },
@@ -573,37 +636,36 @@ export async function GET() {
       cpu_usage_percent: number; memory_used_percent: number; disk_used_percent: number;
     } | null,
   };
-  try {
-    const row = await prisma.dataStore.findUnique({ where: { key: "homelab-monitor" } });
-    const d = row?.data as any;
-    const o = d?.overview;
-    if (o) {
-      const servers = Array.isArray(o.servers) ? o.servers : [];
-      const services = Array.isArray(o.services) ? o.services : [];
-      const containers = Array.isArray(o.containers) ? o.containers : [];
-      const sys = o.system || null;
-      homelab = {
-        connected: true,
-        checkedAt: o.checked_at || d.syncedAt || "",
-        counts: {
-          servers: servers.length,
-          serversUp: servers.filter((s: any) => s.alive).length,
-          services: services.length,
-          servicesUp: services.filter((s: any) => s.status === "up").length,
-          containers: containers.length,
-          runningContainers: containers.filter((c: any) => c.state === "running").length,
-        },
-        system: sys ? {
-          hostname: sys.hostname, os: sys.os, uptime: sys.uptime,
-          cpu_usage_percent: sys.cpu_usage_percent ?? 0,
-          memory_used_percent: sys.memory_used_percent ?? 0,
-          disk_used_percent: sys.disk_used_percent ?? 0,
-        } : null,
-      };
-    }
-  } catch { /* non-fatal */ }
+  const hlData = store["homelab-monitor"] as any;
+  const d = hlData;
+  const o = d?.overview;
+  if (o) {
+    const servers = Array.isArray(o.servers) ? o.servers : [];
+    const services = Array.isArray(o.services) ? o.services : [];
+    const containers = Array.isArray(o.containers) ? o.containers : [];
+    const sys = o.system || null;
+    homelab = {
+      connected: true,
+      checkedAt: o.checked_at || d.syncedAt || "",
+      counts: {
+        servers: servers.length,
+        serversUp: servers.filter((s: any) => s.alive).length,
+        services: services.length,
+        servicesUp: services.filter((s: any) => s.status === "up").length,
+        containers: containers.length,
+        runningContainers: containers.filter((c: any) => c.state === "running").length,
+      },
+      system: sys ? {
+        hostname: sys.hostname, os: sys.os, uptime: sys.uptime,
+        cpu_usage_percent: sys.cpu_usage_percent ?? 0,
+        memory_used_percent: sys.memory_used_percent ?? 0,
+        disk_used_percent: sys.disk_used_percent ?? 0,
+      } : null,
+    };
+  }
 
   // ─── Agent compute spend (mirrored by the bridge from `hermes insights`) ─────
+  // DataStore was batch-fetched upfront (R2c); read from store.
   let spend: {
     syncedAt: string | null;
     totalTokens: number | null;
@@ -617,35 +679,29 @@ export async function GET() {
     syncedAt: null, totalTokens: null, inputTokens: null, outputTokens: null,
     sessions: null, toolCalls: null, byModel: [], days: [],
   };
-  try {
-    const [costRow, histRow] = await Promise.all([
-      prisma.dataStore.findUnique({ where: { key: "hermes-cost" } }),
-      prisma.dataStore.findUnique({ where: { key: "hermes-cost-history" } }),
-    ]);
-    const c = (costRow?.data ?? {}) as Record<string, unknown>;
-    const rawDays = ((histRow?.data as { days?: { date: string; totalTokens?: number | null }[] } | null)?.days ?? []);
-    // Day-over-day deltas of the bridge's daily snapshots ≈ daily usage.
-    const days = rawDays.map((d, i) => {
-      const prev = i > 0 ? rawDays[i - 1] : undefined;
-      const tokens =
-        prev?.totalTokens != null && d.totalTokens != null
-          ? Math.max(0, d.totalTokens - prev.totalTokens)
-          : 0;
-      return { date: d.date, tokens };
-    });
-    spend = {
-      syncedAt: (c.syncedAt as string) ?? null,
-      totalTokens: (c.totalTokens as number) ?? null,
-      inputTokens: (c.inputTokens as number) ?? null,
-      outputTokens: (c.outputTokens as number) ?? null,
-      sessions: (c.sessions as number) ?? null,
-      toolCalls: (c.toolCalls as number) ?? null,
-      byModel: Array.isArray(c.byModel)
-        ? (c.byModel as { model: string; sessions: number; tokens: number }[])
-        : [],
-      days,
-    };
-  } catch { /* non-fatal */ }
+  const costData = store["hermes-cost"] as Record<string, unknown> | undefined;
+  const histData = (store["hermes-cost-history"] as { days?: { date: string; totalTokens?: number | null }[] } | null)?.days ?? [];
+  // Day-over-day deltas of the bridge's daily snapshots ≈ daily usage.
+  const days = histData.map((d, i) => {
+    const prev = i > 0 ? histData[i - 1] : undefined;
+    const tokens =
+      prev?.totalTokens != null && d.totalTokens != null
+        ? Math.max(0, d.totalTokens - prev.totalTokens)
+        : 0;
+    return { date: d.date, tokens };
+  });
+  spend = {
+    syncedAt: (costData?.syncedAt as string) ?? null,
+    totalTokens: (costData?.totalTokens as number) ?? null,
+    inputTokens: (costData?.inputTokens as number) ?? null,
+    outputTokens: (costData?.outputTokens as number) ?? null,
+    sessions: (costData?.sessions as number) ?? null,
+    toolCalls: (costData?.toolCalls as number) ?? null,
+    byModel: Array.isArray(costData?.byModel)
+      ? (costData.byModel as { model: string; sessions: number; tokens: number }[])
+      : [],
+    days,
+  };
 
   return NextResponse.json({
     // X
