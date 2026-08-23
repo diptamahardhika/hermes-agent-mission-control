@@ -141,9 +141,21 @@ export async function GET() {
       return toProposal(row, p, p?.followUpTaskId ? followUpMap.get(p.followUpTaskId) : null);
     });
 
-    proposals.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // Not everything an agent reports is a proposal. Filter out pure status
+    // notifications — reports whose summary says there's nothing to decide
+    // (duplicate work / already implemented / no remaining action). These are
+    // completion notes, not calls for the user's approval.
+    const NOT_A_PROPOSAL =
+      /\b(already (implemented|completed|shipped|done)|duplicate of|no remaining work|nothing to (do|decide)|no further action)\b/i;
+    const actionable = proposals.filter((p: any) => {
+      if (p.status !== "pending") return true;           // reviewed items stay visible
+      if (p.taskStatus === "done" && NOT_A_PROPOSAL.test(p.body || "")) return false;
+      return true;
+    });
 
-    return NextResponse.json(proposals, {
+    actionable.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return NextResponse.json(actionable, {
       headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
     });
   } catch (error) {
