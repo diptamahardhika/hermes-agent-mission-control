@@ -112,10 +112,10 @@ function ProposalCard({
         {/* Action buttons */}
         {proposal.status === "pending" && (
           <div className="flex gap-2 mt-1">
-            <button onClick={() => onCreateTask(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full btn-primary">
+            <button onClick={() => onCreateTask(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ background: "color-mix(in srgb, var(--up) 12%, transparent)", color: "var(--up)", border: "1px solid color-mix(in srgb, var(--up) 30%, transparent)" }}>
               ✓ Implement — create task for {proposal.agent}
             </button>
-            <button onClick={() => onReject(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--text-3)", border: "1px solid var(--line)" }}>
+            <button onClick={() => onReject(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--down)", border: "1px solid color-mix(in srgb, var(--down) 30%, transparent)" }}>
               Dismiss
             </button>
           </div>
