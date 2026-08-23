@@ -160,10 +160,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "action and proposalId required" }, { status: 400 });
     }
 
-    // Find the proposal — create the Postgres row on demand if missing
+    // Find the proposal — create the Postgres row on demand if missing.
+    // Proposals come from two sources: kanban task_comments (id = comment id)
+    // and task_runs summaries (id = "run-<n>"). Look in Postgres first, then
+    // fall back to whichever source matches the id shape.
     let proposal = await prisma.agentProposal.findUnique({ where: { taskId: proposalId } });
     if (!proposal) {
-      const rows = await shJson(COMMENT_SQL.replace("ORDER BY c.created_at DESC;", `AND c.task_id = '${proposalId.replace(/'/g, "")}';`));
+      const isRunId = proposalId.startsWith("run-");
+      const runNum = isRunId ? proposalId.slice(4).replace(/[^0-9]/g, "") : "";
+      // Try, in order: run by run-id, comment by task_id, run by task_id.
+      // (The UI may send any of: proposal id "run-<n>", or the source task id.)
+      const attempts = isRunId
+        ? [RUN_SQL.replace("ORDER BY created_at DESC;", ` AND r.id = '${runNum}';`)]
+        : [
+            COMMENT_SQL.replace("ORDER BY c.created_at DESC;", `AND c.task_id = '${proposalId.replace(/'/g, "")}';`),
+            RUN_SQL.replace("ORDER BY created_at DESC;", ` AND r.task_id = '${proposalId.replace(/'/g, "")}';`),
+          ];
+      let rows: any[] = [];
+      for (const sql of attempts) {
+        rows = await shJson(sql);
+        if (rows.length) break;
+      }
       if (!rows.length) {
         return NextResponse.json({ error: "proposal not found" }, { status: 404 });
       }
@@ -175,7 +192,7 @@ export async function POST(request: Request) {
           agent: row.author,
           title: `${row.author}: ${firstLine(row.body).slice(0, 70)}`,
           body: row.body,
-          createdAt: new Date(row.created_at * 1000),
+          createdAt: epochToIso(row.created_at) as unknown as Date,
           status: "pending",
         },
       });
