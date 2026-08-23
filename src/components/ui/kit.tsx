@@ -91,6 +91,7 @@ export function Panel({
   style?: React.CSSProperties;
 }) {
   const cls = `panel ${interactive || href ? "panel-interactive" : ""} ${className}`;
+  const ariaProps = interactive && !href ? { tabIndex: 0, role: "button" as const } : {};
   if (href) {
     return (
       <a href={href} className={`block ${cls}`} style={style}>
@@ -98,7 +99,7 @@ export function Panel({
       </a>
     );
   }
-  return <div className={cls} style={style}>{children}</div>;
+  return <div className={cls} style={style} {...ariaProps}>{children}</div>;
 }
 
 /* ── Delta pill — semantic up/down/flat ── */
