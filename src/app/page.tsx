@@ -5,7 +5,7 @@ import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, S
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
-import { ApprovalInbox } from "@/components/approval-inbox";
+import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 
 // ── Types ─────────────────────────────────────────────────
 interface HLPosition {
@@ -1210,7 +1210,7 @@ export default function Dashboard() {
             <HermesBriefing />
           </div>
           <div className="xl:col-span-1 hq-rise" style={rise(5)}>
-            <ApprovalInbox compact />
+            <AgentProposalsWidget />
           </div>
         </div>
 
