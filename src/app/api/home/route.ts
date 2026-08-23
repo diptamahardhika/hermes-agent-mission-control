@@ -141,16 +141,6 @@ export async function GET() {
     const cal = col?.contributionCalendar;
     if (!cal?.weeks) return null;
 
-    // GitHub precomputes `contributionCalendar.totalContributions` and it can lag
-    // the live total by a while. The per-type counters are computed fresh per
-    // query, so sum those when available.
-    const freshTotal =
-      (col.totalCommitContributions || 0) +
-      (col.totalIssueContributions || 0) +
-      (col.totalPullRequestContributions || 0) +
-      (col.totalPullRequestReviewContributions || 0) +
-      (col.totalRepositoryContributions || 0);
-
     const levelRank: Record<string, number> = {
       NONE: 0, FIRST_QUARTILE: 1, SECOND_QUARTILE: 2, THIRD_QUARTILE: 3, FOURTH_QUARTILE: 4,
     };
@@ -197,8 +187,13 @@ export async function GET() {
       else run = 0;
     }
 
+    // The day-sum matches GitHub's own profile total; the per-type counters
+    // exclude some contribution types and made the number drift downward.
+    const daySum = allDays.reduce((s, d) => s + d.count, 0);
+    const total = daySum > 0 ? daySum : cal.totalContributions ?? 0;
+
     return {
-      totalContributions: (freshTotal > 0 ? freshTotal : cal.totalContributions ?? allDays.reduce((s, d) => s + d.count, 0)) + (boosted ? todayBoost : 0),
+      totalContributions: total + (boosted ? todayBoost : 0),
       currentStreak,
       longestStreak,
       weeks: weeks,

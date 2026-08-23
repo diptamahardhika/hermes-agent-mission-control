@@ -80,7 +80,7 @@ interface SpendData {
   outputTokens: number | null;
   sessions: number | null;
   toolCalls: number | null;
-  byModel: { model: string; sessions: number; tokens: number }[];
+  byModel: { model: string; sessions: number; tokens: number; inputTokens?: number; outputTokens?: number }[];
   days: { date: string; tokens: number }[];
 }
 
@@ -512,20 +512,51 @@ function AIModelNewsPanel() {
 }
 
 // ── Spend card mini-viz: model share + input/output split ─
+function modelProvider(model: string): string {
+  const KNOWN: [RegExp, string][] = [
+    [/^ox-alpha/i, "openrouter"], [/nemotron/i, "nvidia"], [/solar-pro/i, "upstage"],
+    [/deepseek/i, "deepseek"], [/glm|z-ai/i, "z.ai"], [/qwen/i, "qwen"],
+    [/gemma/i, "google"], [/llama/i, "meta"], [/mistral|magistral/i, "mistral"],
+    [/claude/i, "anthropic"], [/gpt|o[34](-|$)/i, "openai"],
+  ];
+  if (model.includes("/")) return model.split("/")[0];
+  for (const [re, p] of KNOWN) { if (re.test(model)) return p; }
+  return "";
+}
+
 function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; total: number | null }) {
-  const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 3);
+  const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 6);
   if (!top.length || !total) return null;
   return (
     <div className="mt-4 space-y-1.5">
       {top.map(m => {
         const pct = Math.round((m.tokens / total) * 100);
+        const split = m.inputTokens != null && m.outputTokens != null && m.inputTokens + m.outputTokens > 0;
+        const inPct = split ? Math.round((m.inputTokens! / (m.inputTokens! + m.outputTokens!)) * 100) : 100;
         return (
           <div key={m.model} className="flex items-center gap-2">
-            <span className="text-[11px] text-[var(--hq-text-dim)] truncate w-32 shrink-0">{m.model}</span>
+            <span className="text-[11px] text-[var(--hq-text-dim)] truncate w-48 shrink-0">
+              {m.model}
+              {modelProvider(m.model) && <span className="text-[9.5px] text-[var(--hq-text-ghost)]"> | {modelProvider(m.model)}</span>}
+            </span>
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: "#a78bfa", opacity: 0.9 }} />
+              {split ? (
+                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%` }}>
+                  <div className="h-full" style={{ width: `${inPct}%`, background: "#a78bfa", opacity: 0.9 }} />
+                  <div className="h-full" style={{ width: `${100 - inPct}%`, background: "#38bdf8", opacity: 0.85 }} />
+                </div>
+              ) : (
+                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: "#a78bfa", opacity: 0.9 }} />
+              )}
             </div>
-            <span className="num text-[10px] text-[var(--hq-text-ghost)] w-8 text-right shrink-0">{pct}%</span>
+            <span className="num text-[10px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap w-28">
+              {split ? (
+                <>
+                  <span style={{ color: "#a78bfa" }}>in</span> {fmt(m.inputTokens!)}{" "}
+                  <span style={{ color: "#38bdf8" }}>out</span> {fmt(m.outputTokens!)}
+                </>
+              ) : `${pct}%`}
+            </span>
           </div>
         );
       })}
@@ -1154,7 +1185,7 @@ export default function Dashboard() {
               value={data.spend.totalTokens ?? 0}
               format={fmt}
               delta={null} deltaPct={null} deltaLabel={undefined}
-              trend={data.spend.days.map(d => d.tokens)}
+              trend={undefined}
               goal={undefined} goalFormat={undefined}
               icon={<Cpu className="w-4 h-4" />} accent="#a78bfa" href="/hermes#runs" loaded={loaded}
             >
