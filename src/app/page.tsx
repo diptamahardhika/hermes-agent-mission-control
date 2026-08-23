@@ -6,6 +6,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
 import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
+import { Skeleton } from "@/components/ui/kit";
 
 // ── Types ─────────────────────────────────────────────────
 interface HLPosition {
@@ -463,7 +464,22 @@ function AIModelNewsPanel() {
         <span className="eyebrow">AI Models &amp; News</span>
       </div>
       {!news ? (
-        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">Loading OpenRouter catalog &amp; AI news…</div>
+        <div className="space-y-4 py-4">
+          <div className="flex gap-6">
+            <div className="flex-1 space-y-2">
+              <div className="sk h-3 w-24 rounded-full" />
+              <div className="sk h-3 w-full rounded" />
+              <div className="sk h-3 w-4/5 rounded" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="sk h-3 w-20 rounded-full" />
+              <div className="sk h-3 w-full rounded" />
+              <div className="sk h-3 w-3/5 rounded" />
+            </div>
+          </div>
+          <div className="sk h-3 w-48 rounded-full" />
+          <div className="sk h-20 rounded-md" />
+        </div>
       ) : news.newModels.length === 0 && news.freeModels.length === 0 && news.news.length === 0 ? (
         <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">No catalog or news data available right now.</div>
       ) : (
@@ -1071,6 +1087,71 @@ function ScoreGauge({ score }: { score: ScoreData }) {
 }
 
 // ── Main ──────────────────────────────────────────────────
+// ── Sage research findings panel ───────────────────────────
+interface SageFinding {
+  taskId: string;
+  title: string;
+  summary: string;
+  completedAt: string;
+}
+function SageFindingsPanel() {
+  const [findings, setFindings] = useState<SageFinding[] | null>(null);
+  useEffect(() => {
+    fetch("/api/sage-findings").then(r => r.ok ? r.json() : null).then(d => { if (d) setFindings(d.findings ?? []); }).catch(() => {});
+    const iv = setInterval(() => {
+      fetch("/api/sage-findings").then(r => r.ok ? r.json() : null).then(d => { if (d) setFindings(d.findings ?? []); }).catch(() => {});
+    }, 300_000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const [expanded, setExpanded] = useState<number | null>(0);
+
+  return (
+    <div className="panel flex flex-col p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-base leading-none">🌿</span>
+        <span className="eyebrow">Sage · Research Findings</span>
+        <a href="/agents" className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] hover:text-[var(--hq-text-dim)] transition-colors">via Agents Floor</a>
+      </div>
+      {!findings ? (
+        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">Loading Sage&apos;s latest research…</div>
+      ) : findings.length === 0 ? (
+        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">
+          No completed research yet. Sage&apos;s digests will appear here after his daily run.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {findings.map((f, i) => {
+            const open = expanded === i;
+            const bullets = f.summary.split(/\n+/).filter(l => l.trim());
+            return (
+              <div key={f.taskId} className="border-b border-[var(--hq-hairline)] last:border-0 pb-3 last:pb-0">
+                <button
+                  onClick={() => setExpanded(open ? null : i)}
+                  className="w-full flex items-center gap-2 text-left group"
+                >
+                  <span className="flex-1 text-[12px] font-medium text-[var(--hq-text-dim)] group-hover:text-[var(--hq-text)] transition-colors truncate">
+                    {f.title}
+                  </span>
+                  <span className="num shrink-0 text-[10px] text-[var(--hq-text-ghost)]">{timeAgo(f.completedAt)}</span>
+                  <ChevronRight className={`w-3 h-3 shrink-0 text-[var(--hq-text-ghost)] transition-transform ${open ? "rotate-90" : ""}`} />
+                </button>
+                {open && (
+                  <ul className="mt-2 space-y-1.5 pl-3 border-l border-[var(--hq-hairline)]">
+                    {bullets.slice(0, 12).map((b, j) => (
+                      <li key={j} className="text-[11.5px] leading-relaxed text-[var(--hq-text-dim)] whitespace-pre-wrap">{b}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [data, setData] = useState<HomeData>(EMPTY);
   const [time, setTime] = useState(new Date());
@@ -1102,6 +1183,51 @@ export default function Dashboard() {
   }, []);
 
   if (!mounted) return null;
+
+  // ── Loading skeleton (mirrors the grid structure on first paint) ──
+  if (!loaded) {
+    return (
+      <div className="relative z-10 w-full mx-auto pb-16 p-6 md:p-8">
+        <div className="hq-rise mb-10">
+          <div className="sk h-5 w-28 rounded-full mb-3" />
+          <div className="sk h-10 w-72 rounded-full mb-5" />
+          <div className="sk h-3 w-48 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* GitHub */}
+          <div className="flex flex-col gap-5">
+            <div className="sk h-28 rounded-[var(--r-lg)]" />
+            <div className="sk h-64 rounded-[var(--r-lg)]" />
+          </div>
+          {/* Homelab */}
+          <div className="flex flex-col gap-5">
+            <div className="sk h-28 rounded-[var(--r-lg)]" />
+            <div className="sk h-64 rounded-[var(--r-lg)]" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+          <div className="sk h-72 rounded-[var(--r-lg)]" />
+          <div className="sk h-72 rounded-[var(--r-lg)]" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+          <div className="sk h-48 rounded-[var(--r-lg)]" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+          <div className="sk h-64 rounded-[var(--r-lg)]" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+          <div className="sk h-40 rounded-[var(--r-lg)]" />
+          <div className="sk h-40 rounded-[var(--r-lg)]" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+          <div className="sk h-64 rounded-[var(--r-lg)]" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+          <div className="sk h-48 rounded-[var(--r-lg)]" />
+        </div>
+      </div>
+    );
+  }
 
   const xd = withDevPreview(snapDelta(data.snapshots, "xf"), data.xFollowers);
   const ytd = withDevPreview(snapDelta(data.snapshots, "yt"), data.ytSubscribers);
@@ -1227,6 +1353,7 @@ export default function Dashboard() {
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="hq-rise" style={rise(6)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
+            <div className="hq-rise" style={rise(6)}><SageFindingsPanel /></div>
           </div>
         </div>
 
