@@ -57,7 +57,7 @@ const DEFAULT_AGENTS = [
     id: "pixel",
     name: "Pixel",
     emoji: "\uD83C\uDFA8",
-    role: "Web App Specialist \u00B7 OpenCode Coding Sessions",
+    role: "Repo Hygiene Engineer \u00B7 Codebase Cleanliness",
     status: "idle",
     tasksCompleted: 0,
     totalCost: 0,
@@ -74,7 +74,7 @@ function sh(cmd: string, args: string[], timeout = 5000): Promise<string | null>
 // ── Hermes kanban board (~/.hermes/state.db via `hermes` CLI schema) ──
 // max/sage/knox/nova are real Hermes profiles. A task on the board assigned
 // to <profile> with status running/todo/ready means that agent is busy.
-const KANBAN_PROFILES = ["max", "sage", "knox", "nova"] as const;
+const KANBAN_PROFILES = ["max", "sage", "knox", "nova", "pixel"] as const;
 
 const KANBAN_DB = `${homedir()}/.hermes/kanban.db`;
 
@@ -132,36 +132,6 @@ async function hermesSessionLive(): Promise<Live> {
   return { status: "idle" };
 }
 
-// ── OpenCode live state (~/.local/share/opencode/opencode.db) ──
-async function opencodeLive(): Promise<Live> {
-  const running = await sh("pgrep", ["-x", "opencode"]);
-  if (!running || !running.trim()) return { status: "offline" };
-
-  const db = `${homedir()}/.local/share/opencode/opencode.db`;
-  const out = await sh("sqlite3", [
-    "-readonly", db,
-    `SELECT m.time_updated, s.title FROM message m
-     JOIN session s ON s.id = m.session_id
-     ORDER BY m.time_updated DESC LIMIT 1;`,
-  ]);
-  let lastActive: string | undefined;
-  if (out && out.trim()) {
-    const [msStr, title] = out.trim().split("|");
-    const ms = Number(msStr);
-    if (Number.isFinite(ms) && ms > 0) {
-      lastActive = new Date(ms).toISOString();
-      // Actively generating = a message landed in the last 3 minutes
-      if (Date.now() - ms < 3 * 60 * 1000) {
-        return {
-          status: "working",
-          currentTask: title ? title.replace(/^New session - .*/, "Coding session").slice(0, 80) : "Coding",
-          lastActive,
-        };
-      }
-    }
-  }
-  return { status: "idle", lastActive };
-}
 
 export async function GET() {
   try {
@@ -185,8 +155,6 @@ export async function GET() {
       ...kanbanLive,
       max: kanbanLive.max?.status === "working" ? kanbanLive.max : sessionLive,
     };
-    if (kanbanLive.max?.status === "working") liveMap.max = kanbanLive.max;
-    else if (sessionLive.status === "working" || !liveMap.max) liveMap.max = sessionLive;
 
     const agents = DEFAULT_AGENTS.map((agent) => {
       const s = stateMap[agent.id] || {};

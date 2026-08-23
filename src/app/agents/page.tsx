@@ -69,8 +69,17 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
   const status = statusConfig[agent.status] || statusConfig.offline;
   const lastActivity = agent.recentActivity.length > 0 ? agent.recentActivity[0] : null;
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); }
+  }
+
   return (
-    <div className="panel panel-interactive overflow-hidden">
+    <div className="panel panel-interactive overflow-hidden"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="button"
+      aria-expanded={isExpanded}
+    >
       {/* Main card */}
       <div className="p-5 cursor-pointer" onClick={onToggle}>
         <div className="flex items-start gap-3.5">
@@ -157,6 +166,43 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
   const [msgs, setMsgs] = useState<{ role: "user"|"assistant"; content: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const firstFocusableRef = useRef<HTMLButtonElement>(null);
+
+  // Focus first focusable on open, restore to trigger on close
+  useEffect(() => {
+    if (modalRef.current && firstFocusableRef.current) {
+      firstFocusableRef.current.focus();
+    }
+  }, []);
+
+  // Trap focus within modal
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+    const focusable = modal.querySelectorAll<HTMLElement>(
+      'button, input, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    function trap(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    modal.addEventListener("keydown", trap);
+    return () => modal.removeEventListener("keydown", trap);
+  }, [msgs, loading]);
+
+  // Escape closes, and restores focus to the chat trigger
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+  }
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
@@ -184,8 +230,11 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
   const agentColor = roleColors[agent.id]?.split(" ")[0]?.replace("from-","text-")?.replace("/20","") || "text-[var(--text-3)]";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="elevated w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      onClick={onClose} onKeyDown={handleKeyDown} aria-modal="true" role="dialog"
+      aria-label={`Chat with ${agent.name}`}>
+      <div className="elevated w-full max-w-lg overflow-hidden" ref={modalRef} onClick={e => e.stopPropagation()}
+        tabIndex={-1}>
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: "1px solid var(--line)" }}>
           <div className="text-2xl">{agent.emoji}</div>
@@ -193,7 +242,9 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
             <div className="text-[14px] font-semibold text-[var(--text)]">{agent.name}</div>
             <div className="text-[12px] text-[var(--text-3)]">{agent.role}</div>
           </div>
-          <button onClick={onClose} className="ml-auto text-[var(--text-3)] hover:text-[var(--text)] transition-colors text-xl leading-none">×</button>
+          <button onClick={onClose} ref={firstFocusableRef}
+            className="ml-auto text-[var(--text-3)] hover:text-[var(--text)] transition-colors text-xl leading-none"
+            aria-label="Close chat">×</button>
         </div>
         {/* Messages */}
         <div className="h-80 overflow-y-auto p-4 space-y-3 flex flex-col" style={{ background: "var(--surface-1)" }}>
@@ -231,11 +282,13 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
             placeholder={`Message ${agent.name}…`}
             className="flex-1 rounded-full px-4 py-2 text-[13px] text-[var(--text)] focus:outline-none transition-colors"
             style={{ background: "var(--surface-1)", border: "1px solid var(--line)" }}
+            aria-label={`Message ${agent.name}`}
           />
           <button
             onClick={send}
             disabled={!input.trim() || loading}
             className="btn-primary px-4 py-2 text-[13px]"
+            aria-label="Send message"
           >Send</button>
         </div>
       </div>
@@ -452,14 +505,20 @@ export default function AgentsPage() {
             {agents.filter(a => a.id !== "max").map(a => (
               <button key={a.id} onClick={() => setChatAgent(a)}
                 className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] text-[var(--text-2)] transition-colors panel-interactive"
-                style={{ background: "var(--surface-1)", border: "1px solid var(--line)" }}>
+                style={{ background: "var(--surface-1)", border: "1px solid var(--line)" }}
+                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setChatAgent(a); } }}
+                tabIndex={0}
+              >
                 <span>{a.emoji}</span> Chat with {a.name}
               </button>
             ))}
             {agents.find(a => a.id === "max") && (
               <button onClick={() => setChatAgent(agents.find(a => a.id === "max")!)}
                 className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] transition-colors"
-                style={{ color: "var(--accent)", background: "color-mix(in srgb, var(--accent) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}>
+                style={{ color: "var(--accent)", background: "color-mix(in srgb, var(--accent) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}
+                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setChatAgent(agents.find(a => a.id === "max")!); } }}
+                tabIndex={0}
+              >
                 🐺 Chat with Max
               </button>
             )}
