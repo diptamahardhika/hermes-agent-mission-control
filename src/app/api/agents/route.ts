@@ -165,26 +165,28 @@ async function opencodeLive(): Promise<Live> {
 
 export async function GET() {
   try {
-    const [states, sessionLive, kanbanLive, opencode] = await Promise.all([
+    const [states, sessionLive, kanbanLive] = await Promise.all([
       prisma.agentState.findMany(),
       hermesSessionLive(),
       hermesKanbanLive(),
-      opencodeLive(),
     ]);
     const stateMap: Record<string, any> = {};
     for (const s of states) {
       stateMap[s.id] = s;
     }
 
-    // Real runtime → cast mapping:
-    // max: Hermes interactive sessions (you talking to Hermes) OR his kanban tasks
-    // sage/knox/nova: their kanban profile tasks (running = Working)
-    // pixel: OpenCode sessions
+    // Real runtime → cast mapping: all five agents are Hermes kanban profiles.
+    // max: interactive Hermes sessions (you talking to Hermes) OR his kanban tasks;
+    // sage/knox/nova/pixel: their kanban profile tasks (running = Working).
     const liveMap: Record<string, Live> = {
-      max: kanbanLive.max?.status === "working" ? kanbanLive.max : sessionLive,
+      // NB: spread kanbanLive FIRST — the max: line must win, otherwise a
+      // queued (ready) kanban task's "idle" overwrites the live session's
+      // "working" (interactive turn beats a queued task).
       ...kanbanLive,
-      pixel: opencode,
+      max: kanbanLive.max?.status === "working" ? kanbanLive.max : sessionLive,
     };
+    if (kanbanLive.max?.status === "working") liveMap.max = kanbanLive.max;
+    else if (sessionLive.status === "working" || !liveMap.max) liveMap.max = sessionLive;
 
     const agents = DEFAULT_AGENTS.map((agent) => {
       const s = stateMap[agent.id] || {};
