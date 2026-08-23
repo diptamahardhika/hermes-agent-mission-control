@@ -117,7 +117,7 @@ export async function GET() {
   const headers = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
-    ...(GITHUB_TOKEN ? { Authorization: `*** ${GITHUB_TOKEN}` } : {}),
+    ...(GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {}),
   };
 
   // ─── Batch-fetch ALL DataStore keys upfront (R2c) ───────────────────────────
