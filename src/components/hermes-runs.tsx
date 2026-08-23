@@ -261,10 +261,29 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
             const widthPct = Math.max(2, Math.round(Math.sqrt(total / max) * 100));
             const sharePct = Math.round((total / grand) * 100);
             const inPct = split ? Math.round((m.inputTokens! / (m.inputTokens! + m.outputTokens!)) * 100) : 100;
+            // Provider label: use the id prefix when present ("nous/..." -> nous),
+            // otherwise match known model families to their usual route.
+            const KNOWN_PROVIDERS: [RegExp, string][] = [
+              [/^ox-alpha/i, "openrouter"],
+              [/nemotron/i, "nvidia"],
+              [/solar-pro/i, "upstage"],
+              [/deepseek/i, "deepseek"],
+              [/glm|z-ai/i, "z.ai"],
+              [/qwen/i, "qwen"],
+              [/gemma/i, "google"],
+              [/llama/i, "meta"],
+              [/mistral|magistral/i, "mistral"],
+              [/claude/i, "anthropic"],
+              [/gpt|o[34](-|$)/i, "openai"],
+            ];
+            let provider = "";
+            if (m.model.includes("/")) provider = m.model.split("/")[0];
+            else for (const [re, p] of KNOWN_PROVIDERS) { if (re.test(m.model)) { provider = p; break; } }
             return (
               <div key={m.model} className="flex items-center gap-3">
-                <span className="text-[12px] text-[var(--text-2)] w-36 shrink-0 truncate">
+                <span className="text-[12px] text-[var(--text-2)] w-56 shrink-0 truncate">
                   {m.model}
+                  {provider && <span className="text-[10px] text-[var(--text-3)]"> | {provider}</span>}
                 </span>
                 <div className="flex-1 h-[6px] rounded-full bg-[var(--surface-2)] overflow-hidden">
                   <div
@@ -287,7 +306,7 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                     )}
                   </div>
                 </div>
-                <span className="num text-[11px] text-[var(--text-3)] shrink-0 w-44 text-right tabular-nums whitespace-nowrap">
+                <span className="num text-[11px] text-[var(--text-3)] shrink-0 w-32 text-right tabular-nums whitespace-nowrap">
                   {split ? (
                     <>
                       <span style={{ color: "#a78bfa" }}>in</span> {fmtTokens(m.inputTokens!)}

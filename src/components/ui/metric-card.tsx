@@ -98,7 +98,7 @@ export function MetricCard({
       {/* sparkline */}
       {series && (
         <div className="mt-4">
-          <Sparkline data={series} color={deltaColor} area idSeed={label} className="h-9" />
+          <Sparkline data={series} color={deltaColor !== GHOST ? deltaColor : accent} area idSeed={label} className="h-9" />
         </div>
       )}
 
