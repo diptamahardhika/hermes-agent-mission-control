@@ -429,6 +429,7 @@ function TaskBoard({
   total: number;
   lastSync: string | null;
 }) {
+  const [openCols, setOpenCols] = useState<Record<string, boolean>>({});
   const groups: Record<string, Task[]> = {};
   for (const t of tasks) {
     const col = columnFor(t.status);
@@ -462,6 +463,11 @@ function TaskBoard({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {cols.map((col) => {
             const tone = columnTone(col);
+            const MAX_VISIBLE = 7;
+            const sorted = [...groups[col]].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+            const expanded = !!openCols[col];
+            const visible = expanded ? sorted : sorted.slice(0, MAX_VISIBLE);
+            const overflow = expanded ? 0 : sorted.length - visible.length;
             return (
               <div key={col} className="flex flex-col gap-2.5">
                 <div className="flex items-center justify-between px-1">
@@ -471,9 +477,7 @@ function TaskBoard({
                   </span>
                 </div>
                 <div className="flex flex-col gap-2.5">
-                  {groups[col]
-                    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
-                    .map((t) => (
+                  {visible.map((t) => (
                       <div
                         key={t.id}
                         className="panel p-3.5"
@@ -499,7 +503,15 @@ function TaskBoard({
                           )}
                         </div>
                       </div>
-                    ))}
+                  ))}
+                  {overflow > 0 && (
+                    <button
+                      onClick={() => setOpenCols(prev => ({ ...prev, [col]: !prev[col] }))}
+                      className="self-start text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors px-1"
+                    >
+                      {openCols[col] ? "Show less" : `+${overflow} more…`}
+                    </button>
+                  )}
                 </div>
               </div>
             );

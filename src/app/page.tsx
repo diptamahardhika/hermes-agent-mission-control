@@ -1087,12 +1087,43 @@ function ScoreGauge({ score }: { score: ScoreData }) {
 }
 
 // ── Main ──────────────────────────────────────────────────
+// Render digest text, turning markdown links and bare URLs clickable.
+function renderWithLinks(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  // [label](url) | bare url
+  const re = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)]+)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) nodes.push(<span key={key++}>{text.slice(last, m.index)}</span>);
+    const label = m[1];
+    const url = m[2] || m[3];
+    nodes.push(
+      <a
+        key={key++}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hover:underline break-all"
+        style={{ color: "var(--accent)" }}
+      >
+        {label || url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]}
+      </a>
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) nodes.push(<span key={key++}>{text.slice(last)}</span>);
+  return nodes;
+}
+
 // ── Sage research findings panel ───────────────────────────
 interface SageFinding {
   taskId: string;
   title: string;
   summary: string;
   completedAt: string;
+  category: "ai" | "security";
 }
 function SageFindingsPanel() {
   const [findings, setFindings] = useState<SageFinding[] | null>(null);
@@ -1104,7 +1135,12 @@ function SageFindingsPanel() {
     return () => clearInterval(iv);
   }, []);
 
-  const [expanded, setExpanded] = useState<number | null>(0);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const GROUPS: { key: "ai" | "security"; label: string; dot: string }[] = [
+    { key: "ai", label: "AI Models & Market", dot: "#38bdf8" },
+    { key: "security", label: "Cybersecurity & Threats", dot: "#fb7185" },
+  ];
 
   return (
     <div className="panel flex flex-col p-6">
@@ -1120,29 +1156,46 @@ function SageFindingsPanel() {
           No completed research yet. Sage&apos;s digests will appear here after his daily run.
         </div>
       ) : (
-        <div className="space-y-3">
-          {findings.map((f, i) => {
-            const open = expanded === i;
-            const bullets = f.summary.split(/\n+/).filter(l => l.trim());
+        <div className="space-y-5">
+          {GROUPS.map(group => {
+            const items = findings.filter(f => f.category === group.key).slice(0, 3);
+            if (!items.length) return null;
             return (
-              <div key={f.taskId} className="border-b border-[var(--hq-hairline)] last:border-0 pb-3 last:pb-0">
-                <button
-                  onClick={() => setExpanded(open ? null : i)}
-                  className="w-full flex items-center gap-2 text-left group"
-                >
-                  <span className="flex-1 text-[12px] font-medium text-[var(--hq-text-dim)] group-hover:text-[var(--hq-text)] transition-colors truncate">
-                    {f.title}
-                  </span>
-                  <span className="num shrink-0 text-[10px] text-[var(--hq-text-ghost)]">{timeAgo(f.completedAt)}</span>
-                  <ChevronRight className={`w-3 h-3 shrink-0 text-[var(--hq-text-ghost)] transition-transform ${open ? "rotate-90" : ""}`} />
-                </button>
-                {open && (
-                  <ul className="mt-2 space-y-1.5 pl-3 border-l border-[var(--hq-hairline)]">
-                    {bullets.slice(0, 12).map((b, j) => (
-                      <li key={j} className="text-[11.5px] leading-relaxed text-[var(--hq-text-dim)] whitespace-pre-wrap">{b}</li>
-                    ))}
-                  </ul>
-                )}
+              <div key={group.key}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: group.dot }} />
+                  <span className="eyebrow !text-[9.5px]" style={{ color: group.dot }}>{group.label}</span>
+                </div>
+                <div className="space-y-3">
+                  {items.map((f, i) => {
+                    const key = f.taskId;
+                    const open = expanded === key || (expanded === null && i === 0 && group.key === "ai");
+                    const bullets = f.summary.split(/\n+/).filter(l => l.trim());
+                    return (
+                      <div key={key} className="border-b border-[var(--hq-hairline)] last:border-0 pb-3 last:pb-0">
+                        <button
+                          onClick={() => setExpanded(open ? null : key)}
+                          className="w-full flex items-center gap-2 text-left group"
+                        >
+                          <span className="flex-1 text-[12px] font-medium text-[var(--hq-text-dim)] group-hover:text-[var(--hq-text)] transition-colors truncate">
+                            {f.title}
+                          </span>
+                          <span className="num shrink-0 text-[10px] text-[var(--hq-text-ghost)]">{timeAgo(f.completedAt)}</span>
+                          <ChevronRight className={`w-3 h-3 shrink-0 text-[var(--hq-text-ghost)] transition-transform ${open ? "rotate-90" : ""}`} />
+                        </button>
+                        {open && (
+                          <ul className="mt-2 space-y-1.5 pl-3 border-l" style={{ borderColor: `${group.dot}33` }}>
+                            {bullets.slice(0, 12).map((b, j) => (
+                              <li key={j} className="text-[11.5px] leading-relaxed text-[var(--hq-text-dim)] whitespace-pre-wrap">
+                                {renderWithLinks(b)}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
@@ -1352,8 +1405,8 @@ export default function Dashboard() {
         <div className="mt-14">
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="hq-rise" style={rise(6)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
             <div className="hq-rise" style={rise(6)}><SageFindingsPanel /></div>
+            <div className="hq-rise" style={rise(6)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
           </div>
         </div>
 
