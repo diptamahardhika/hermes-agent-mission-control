@@ -56,39 +56,48 @@ export async function POST(request: NextRequest): Promise<NextResponse<AgentChat
       { role: 'user' as const, content: message },
     ];
 
-    // Call OpenRouter API
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://your-app.vercel.app',
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-haiku-4-5',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages,
-        ],
-        max_tokens: 800,
-      }),
-    });
+    // Free models only — the OpenRouter account has no credits. Try in order.
+    const FREE_MODELS = [
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "google/gemma-4-31b-it:free",
+      "nvidia/nemotron-3-nano-30b-a3b:free",
+    ];
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('OpenRouter API error:', error);
-      return NextResponse.json(
-        { error: 'Failed to get response from AI model' },
-        { status: 500 }
-      );
+    let reply = "";
+    let lastError = "";
+    for (const model of FREE_MODELS) {
+      // Call OpenRouter API
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://your-app.vercel.app',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...messages,
+          ],
+          max_tokens: 800,
+        }),
+      });
+
+      if (!response.ok) {
+        lastError = `${model}: ${response.status} ${(await response.text()).slice(0, 200)}`;
+        console.error('OpenRouter API error:', lastError);
+        continue;
+      }
+
+      const data = await response.json();
+      reply = data.choices?.[0]?.message?.content || '';
+      if (reply) break;
     }
-
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || '';
 
     if (!reply) {
       return NextResponse.json(
-        { error: 'No response from AI model' },
+        { error: lastError || 'No response from AI model' },
         { status: 500 }
       );
     }

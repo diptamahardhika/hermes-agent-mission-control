@@ -9,7 +9,9 @@ const execFileP = promisify(execFile);
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Default agent roster
+// Default agent roster — each maps to a REAL runtime:
+// max/sage/knox/nova → Hermes kanban profiles (~/.hermes/profiles/<id>),
+// pixel → OpenCode sessions. Status derives live in GET().
 const DEFAULT_AGENTS = [
   {
     id: "max",
@@ -25,7 +27,7 @@ const DEFAULT_AGENTS = [
     id: "sage",
     name: "Sage",
     emoji: "\uD83C\uDF3F",
-    role: "X Content Specialist \u00B7 Trend Scout",
+    role: "AI Research Analyst \u00B7 Model News & Market Watch",
     status: "idle",
     tasksCompleted: 0,
     totalCost: 0,
@@ -35,7 +37,7 @@ const DEFAULT_AGENTS = [
     id: "knox",
     name: "Knox",
     emoji: "\uD83D\uDD10",
-    role: "Trading Operations \u00B7 Bot Monitor",
+    role: "Ops/Infra Engineer \u00B7 Homelab & Monitoring",
     status: "idle",
     tasksCompleted: 0,
     totalCost: 0,
@@ -45,7 +47,7 @@ const DEFAULT_AGENTS = [
     id: "nova",
     name: "Nova",
     emoji: "\u2B50",
-    role: "YouTube Strategy \u00B7 Content Research",
+    role: "UI/UX Designer \u00B7 Product Interfaces",
     status: "idle",
     tasksCompleted: 0,
     totalCost: 0,
@@ -69,12 +71,45 @@ function sh(cmd: string, args: string[], timeout = 5000): Promise<string | null>
     .catch(() => null);
 }
 
+// ── Hermes kanban board (~/.hermes/state.db via `hermes` CLI schema) ──
+// max/sage/knox/nova are real Hermes profiles. A task on the board assigned
+// to <profile> with status running/todo/ready means that agent is busy.
+const KANBAN_PROFILES = ["max", "sage", "knox", "nova"] as const;
+
+const KANBAN_DB = `${homedir()}/.hermes/kanban.db`;
+
+async function hermesKanbanLive(): Promise<Record<string, Live>> {
+  // NB: no -readonly here — macOS sqlite3 can't open a WAL db readonly if it
+  // needs recovery, and this DB is actively written by the gateway dispatcher.
+  const out = await sh("sqlite3", [
+    KANBAN_DB,
+    `SELECT assignee, status, title FROM tasks
+     WHERE status IN ('running','todo','ready','review','blocked')
+     ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'ready' THEN 1 WHEN 'todo' THEN 2 ELSE 3 END;`,
+  ]);
+  const map: Record<string, Live> = {};
+  if (!out) return map;
+  for (const line of out.trim().split("\n")) {
+    if (!line) continue;
+    const [assignee, status, title] = line.split("|");
+    if (!assignee || !KANBAN_PROFILES.includes(assignee as any)) continue;
+    if (!map[assignee]) {
+      map[assignee] =
+        status === "running"
+          ? { status: "working", currentTask: (title || "Working").slice(0, 80), lastActive: new Date().toISOString() }
+          : { status: "idle", currentTask: undefined };
+      // queued work still counts as "has a task" but only running shows Working
+    }
+  }
+  return map;
+}
+
 type Live = { status: string; currentTask?: string; lastActive?: string };
 
-// ── Hermes live state (local state.db) ──────────────────────
+// ── Hermes interactive sessions (local state.db) → Max ─────
 // A row in session_turn_leases with expires_at in the future means a turn is
-// generating RIGHT NOW. Recent open sessions mean the runtime is in use.
-async function hermesLive(): Promise<Live> {
+// generating RIGHT NOW.
+async function hermesSessionLive(): Promise<Live> {
   const db = `${homedir()}/.hermes/state.db`;
   const nowSql = "strftime('%s','now')";
 
@@ -94,22 +129,7 @@ async function hermesLive(): Promise<Live> {
     };
   }
 
-  const recentOut = await sh("sqlite3", [
-    "-readonly", db,
-    `SELECT datetime(MAX(last_activity_at), 'unixepoch'), COUNT(*)
-     FROM sessions WHERE ended_at IS NULL AND last_activity_at > ${nowSql} - 900;`,
-  ]);
-  if (recentOut && recentOut.trim() && !recentOut.trim().startsWith("|")) {
-    const [ts, count] = recentOut.trim().split("|");
-    if (Number(count) > 0 && ts) {
-      // epoch-ish sanity: only trust if we got a timestamp
-      return {
-        status: "idle",
-        lastActive: new Date(Date.parse(ts.replace(" ", "T") + "Z") || Date.now()).toISOString(),
-      };
-    }
-  }
-  return { status: "offline" };
+  return { status: "idle" };
 }
 
 // ── OpenCode live state (~/.local/share/opencode/opencode.db) ──
@@ -125,7 +145,6 @@ async function opencodeLive(): Promise<Live> {
      ORDER BY m.time_updated DESC LIMIT 1;`,
   ]);
   let lastActive: string | undefined;
-  let currentTask: string | undefined;
   if (out && out.trim()) {
     const [msStr, title] = out.trim().split("|");
     const ms = Number(msStr);
@@ -146,9 +165,10 @@ async function opencodeLive(): Promise<Live> {
 
 export async function GET() {
   try {
-    const [states, hermes, opencode] = await Promise.all([
+    const [states, sessionLive, kanbanLive, opencode] = await Promise.all([
       prisma.agentState.findMany(),
-      hermesLive(),
+      hermesSessionLive(),
+      hermesKanbanLive(),
       opencodeLive(),
     ]);
     const stateMap: Record<string, any> = {};
@@ -156,8 +176,15 @@ export async function GET() {
       stateMap[s.id] = s;
     }
 
-    // Real runtime → cast mapping: Max runs Hermes, Pixel runs OpenCode.
-    const liveMap: Record<string, Live> = { max: hermes, pixel: opencode };
+    // Real runtime → cast mapping:
+    // max: Hermes interactive sessions (you talking to Hermes) OR his kanban tasks
+    // sage/knox/nova: their kanban profile tasks (running = Working)
+    // pixel: OpenCode sessions
+    const liveMap: Record<string, Live> = {
+      max: kanbanLive.max?.status === "working" ? kanbanLive.max : sessionLive,
+      ...kanbanLive,
+      pixel: opencode,
+    };
 
     const agents = DEFAULT_AGENTS.map((agent) => {
       const s = stateMap[agent.id] || {};
@@ -201,7 +228,7 @@ export async function POST(request: Request) {
     const defaultAgent = DEFAULT_AGENTS.find((a) => a.id === agentId);
 
     // Get existing state or create defaults
-    let existing = await prisma.agentState.findUnique({ where: { id: agentId } });
+    const existing = await prisma.agentState.findUnique({ where: { id: agentId } });
 
     const recentActivity = (existing?.recentActivity as any[]) || [];
     const newRecentActivity = action

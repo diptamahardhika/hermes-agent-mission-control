@@ -118,25 +118,29 @@ export async function GET() {
   // PR can take hours to register on the calendar). The REST events feed is
   // near-instant, so estimate today's contributions from it — used ONLY to
   // fill a zero day; once the calendar reports, its number wins.
-  function estimateTodayContributions(eventsResult: { status: string; value?: unknown }): number {
+  function estimateRecentContributions(eventsResult: { status: string; value?: unknown }): Map<string, number> {
     const events = eventsResult?.status === "fulfilled" && Array.isArray(eventsResult.value)
       ? (eventsResult.value as Array<{ type?: string; created_at?: string; payload?: Record<string, unknown> }>)
       : [];
-    const today = new Date().toISOString().slice(0, 10);
-    let n = 0;
+    // Per-day counts for today + yesterday — the calendar's lag window.
+    const days = new Set([0, 1].map(o => new Date(Date.now() - o * 86400000).toISOString().slice(0, 10)));
+    const perDay = new Map<string, number>();
     for (const ev of events) {
-      if ((ev.created_at || "").slice(0, 10) !== today) continue;
-      if (ev.type === "PushEvent") n += 1;
+      const day = (ev.created_at || "").slice(0, 10);
+      if (!days.has(day)) continue;
+      let n = 0;
+      if (ev.type === "PushEvent") n = 1;
       else if (ev.type === "PullRequestEvent") {
         const a = ev.payload?.action;
-        if (a === "opened" || a === "merged") n += 1;
-      } else if (ev.type === "IssuesEvent" && ev.payload?.action === "opened") n += 1;
-      else if (ev.type === "CreateEvent" && ev.payload?.ref_type === "repository") n += 1;
+        if (a === "opened" || a === "merged") n = 1;
+      } else if (ev.type === "IssuesEvent" && ev.payload?.action === "opened") n = 1;
+      else if (ev.type === "CreateEvent" && ev.payload?.ref_type === "repository") n = 1;
+      if (n) perDay.set(day, (perDay.get(day) || 0) + n);
     }
-    return n;
+    return perDay;
   }
 
-  function buildGithubContributions(result: any, todayBoost: number) {
+  function buildGithubContributions(result: any, recentBoosts: Map<string, number>) {
     const col = result?.status === "fulfilled" ? result.value?.data?.user?.contributionsCollection : null;
     const cal = col?.contributionCalendar;
     if (!cal?.weeks) return null;
@@ -152,19 +156,20 @@ export async function GET() {
       return { date: d.date, count, level: levelRank[d.contributionLevel] ?? (count > 0 ? 1 : 0) };
     }));
 
-    // Patch today's cell if GitHub hasn't credited it yet — must run BEFORE
-    // streak math so a lagging zero doesn't break the streak.
+    // GitHub's calendar lags reality (a day can sit at 0 for hours). The REST
+    // events feed is near-instant, so patch ANY lagging cell in the last 2 days
+    // with its own events-based count. Once the calendar reports, its number
+    // wins — the patch only fills zeros, never overwrites real data.
     let boosted = false;
-    if (todayBoost > 0) {
-      const todayKey = new Date().toISOString().slice(0, 10);
-      const cell = allDays.find(d => d.date === todayKey);
-      if (!cell || cell.count === 0) {
-        boosted = true;
-        if (cell) cell.count = todayBoost;
-        for (const week of weeks) {
-          const c = week.find((d: any) => d.date === todayKey);
-          if (c && c.count === 0) { c.count = todayBoost; c.level = Math.max(c.level, 1); }
-        }
+    const recent = recentBoosts; // Map<string, number> of per-day event counts
+    for (const [key, count] of recent) {
+      const cell = allDays.find(d => d.date === key);
+      if (cell && cell.count > 0) continue; // calendar already credited it
+      boosted = true;
+      if (cell) cell.count = count;
+      for (const week of weeks) {
+        const c = week.find((d: any) => d.date === key);
+        if (c && c.count === 0) { c.count = count; c.level = Math.max(c.level, 1); }
       }
     }
 
@@ -189,11 +194,12 @@ export async function GET() {
 
     // The day-sum matches GitHub's own profile total; the per-type counters
     // exclude some contribution types and made the number drift downward.
+    // allDays already includes the patched cells, so no extra addition needed.
     const daySum = allDays.reduce((s, d) => s + d.count, 0);
     const total = daySum > 0 ? daySum : cal.totalContributions ?? 0;
 
     return {
-      totalContributions: total + (boosted ? todayBoost : 0),
+      totalContributions: total,
       currentStreak,
       longestStreak,
       weeks: weeks,
@@ -672,7 +678,7 @@ export async function GET() {
         ? githubEventsResult.value
         : null,
       status: GITHUB_STATUS || null,
-      contributions: buildGithubContributions(githubContribResult, estimateTodayContributions(githubEventsResult)),
+      contributions: buildGithubContributions(githubContribResult, estimateRecentContributions(githubEventsResult)),
     },
     // Homelab
     homelab,
