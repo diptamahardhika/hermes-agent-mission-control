@@ -87,7 +87,6 @@ async function hlPost(body: object) {
 export async function GET() {
   const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "";
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
-  const GITHUB_STATUS = process.env.GITHUB_STATUS || "";
 
   const headers = {
     Accept: "application/vnd.github+json",
@@ -119,6 +118,24 @@ export async function GET() {
   // PR can take hours to register on the calendar). The REST events feed is
   // near-instant, so estimate today's contributions from it — used ONLY to
   // fill a zero day; once the calendar reports, its number wins.
+  // "Working on X" — repo of the freshest push/merged PR within 14 days,
+  // same live derivation as /api/github (replaces the stale GITHUB_STATUS env).
+  function deriveGithubStatus(eventsResult: { status: string; value?: unknown }): string | null {
+    const events = eventsResult?.status === "fulfilled" && Array.isArray(eventsResult.value)
+      ? (eventsResult.value as Array<{ type?: string; created_at?: string; repo?: { name?: string } }>)
+      : [];
+    const cutoff = Date.now() - 14 * 86400000;
+    for (const ev of events) {
+      const t = new Date(ev.created_at || "").getTime();
+      if (!(t >= cutoff)) continue;
+      const isWork = ev.type === "PushEvent" || (ev.type === "PullRequestEvent");
+      if (isWork && ev.repo?.name) {
+        return `Working on ${ev.repo.name.split("/").pop()}`;
+      }
+    }
+    return null;
+  }
+
   function estimateRecentContributions(eventsResult: { status: string; value?: unknown }): Map<string, number> {
     const events = eventsResult?.status === "fulfilled" && Array.isArray(eventsResult.value)
       ? (eventsResult.value as Array<{ type?: string; created_at?: string; payload?: Record<string, unknown> }>)
@@ -678,7 +695,7 @@ export async function GET() {
       activity: githubEventsResult.status === "fulfilled" && Array.isArray(githubEventsResult.value)
         ? githubEventsResult.value
         : null,
-      status: GITHUB_STATUS || null,
+      status: deriveGithubStatus(githubEventsResult),
       contributions: buildGithubContributions(githubContribResult, estimateRecentContributions(githubEventsResult)),
     },
     // Homelab

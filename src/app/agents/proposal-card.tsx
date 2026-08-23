@@ -1,4 +1,8 @@
 // ── Proposal Card ────────────────────────────────────────
+"use client";
+
+import { useState, useRef, useLayoutEffect } from "react";
+
 interface Proposal {
   id: string;
   taskId: string;
@@ -44,6 +48,16 @@ function ProposalCard({
   onReject: (id: string) => void;
   onCreateTask: (id: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  // Detect actual clamping instead of guessing by character count: a body that
+  // fits in 4 lines (or wraps to exactly ≤4) gets no "Read more…" button.
+  const bodyRef = useRef<HTMLParagraphElement | null>(null);
+  const [overflows, setOverflows] = useState(false);
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    setOverflows(el.scrollHeight > el.clientHeight + 1);
+  }, [proposal.body]);
   const agentEmoji: Record<string, string> = {
     nova: "\u2B50",
     sage: "\uD83C\uDF3F",
@@ -99,7 +113,16 @@ function ProposalCard({
           )}
         </div>
 
-        <p className="text-[12px] text-[var(--text-2)] leading-relaxed whitespace-pre-line line-clamp-4">{proposal.body}</p>
+        <p ref={bodyRef} className={`text-[12px] text-[var(--text-2)] leading-relaxed whitespace-pre-line ${expanded ? "" : "line-clamp-4"}`}>{proposal.body}</p>
+        {overflows && (
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="self-start text-[11px] font-medium transition-colors"
+            style={{ color: "var(--accent)" }}
+          >
+            {expanded ? "Show less" : "Read more…"}
+          </button>
+        )}
 
         {liveBadge?.label === "✅ Completed" && proposal.followUpResult && (
           <p className="text-[11px] leading-relaxed rounded-[var(--r-sm)] px-2.5 py-1.5" style={{ background: "color-mix(in srgb, var(--up) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--up) 20%, transparent)", color: "var(--text-2)" }}>
