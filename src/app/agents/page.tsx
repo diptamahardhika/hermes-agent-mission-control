@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import OfficeView from "@/components/OfficeView";
+import { ProposalCard } from "./proposal-card";
 
 interface AgentActivity {
   timestamp: string;
@@ -20,6 +21,20 @@ interface Agent {
   tasksCompleted: number;
   totalCost: number;
   recentActivity: AgentActivity[];
+  proposals?: AgentProposal[];
+}
+
+interface AgentProposal {
+  id: string;
+  taskId: string;
+  agent: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  reviewedAt: string | null;
+  status: string;
+  taskTitle?: string;
+  taskStatus?: string;
 }
 
 const statusConfig: Record<string, { color: string; dot: string; label: string; pulse?: boolean }> = {
@@ -50,8 +65,9 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-function AgentCard({ agent, isExpanded, onToggle }: { agent: Agent; isExpanded: boolean; onToggle: () => void }) {
+function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isExpanded: boolean; onToggle: () => void; onChat: () => void }) {
   const status = statusConfig[agent.status] || statusConfig.offline;
+  const lastActivity = agent.recentActivity.length > 0 ? agent.recentActivity[0] : null;
 
   return (
     <div className="panel panel-interactive overflow-hidden">
@@ -75,6 +91,13 @@ function AgentCard({ agent, isExpanded, onToggle }: { agent: Agent; isExpanded: 
               <span className="text-[10px] font-medium" style={{ color: status.color }}>{status.label}</span>
             </div>
             <p className="text-[12px] text-[var(--text-3)] mt-1">{agent.role}</p>
+
+            {/* Collapsed activity preview — always visible */}
+            {lastActivity && (
+              <p className="text-[12px] mt-2 truncate" style={{ color: "var(--text-3)" }}>
+                Last: {lastActivity.action} · {timeAgo(lastActivity.timestamp)}
+              </p>
+            )}
 
             {/* Current task */}
             {agent.currentTask && agent.status === "working" && (
@@ -112,6 +135,16 @@ function AgentCard({ agent, isExpanded, onToggle }: { agent: Agent; isExpanded: 
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Chat button — visible on Cards view */}
+      {onChat && (
+        <div className="px-5 py-3" style={{ borderTop: "1px solid var(--line)" }}>
+          <button onClick={onChat} className="flex items-center gap-2 w-full rounded-full py-2 text-[12px] text-[var(--text-2)] transition-colors panel-interactive hover:text-[var(--text)]"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--line)" }}>
+            <span>{agent.emoji}</span> Chat with {agent.name}
+          </button>
         </div>
       )}
     </div>
@@ -213,24 +246,73 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [view, setView] = useState<"cards" | "office">("office");
   const [chatAgent, setChatAgent] = useState<Agent | null>(null);
+  const [proposals, setProposals] = useState<AgentProposal[]>([]);
+  const [proposalsCollapsed, setProposalsCollapsed] = useState(false);
+  const [proposalsLoading, setProposalsLoading] = useState(false);
 
   const loadAgents = useCallback(async () => {
     try {
       const res = await fetch("/api/agents");
       const data = await res.json();
       setAgents(Array.isArray(data) ? data : []);
-    } catch {}
+    } catch (e) {
+      setLoadError("Failed to load agents. Check your connection and try again.");
+    }
     setLoading(false);
+  }, []);
+
+  const loadProposals = useCallback(async () => {
+    setProposalsLoading(true);
+    try {
+      const res = await fetch("/api/agent-proposals");
+      const data = await res.json();
+      setProposals(Array.isArray(data) ? data : []);
+    } catch {}
+    setProposalsLoading(false);
   }, []);
 
   useEffect(() => {
     loadAgents();
-    const interval = setInterval(loadAgents, 10000); // poll every 10s
+    const interval = setInterval(loadAgents, 10000);
     return () => clearInterval(interval);
   }, [loadAgents]);
+
+  useEffect(() => {
+    loadProposals();
+    const interval = setInterval(loadProposals, 20000);
+    return () => clearInterval(interval);
+  }, [loadProposals]);
+
+  async function handleApprove(taskId: string) {
+    await fetch("/api/agent-proposals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "approve", proposalId: taskId }),
+    });
+    loadProposals();
+  }
+
+  async function handleReject(taskId: string) {
+    await fetch("/api/agent-proposals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reject", proposalId: taskId }),
+    });
+    loadProposals();
+  }
+
+  async function handleCreateTask(taskId: string) {
+    await fetch("/api/agent-proposals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "createTask", proposalId: taskId }),
+    });
+    loadProposals();
+  }
 
   if (loading) {
     return (
@@ -303,6 +385,74 @@ export default function AgentsPage() {
       {/* Live Agent Chat Modal */}
       {chatAgent && <AgentChat agent={chatAgent} onClose={() => setChatAgent(null)} />}
 
+      {/* Proposals section */}
+      {proposals.length > 0 && (() => {
+        const pendingCount = proposals.filter(p => p.status === "pending").length;
+        const doneCount = proposals.length - pendingCount;
+        return (
+        <div className="panel p-5 space-y-3">
+          <button
+            className="w-full flex items-center justify-between cursor-pointer"
+            onClick={() => setProposalsCollapsed(c => !c)}
+          >
+            <span className="eyebrow flex items-center gap-2">
+              <span className="inline-block transition-transform" style={{ transform: proposalsCollapsed ? "rotate(-90deg)" : "none" }}>▾</span>
+              Agent Proposals
+            </span>
+            <span className="flex items-center gap-2">
+              {pendingCount > 0 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full num border" style={{ color: "var(--warn)", borderColor: "color-mix(in srgb, var(--warn) 40%, transparent)", background: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
+                  {pendingCount} waiting your call
+                </span>
+              )}
+              {doneCount > 0 && (
+                <span className="text-[10px] text-[var(--text-4)] num">{doneCount} handled</span>
+              )}
+            </span>
+          </button>
+          {!proposalsCollapsed && (
+            <>
+              <p className="text-[12px] text-[var(--text-3)]">
+                Ideas and UI/UX proposals from your agents — review, approve, dismiss, or turn into a task.
+              </p>
+              {/* Pending first, then handled ones */}
+              <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+                {[...proposals].sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1)).map((p) => (
+                  <ProposalCard
+                    key={p.taskId}
+                    proposal={p}
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                    onCreateTask={handleCreateTask}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        );
+      })()}
+
+      {/* Empty / failure state */}
+      {!loading && agents.length === 0 && (
+        <div className="panel p-8 text-center">
+          {loadError ? (
+            <>
+              <div className="text-2xl mb-3">⚠</div>
+              <h3 className="text-[14px] font-semibold text-[var(--text)]">Couldn't load agents</h3>
+              <p className="text-[12px] text-[var(--text-3)] mt-2 max-w-xs mx-auto">{loadError}</p>
+              <button onClick={loadAgents} className="btn-primary mt-5 px-5 py-2 text-[13px]">Retry</button>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl mb-3">👤</div>
+              <h3 className="text-[14px] font-semibold text-[var(--text)]">No agents yet</h3>
+              <p className="text-[12px] text-[var(--text-3)] mt-2">Your AI team will appear here once they're connected.</p>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Office View */}
       {view === "office" && (
         <>
@@ -336,6 +486,7 @@ export default function AgentsPage() {
               agent={maxAgent}
               isExpanded={expandedAgent === maxAgent.id}
               onToggle={() => setExpandedAgent(expandedAgent === maxAgent.id ? null : maxAgent.id)}
+              onChat={() => setChatAgent(maxAgent)}
             />
           )}
 
@@ -347,6 +498,7 @@ export default function AgentsPage() {
                 agent={agent}
                 isExpanded={expandedAgent === agent.id}
                 onToggle={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
+                onChat={() => setChatAgent(agent)}
               />
             ))}
           </div>

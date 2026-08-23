@@ -69,7 +69,7 @@ interface GitHubHomeData {
   status: string | null;
   contributions: GitHubContributions | null;
 }
-interface KanbanTask { id: string; title: string; assignee: string; status: string; priority: number }
+interface KanbanTask { id: string; title: string; assignee: string; status: string; priority: number; result?: string | null }
 interface HermesKanban { board: string; slug: string; total: number; counts: Record<string, number>; tasks: KanbanTask[] }
 interface ScoreComponent { score: number; weight?: number; label: string; detail?: string }
 interface ScoreData { score: number; grade: string; label: string; color: string; period?: string; components: Record<string, ScoreComponent> }
@@ -1010,10 +1010,17 @@ function HermesKanbanPanel({ kanban }: { kanban: HermesKanban }) {
       {kanban.tasks.length === 0 ? <Empty>No active tasks.</Empty> : (
         <div className="space-y-0">
           {kanban.tasks.slice(0, 5).map((t) => (
-            <div key={t.id} className="flex items-center gap-3 py-2.5 border-b border-[var(--hq-hairline)] last:border-0">
-              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusColor(t.status) }} />
-              <p className="text-[13px] text-[var(--hq-text-dim)] leading-snug line-clamp-1 flex-1">{t.title}</p>
-              {t.assignee && <span className="num text-[10.5px] text-[var(--hq-text-ghost)] shrink-0">{t.assignee}</span>}
+            <div key={t.id} className="py-2.5 border-b border-[var(--hq-hairline)] last:border-0">
+              <div className="flex items-center gap-3">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusColor(t.status) }} />
+                <p className="text-[13px] text-[var(--hq-text-dim)] leading-snug line-clamp-1 flex-1">{t.title}</p>
+                {t.assignee && <span className="num text-[10.5px] text-[var(--hq-text-ghost)] shrink-0">{t.assignee}</span>}
+              </div>
+              {t.result && (
+                <p className="text-[11.5px] leading-relaxed mt-1 pl-[18px]" style={{ color: "var(--hq-text-faint)" }}>
+                  ↳ {t.result}
+                </p>
+              )}
             </div>
           ))}
         </div>

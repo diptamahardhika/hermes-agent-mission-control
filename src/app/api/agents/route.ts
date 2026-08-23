@@ -57,7 +57,7 @@ const DEFAULT_AGENTS = [
     id: "pixel",
     name: "Pixel",
     emoji: "\uD83C\uDFA8",
-    role: "Web App Specialist \u00B7 Product Ideas",
+    role: "Web App Specialist \u00B7 OpenCode Coding Sessions",
     status: "idle",
     tasksCompleted: 0,
     totalCost: 0,
@@ -92,7 +92,7 @@ async function hermesKanbanLive(): Promise<Record<string, Live>> {
   for (const line of out.trim().split("\n")) {
     if (!line) continue;
     const [assignee, status, title] = line.split("|");
-    if (!assignee || !KANBAN_PROFILES.includes(assignee as any)) continue;
+    if (!assignee || !(KANBAN_PROFILES as readonly string[]).includes(assignee)) continue;
     if (!map[assignee]) {
       map[assignee] =
         status === "running"

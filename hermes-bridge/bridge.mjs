@@ -115,11 +115,33 @@ async function mirrorKanban() {
     tasks = Array.isArray(parsed) ? parsed : parsed.tasks || [];
   } catch (e) { log("kanban list failed:", e.message.split("\n")[0]); return; }
 
+  // tasks.result is often null (agents write files instead of returning text);
+  // the human-readable summary lives in the latest task_runs row of the LOCAL
+  // sqlite kanban.db (not Postgres). Read it with sqlite3.
+  let runSummaries = {};
+  try {
+    const kanbanDb = path.join(os.homedir(), ".hermes", "kanban.db");
+    if (fs.existsSync(kanbanDb)) {
+      const { stdout } = await execFileP("sqlite3", [
+        kanbanDb,
+        `SELECT task_id, summary FROM task_runs r
+         WHERE summary IS NOT NULL AND summary <> ''
+         AND id = (SELECT max(id) FROM task_runs r2 WHERE r2.task_id = r.task_id AND r2.summary IS NOT NULL AND r2.summary <> '');`,
+      ], { timeout: 10000, maxBuffer: 4 * 1024 * 1024 });
+      for (const line of stdout.trim().split("\n")) {
+        if (!line) continue;
+        const sep = line.indexOf("|");
+        if (sep > 0) runSummaries[line.slice(0, sep)] = line.slice(sep + 1);
+      }
+    }
+  } catch (e) { log("task_runs join failed:", e.message.split("\n")[0]); }
+
   const seen = new Set();
   for (const t of tasks) {
     const id = String(t.id ?? t.task_id ?? "");
     if (!id) continue;
     seen.add(id);
+    const result = (t.result || runSummaries[id] || null);
     await q(
       `INSERT INTO "HermesTask" (id, board, title, assignee, status, priority, result, "updatedAt", "syncedAt")
        VALUES ($1,$2,$3,$4,$5,$6,$7, now(), now())
@@ -128,7 +150,7 @@ async function mirrorKanban() {
          priority=EXCLUDED.priority, result=EXCLUDED.result, "syncedAt"=now()`,
       [id, BOARD, String(t.title ?? "untitled").slice(0, 300), t.assignee ?? null,
        String(t.status ?? "todo"), t.priority != null ? Number(t.priority) : null,
-       t.result ? String(t.result).slice(0, 2000) : null]
+       result ? String(result).slice(0, 2000) : null]
     );
   }
   // prune tasks that vanished from the board
@@ -480,7 +502,14 @@ async function runRequest(r) {
     if (r.kind === "oneshot" || r.kind === "chat") {
       result = (await hermes(["-z", r.prompt || r.title], { timeout: RUN_TIMEOUT_MS })).trim();
     } else if (r.kind === "kanban") {
-      result = (await hermes(["kanban", "--board", BOARD, "create", "--json", r.title], { timeout: 20000 })).trim();
+      // Optional "[agent]" title prefix routes the task to that profile,
+      // e.g. "[nova] Implement: …" → hermes kanban create --assignee nova
+      const m = /^\[(\w+)\]\s+/.exec(r.title || "");
+      const assignee = m ? m[1] : null;
+      const cleanTitle = m ? (r.title || "").slice(m[0].length) : r.title;
+      const args = ["kanban", "--board", BOARD, "create", "--json", cleanTitle];
+      if (assignee) args.push("--assignee", assignee);
+      result = (await hermes(args, { timeout: 20000 })).trim();
     } else if (r.kind.startsWith("cron.")) {
       const op = r.kind.split(".")[1];
       const a = JSON.parse(r.prompt || "{}");

@@ -19,7 +19,7 @@ const HERMES_KANBAN_DEMO_TASKS = [
   { id: "demo-6", title: "Design thumbnail concepts", assignee: "creative-agent", status: "ready", priority: 75 },
 ];
 
-function formatHermesKanban(tasks: Array<{ id: string; title: string; assignee?: string | null; status: string; priority?: number | null }>, source: "live" | "demo" = "live") {
+function formatHermesKanban(tasks: Array<{ id: string; title: string; assignee?: string | null; status: string; priority?: number | null; result?: string | null }>, source: "live" | "demo" = "live") {
   const counts = tasks.reduce<Record<string, number>>((acc, task) => {
     acc[task.status] = (acc[task.status] || 0) + 1;
     return acc;
@@ -39,6 +39,7 @@ function formatHermesKanban(tasks: Array<{ id: string; title: string; assignee?:
         assignee: task.assignee || "unassigned",
         status: task.status,
         priority: task.priority || 0,
+        result: task.result ? String(task.result).slice(0, 220) : null,
       })),
   };
 }
@@ -51,7 +52,7 @@ async function loadHermesKanban() {
     const tasks = await prisma.hermesTask.findMany({ orderBy: [{ priority: "desc" }], take: 50 });
     if (!tasks.length) return formatHermesKanban(HERMES_KANBAN_DEMO_TASKS, "demo");
     return formatHermesKanban(
-      tasks.map(t => ({ id: t.id, title: t.title, assignee: t.assignee, status: t.status, priority: t.priority })),
+      tasks.map(t => ({ id: t.id, title: t.title, assignee: t.assignee, status: t.status, priority: t.priority, result: t.result })),
       "live"
     );
   } catch {
@@ -690,5 +691,6 @@ export async function GET() {
     videosToFilm: await prisma.youtubeScript.count({ where: { status: { in: ["ready", "to_film", "tofilm", "approved"] } } }).catch(() => 0),
     processes,
     insight: "",
+    hermesKanban,
   }, { headers: { "Cache-Control": "no-store, no-cache" } });
 }

@@ -497,6 +497,21 @@ model HermesTask {
   @@index([status])
 }
 
+model AgentProposal {
+  id          String   @id                    // kanban comment id surfaced as proposal
+  taskId      String   @unique                 // source kanban task id
+  agent       String                           // nova | sage | knox | max | pixel
+  title       String                           // short label (file/area + hook)
+  body        String                           @db.Text  // the full proposal text
+  createdAt   DateTime  @default(now())
+  reviewedAt  DateTime?
+  status      String   @default("pending")     // pending | approved | rejected | turned-into-task
+  followUpTaskId String?                       // kanban task created from this proposal (tracks live status)
+
+  @@index([agent])
+  @@index([status])
+}
+
 // ─── Hermes Memory Wiki (warm tier — git-tracked markdown, mirrored) ─────
 model HermesMemory {
   id         String    @id            // wiki entry slug (relative path w/o .md)
