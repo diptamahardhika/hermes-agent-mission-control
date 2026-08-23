@@ -69,8 +69,12 @@ function ProposalCard({
 
   const liveBadge = followUpBadge(proposal);
 
+  const accent = agentColor[proposal.agent] || "var(--line)";
+
   return (
-    <div className="panel flex gap-4 p-4 items-start" style={{ borderLeft: `3px solid ${agentColor[proposal.agent] || "var(--line)"}` }}>
+    <div className="panel relative flex gap-4 p-4 pl-5 items-start overflow-hidden">
+      {/* Agent accent strip — absolute so the panel's rounded border can't clip it */}
+      <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: accent }} />
       {/* Agent badge */}
       <div className="shrink-0 mt-0.5">
         <div className="w-9 h-9 rounded-[var(--r-md)] flex items-center justify-center text-lg" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>

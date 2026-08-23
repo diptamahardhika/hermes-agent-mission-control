@@ -60,7 +60,7 @@ export function AgentProposalsWidget() {
   const handled = proposals.length - pending.length;
   const visible = [...proposals]
     .sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1))
-    .slice(0, 3);
+    .slice(0, 2);
 
   const reject = async (taskId: string) => {
     await fetch("/api/agent-proposals", {
