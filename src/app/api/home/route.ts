@@ -183,8 +183,10 @@ export async function GET() {
     const events = eventsResult?.status === "fulfilled" && Array.isArray(eventsResult.value)
       ? (eventsResult.value as Array<{ type?: string; created_at?: string; payload?: Record<string, unknown> }>)
       : [];
-    // Per-day counts for today + yesterday — the calendar's lag window.
-    const days = new Set([0, 1].map(o => new Date(Date.now() - o * 86400000).toISOString().slice(0, 10)));
+    // Per-day counts for the last 7 days — GitHub's calendar sometimes drops
+    // whole days (observed: a merge-heavy day stayed 0 permanently), not just
+    // today. The events feed covers ~90 events ≈ several days of history.
+    const days = new Set([0, 1, 2, 3, 4, 5, 6].map(o => new Date(Date.now() - o * 86400000).toISOString().slice(0, 10)));
     const perDay = new Map<string, number>();
     for (const ev of events) {
       const day = (ev.created_at || "").slice(0, 10);
@@ -217,10 +219,10 @@ export async function GET() {
       return { date: d.date, count, level: levelRank[d.contributionLevel] ?? (count > 0 ? 1 : 0) };
     }));
 
-    // GitHub's calendar lags reality (a day can sit at 0 for hours). The REST
-    // events feed is near-instant, so patch ANY lagging cell in the last 2 days
-    // with its own events-based count. Once the calendar reports, its number
-    // wins — the patch only fills zeros, never overwrites real data.
+    // GitHub's calendar lags reality — and sometimes drops whole days
+    // permanently (observed on a merge-heavy day). Patch any lagging cell in
+    // the last week with its events-based count. Only fills zeros; once the
+    // calendar reports real data, its number wins.
     let boosted = false;
     const recent = recentBoosts; // Map<string, number> of per-day event counts
     for (const [key, count] of recent) {
@@ -277,7 +279,7 @@ export async function GET() {
     ? `https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=10&type=all`
     : null;
   const githubEventsUrl = GITHUB_USERNAME && GITHUB_TOKEN
-    ? `https://api.github.com/users/${GITHUB_USERNAME}/events?per_page=50`
+    ? `https://api.github.com/users/${GITHUB_USERNAME}/events?per_page=100`
     : null;
   const GITHUB_CONTRIB_QUERY = `
     query($login: String!) {
