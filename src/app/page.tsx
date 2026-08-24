@@ -547,10 +547,21 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
     <div className="mt-4 space-y-1.5">
       {top.map(m => {
         const pct = Math.round((m.tokens / total) * 100);
-        const split = m.inputTokens != null && m.outputTokens != null && m.inputTokens + m.outputTokens > 0;
-        const inPct = split ? Math.round((m.inputTokens! / (m.inputTokens! + m.outputTokens!)) * 100) : 100;
+        // tokens includes cache reads; show all three components so the bar
+        // segments always sum to what's being ranked.
+        const cacheRead = (m as { cacheReadTokens?: number }).cacheReadTokens ?? 0;
+        const parts = [
+          { label: "in", v: m.inputTokens ?? 0, color: "#a78bfa" },
+          { label: "cached", v: cacheRead, color: "#fbbf24" },
+          { label: "out", v: m.outputTokens ?? 0, color: "#38bdf8" },
+        ];
+        const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
+        const split = knownSum > 0;
+        const pctOf = (v: number) => split ? (v / knownSum) * 100 : 0;
+        const hasCache = cacheRead > 0;
         return (
-          <div key={m.model} className="flex items-center gap-2">
+          <div key={m.model} className="flex items-center gap-2"
+            title={split ? `${parts.map(p2 => `${p2.label}: ${fmt(p2.v)}`).join(" · ")}` : undefined}>
             <span className="text-[11px] text-[var(--hq-text-dim)] truncate w-48 shrink-0">
               {m.model}
               {modelProvider(m.model) && <span className="text-[9.5px] text-[var(--hq-text-ghost)]"> | {modelProvider(m.model)}</span>}
@@ -558,18 +569,20 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               {split ? (
                 <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%` }}>
-                  <div className="h-full" style={{ width: `${inPct}%`, background: "#a78bfa", opacity: 0.9 }} />
-                  <div className="h-full" style={{ width: `${100 - inPct}%`, background: "#38bdf8", opacity: 0.85 }} />
+                  {parts.filter(p2 => p2.v > 0).map(p2 => (
+                    <div key={p2.label} className="h-full" style={{ width: `${pctOf(p2.v)}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
+                  ))}
                 </div>
               ) : (
                 <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: "#a78bfa", opacity: 0.9 }} />
               )}
             </div>
-            <span className="num text-[10px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap w-28">
+            <span className="num text-[10px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap w-36">
               {split ? (
                 <>
-                  <span style={{ color: "#a78bfa" }}>in</span> {fmt(m.inputTokens!)}{" "}
-                  <span style={{ color: "#38bdf8" }}>out</span> {fmt(m.outputTokens!)}
+                  <span style={{ color: "#a78bfa" }}>in</span> {fmt(m.inputTokens ?? 0)}{" "}
+                  {hasCache && <><span style={{ color: "#fbbf24" }}>·c</span> {fmt(cacheRead)}{" "}</>}
+                  <span style={{ color: "#38bdf8" }}>out</span> {fmt(m.outputTokens ?? 0)}
                 </>
               ) : `${pct}%`}
             </span>

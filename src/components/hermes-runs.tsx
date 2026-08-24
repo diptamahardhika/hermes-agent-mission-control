@@ -36,6 +36,7 @@ interface ModelUsage {
   calls?: number;
   inputTokens?: number;
   outputTokens?: number;
+  cacheReadTokens?: number;
 }
 
 interface Cost {
@@ -181,10 +182,11 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
   // dominant model (60%+ of total), sqrt keeps every model visible while
   // preserving the ranking read.
   const hasSplit = byModel.some((m) => m.inputTokens != null && m.outputTokens != null);
-  const modelTotal = (m: ModelUsage) =>
-    m.inputTokens != null && m.outputTokens != null
-      ? m.inputTokens + m.outputTokens
-      : m.tokens ?? m.cost ?? m.calls ?? 0;
+  const modelTotal = (m: ModelUsage) => {
+    if (m.inputTokens != null && m.outputTokens != null)
+      return m.inputTokens + m.outputTokens + (m.cacheReadTokens ?? 0);
+    return m.tokens ?? m.cost ?? m.calls ?? 0;
+  };
   const sorted = [...byModel].sort((a, b) => (modelTotal(b) ?? 0) - (modelTotal(a) ?? 0));
   const max = byModel.reduce((mx, m) => Math.max(mx, modelTotal(m) ?? 0), 0) || 1;
   const grand = byModel.reduce((s, m) => s + (modelTotal(m) ?? 0), 0) || 1;
@@ -251,16 +253,22 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                   <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#38bdf8" }} />
                   out
                 </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#fbbf24" }} />
+                  cached
+                </span>
                 <span className="opacity-60">· √ scale</span>
               </span>
             )}
           </div>
           {sorted.map((m) => {
-            const split = m.inputTokens != null && m.outputTokens != null && m.inputTokens + m.outputTokens > 0;
+            const cacheRead = m.cacheReadTokens ?? 0;
+            const split = m.inputTokens != null && m.outputTokens != null && m.inputTokens + m.outputTokens + cacheRead > 0;
             const total = modelTotal(m) ?? 0;
             const widthPct = Math.max(2, Math.round(Math.sqrt(total / max) * 100));
             const sharePct = Math.round((total / grand) * 100);
-            const inPct = split ? Math.round((m.inputTokens! / (m.inputTokens! + m.outputTokens!)) * 100) : 100;
+            const knownSum = split ? m.inputTokens! + m.outputTokens! + cacheRead : 0;
+            const segOf = (v: number) => (knownSum > 0 ? (v / knownSum) * 100 : 0);
             // Provider label: use the id prefix when present ("nous/..." -> nous),
             // otherwise match known model families to their usual route.
             const KNOWN_PROVIDERS: [RegExp, string][] = [
@@ -281,7 +289,7 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
             else for (const [re, p] of KNOWN_PROVIDERS) { if (re.test(m.model)) { provider = p; break; } }
             return (
               <div key={m.model} className="flex items-center gap-3">
-                <span className="text-[12px] text-[var(--text-2)] w-56 shrink-0 truncate">
+                <span className="text-[12px] text-[var(--text-2)] w-44 shrink-0 truncate">
                   {m.model}
                   {provider && <span className="text-[10px] text-[var(--text-3)]"> | {provider}</span>}
                 </span>
@@ -292,8 +300,15 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                   >
                     {split ? (
                       <>
-                        <div className="h-full" style={{ width: `${inPct}%`, background: "#a78bfa", opacity: 0.9 }} />
-                        <div className="h-full" style={{ width: `${100 - inPct}%`, background: "#38bdf8", opacity: 0.85 }} />
+                        {cacheRead > 0 && (
+                          <div
+                            className="h-full"
+                            style={{ width: `${segOf(cacheRead)}%`, background: "#fbbf24", opacity: 0.8 }}
+                            title={`cached: ${fmtTokens(cacheRead)}`}
+                          />
+                        )}
+                        <div className="h-full" style={{ width: `${segOf(m.inputTokens!)}%`, background: "#a78bfa", opacity: 0.9 }} />
+                        <div className="h-full" style={{ width: `${segOf(m.outputTokens!)}%`, background: "#38bdf8", opacity: 0.85 }} />
                       </>
                     ) : (
                       <div
@@ -306,10 +321,13 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                     )}
                   </div>
                 </div>
-                <span className="num text-[11px] text-[var(--text-3)] shrink-0 w-32 text-right tabular-nums whitespace-nowrap">
+                <span className="num text-[11px] text-[var(--text-3)] shrink-0 w-48 text-right tabular-nums whitespace-nowrap">
                   {split ? (
                     <>
                       <span style={{ color: "#a78bfa" }}>in</span> {fmtTokens(m.inputTokens!)}
+                      {cacheRead > knownSum * 0.01 && (
+                        <>{" "}<span style={{ color: "#fbbf24" }}>·c</span> {fmtTokens(cacheRead)}</>
+                      )}
                       {" "}
                       <span style={{ color: "#38bdf8" }}>out</span> {fmtTokens(m.outputTokens!)}
                     </>
