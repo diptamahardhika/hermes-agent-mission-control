@@ -210,12 +210,12 @@ async function mirrorCost() {
   try {
     const { stdout } = await execFileP("sqlite3", [
       path.join(os.homedir(), ".hermes", "state.db"),
-      `SELECT model, SUM(input_tokens), SUM(output_tokens) FROM session_model_usage
+      `SELECT model, SUM(input_tokens), SUM(output_tokens), SUM(cache_read_tokens) FROM session_model_usage
        WHERE last_seen > strftime('%s','now') - 7*86400 GROUP BY model ORDER BY SUM(input_tokens)+SUM(output_tokens) DESC;`,
     ], { timeout: 10000 });
     const byModelMap = new Map(parsed.byModel.map((m) => [m.model, m]));
     for (const line of stdout.trim().split("\n")) {
-      const [model, inTok, outTok] = line.split("|");
+      const [model, inTok, outTok, cacheTok] = line.split("|");
       if (!model || !/^\d+$/.test(inTok ?? "") || !/^\d+$/.test(outTok ?? "")) continue;
       // Insights names are display aliases (e.g. "solar-pro4:free" for
       // "upstage/solar-pro4:free") — match on suffix.
@@ -225,11 +225,13 @@ async function mirrorCost() {
           if (k === model || model.endsWith("/" + k)) { entry = v; break; }
         }
       }
+      const cacheRead = /^\d+$/.test(cacheTok ?? "") ? Number(cacheTok) : 0;
       if (entry) {
         entry.inputTokens = Number(inTok);
         entry.outputTokens = Number(outTok);
+        entry.cacheReadTokens = cacheRead;
       } else {
-        const e = { model, sessions: 0, tokens: Number(inTok) + Number(outTok), inputTokens: Number(inTok), outputTokens: Number(outTok) };
+        const e = { model, sessions: 0, tokens: Number(inTok) + Number(outTok) + cacheRead, inputTokens: Number(inTok), outputTokens: Number(outTok), cacheReadTokens: cacheRead };
         parsed.byModel.push(e);
         byModelMap.set(model, e);
       }
