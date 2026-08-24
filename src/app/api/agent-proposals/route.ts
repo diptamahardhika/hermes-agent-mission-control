@@ -26,7 +26,9 @@ const COMMENT_SQL = `
 // run as a proposal when the task asked for ideas/recommendations (reviews,
 // UX proposals, audits) — routine reports stay off the proposal board.
 const RUN_SQL = `
-  SELECT 'run-' || r.id AS id, r.task_id, r.profile AS author, r.summary AS body,
+  SELECT 'run-' || r.id AS id, r.task_id,
+         CASE WHEN r.profile = 'default' THEN 'max' ELSE r.profile END AS author,
+         r.summary AS body,
          coalesce(r.ended_at, r.started_at) AS created_at,
          t.title AS task_title, t.status AS task_status
   FROM task_runs r
