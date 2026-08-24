@@ -223,8 +223,11 @@ export async function POST(request: Request) {
 
     if (action === "createTask") {
       const strippedTitle = proposal.title.replace(/^[a-z]+:\s*/, "").trim();
-      // "[agent]" prefix tells the bridge which profile to assign the task to
-      const routedTitle = `[${proposal.agent}] Implement: ${strippedTitle}`;
+      // "[agent]" prefix tells the bridge which profile to assign the task to.
+      // NB: Max's cast id is "max" but his real Hermes profile is "default" —
+      // route to the actual profile so the dispatcher can claim the task.
+      const profileId = proposal.agent === "max" ? "default" : proposal.agent;
+      const routedTitle = `[${profileId}] Implement: ${strippedTitle}`;
       const pr = await prisma.agentProposal.update({
         where: { taskId: proposalId },
         data: { status: "turned-into-task", reviewedAt: new Date() },
