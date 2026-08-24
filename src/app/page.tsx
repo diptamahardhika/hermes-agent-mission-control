@@ -81,7 +81,7 @@ interface SpendData {
   outputTokens: number | null;
   sessions: number | null;
   toolCalls: number | null;
-  byModel: { model: string; sessions: number; tokens: number; inputTokens?: number; outputTokens?: number }[];
+  byModel: { model: string; sessions: number; tokens: number; inputTokens?: number; outputTokens?: number; cacheReadTokens?: number }[];
   days: { date: string; tokens: number }[];
 }
 
@@ -383,6 +383,12 @@ function SpendPanel({ spend }: { spend: SpendData }) {
           </div>
           {series.some(v => v > 0) && <Sparkline data={series} color="#a78bfa" area idSeed="spend" className="h-9 mt-3" />}
         </div>
+        {(() => {
+          const cached = spend.byModel.reduce((s, m) => s + (m.cacheReadTokens ?? 0), 0);
+          const topCache = topModel?.cacheReadTokens ?? 0;
+          const topCachePct = topModel && topModel.tokens ? Math.round((topCache / topModel.tokens) * 100) : 0;
+          return (
+        <>
         <div className="grid grid-cols-2 gap-3 pt-1">
           <div>
             <div className="eyebrow mb-1.5 !text-[9.5px]">Sessions</div>
@@ -393,12 +399,23 @@ function SpendPanel({ spend }: { spend: SpendData }) {
             <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{spend.toolCalls != null ? fmtExact(spend.toolCalls) : "—"}</div>
           </div>
         </div>
+        {cached > 0 && (
+          <div className="text-[12px] text-[var(--hq-text-dim)]">
+            Cached reads <span className="num text-[var(--hq-text)] font-medium">{fmt(cached)}</span>
+            <span className="num text-[var(--hq-text-ghost)]"> · {Math.round((cached / (spend.totalTokens || 1)) * 100)}% of total</span>
+          </div>
+        )}
         {topModel && (
           <div className="text-[12px] text-[var(--hq-text-dim)]">
             Top model <span className="text-[var(--hq-text)] font-medium">{topModel.model}</span>
-            <span className="num text-[var(--hq-text-ghost)]"> · {fmt(topModel.tokens)} tok</span>
+            <span className="num text-[var(--hq-text-ghost)]">
+               · {fmt(topModel.tokens)} tok{topCache > 0 ? ` (${topCachePct}% cached)` : ""}
+            </span>
           </div>
         )}
+        </>
+        );
+          })()}
       </div>
       <a href="/hermes#runs" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
         Open Hermes hub <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -541,7 +558,7 @@ function modelProvider(model: string): string {
 }
 
 function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; total: number | null }) {
-  const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 6);
+  const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   if (!top.length || !total) return null;
   return (
     <div className="mt-4 space-y-1.5">
@@ -593,19 +610,30 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
   );
 }
 
-function TokenIOSplit({ input, output }: { input: number | null; output: number | null }) {
-  if (input == null || output == null || input + output === 0) return null;
-  const inPct = Math.round((input / (input + output)) * 100);
+function TokenIOSplit({ input, output, cache = 0 }: { input: number | null; output: number | null; cache?: number }) {
+  if (input == null || output == null) return null;
+  const sum = input + output + cache;
+  if (sum === 0) return null;
+  const seg = (v: number) => `${(v / sum) * 100}%`;
   return (
     <div className="mt-auto pt-3">
       <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
-        <div style={{ width: `${inPct}%`, background: "#a78bfa" }} />
-        <div style={{ width: `${100 - inPct}%`, background: "#38bdf8" }} />
+        {cache > 0 && <div style={{ width: seg(cache), background: "#fbbf24", opacity: 0.8 }} />}
+        <div style={{ width: seg(input), background: "#a78bfa" }} />
+        <div style={{ width: seg(output), background: "#38bdf8" }} />
       </div>
       <div className="flex items-center justify-between mt-1.5 text-[10px] num text-[var(--hq-text-ghost)]">
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#a78bfa" }} />
           in {fmt(input)}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {cache > 0 && (
+            <>
+              cached {fmt(cache)}
+              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#fbbf24" }} />
+            </>
+          )}
         </span>
         <span className="flex items-center gap-1.5">
           out {fmt(output)}
@@ -1391,7 +1419,11 @@ export default function Dashboard() {
             >
               <ModelShareBars byModel={data.spend.byModel} total={data.spend.totalTokens} />
               <HistoryBuilding days={data.spend.days} />
-              <TokenIOSplit input={data.spend.inputTokens} output={data.spend.outputTokens} />
+              <TokenIOSplit
+              input={data.spend.inputTokens}
+              output={data.spend.outputTokens}
+              cache={data.spend.byModel.reduce((s, m) => s + (m.cacheReadTokens ?? 0), 0)}
+            />
             </MetricCard>
             <SpendPanel spend={data.spend} />
           </div>
