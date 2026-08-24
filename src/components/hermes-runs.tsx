@@ -220,24 +220,43 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
         </p>
       )}
 
-      {cost?.inputTokens != null && cost?.outputTokens != null && cost.inputTokens + cost.outputTokens > 0 && (
-        <div className="mt-4">
-          <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
-            <div style={{ width: `${Math.round((cost.inputTokens / (cost.inputTokens + cost.outputTokens)) * 100)}%`, background: "#a78bfa" }} />
-            <div style={{ width: `${100 - Math.round((cost.inputTokens / (cost.inputTokens + cost.outputTokens)) * 100)}%`, background: "#38bdf8" }} />
+      {(() => {
+        // Aggregate in/cached/out — cache summed from per-model rows so the
+        // aggregate bar is consistent with the "By model" breakdown below.
+        const cacheTotal = byModel.reduce((s, m) => s + (m.cacheReadTokens ?? 0), 0);
+        const input = cost?.inputTokens ?? 0;
+        const output = cost?.outputTokens ?? 0;
+        const sum = input + output + cacheTotal;
+        if (!cost || sum === 0) return null;
+        const seg = (v: number) => `${(v / sum) * 100}%`;
+        return (
+          <div className="mt-4">
+            <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
+              {cacheTotal > 0 && <div style={{ width: seg(cacheTotal), background: "#fbbf24", opacity: 0.8 }} />}
+              <div style={{ width: seg(input), background: "#a78bfa" }} />
+              <div style={{ width: seg(output), background: "#38bdf8" }} />
+            </div>
+            <div className="flex items-center justify-between mt-1.5 text-[10px] num text-[var(--hq-text-ghost)]">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#a78bfa" }} />
+                in {fmtTokens(input)}
+              </span>
+              <span className="flex items-center gap-1.5">
+                {cacheTotal > 0 && (
+                  <>
+                    cached {fmtTokens(cacheTotal)}
+                    <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#fbbf24" }} />
+                  </>
+                )}
+              </span>
+              <span className="flex items-center gap-1.5">
+                out {fmtTokens(output)}
+                <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#38bdf8" }} />
+              </span>
+            </div>
           </div>
-          <div className="flex items-center justify-between mt-1.5 text-[10px] num text-[var(--hq-text-ghost)]">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#a78bfa" }} />
-              in {fmtTokens(cost.inputTokens)}
-            </span>
-            <span className="flex items-center gap-1.5">
-              out {fmtTokens(cost.outputTokens)}
-              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#38bdf8" }} />
-            </span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {byModel.length > 0 && (
         <div className="mt-5 pt-4 border-t border-[var(--line)] flex flex-col gap-2">
