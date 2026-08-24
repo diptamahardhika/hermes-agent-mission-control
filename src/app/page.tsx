@@ -247,7 +247,7 @@ function IdeasPanel({ sageDrafts, ytIdeas, buildIdeas }: {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                tab === t.key ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-ghost)] hover:text-[var(--hq-text-dim)]"
+                tab === t.key ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"
               }`}
             >
               {t.label}
@@ -645,7 +645,7 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
     <button
       onClick={() => setTab(k)}
       className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
-        tab === k ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-ghost)] hover:text-[var(--hq-text-dim)]"
+        tab === k ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"
       }`}
     >
       {label}
@@ -746,6 +746,7 @@ function GitHubHomeCard({
               <button
                 onClick={() => onRefresh?.()}
                 title="Refresh from GitHub"
+                aria-label="Refresh GitHub data"
                 className="ml-1 p-1 rounded hover:bg-white/[0.06] text-[var(--hq-text-ghost)] hover:text-[var(--hq-text-dim)] transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={refreshing ? "animate-spin" : ""} aria-hidden="true">
@@ -876,8 +877,8 @@ function HomelabHomeCard({ homelab }: { homelab: HomeData["homelab"] }) {
       {/* Status header */}
       <div className="flex items-center gap-2 mb-4">
         <span className="relative flex w-2 h-2">
-          <span className={`absolute inline-flex h-full w-full rounded-full animate-ping opacity-50 ${allUp ? "bg-emerald-400" : "bg-rose-400"}`} />
-          <span className={`relative inline-flex w-2 h-2 rounded-full ${allUp ? "bg-emerald-400" : "bg-rose-400"}`} />
+          <span className="absolute inline-flex h-full w-full rounded-full animate-ping opacity-50" style={{ background: allUp ? "var(--hq-up)" : "var(--hq-down)" }} />
+          <span className="relative inline-flex w-2 h-2 rounded-full" style={{ background: allUp ? "var(--hq-up)" : "var(--hq-down)" }} />
         </span>
         <span className="eyebrow">Homelab</span>
         <span className="ml-auto num text-[10px] text-[var(--hq-text-ghost)]">

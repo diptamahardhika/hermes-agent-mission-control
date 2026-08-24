@@ -400,12 +400,12 @@ export default function OfficeView({ agents }: { agents: Agent[] }) {
 
         {/* Floor props */}
         <div className="mt-4 flex items-center justify-center gap-6 opacity-20">
-          <span className="text-2xl select-none">🌿</span>
+          <span className="text-neutral-500 select-none" aria-hidden="true">🌿</span>
           <div className="flex items-center gap-1">
-            <span className="text-xl">☕</span>
-            <span className="text-[10px] text-neutral-500 font-mono">FUEL STATION</span>
+          <span className="text-neutral-500 select-none" aria-hidden="true">☕</span>
+          <span className="text-[10px] text-neutral-500 font-mono">FUEL STATION</span>
           </div>
-          <span className="text-2xl select-none">🌿</span>
+          <span className="text-neutral-500 select-none" aria-hidden="true">🌿</span>
         </div>
       </div>
 
