@@ -578,9 +578,9 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
         const pctOf = (v: number) => split ? (v / knownSum) * 100 : 0;
         const hasCache = cacheRead > 0;
         return (
-          <div key={m.model} className="flex items-center gap-2"
+          <div key={m.model} className="flex items-center gap-2 justify-between"
             title={split ? `${parts.map(p2 => `${p2.label}: ${fmt(p2.v)}`).join(" · ")}` : undefined}>
-            <span className="text-[11px] text-[var(--hq-text-dim)] truncate w-48 shrink-0">
+            <span className="text-[10px] text-[var(--hq-text-dim)] truncate w-28 sm:w-48 shrink-0">
               {m.model}
               {modelProvider(m.model) && <span className="text-[9.5px] text-[var(--hq-text-ghost)]"> | {modelProvider(m.model)}</span>}
             </span>
@@ -595,7 +595,7 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
                 <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: "#a78bfa", opacity: 0.9 }} />
               )}
             </div>
-            <span className="num text-[10px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap w-36">
+            <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
               {split ? (
                 <>
                   <span style={{ color: "#a78bfa" }}>in</span> {fmt(m.inputTokens ?? 0)}{" "}
@@ -1153,7 +1153,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
           <div>
             <div className="eyebrow mb-2 !text-[9.5px]">Wallet value</div>
             <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
-              ${balance > 0 ? fmt(balance) : "0.00"}
+              ${balance > 0 ? balance.toFixed(2) : "0.00"}
             </div>
           </div>
 
@@ -1181,7 +1181,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
                 const share = balance > 0 ? (a.usdValue / balance) * 100 : 0;
                 return (
                   <div key={a.asset} className="flex items-center gap-2">
-                    <span className="text-[11px] text-[var(--hq-text-dim)] w-24 shrink-0 truncate">
+                    <span className="text-[10px] text-[var(--hq-text-dim)] w-20 shrink-0 truncate">
                     {a.asset}
                     {a.wallet && <span className="text-[9px] text-[var(--hq-text-ghost)]"> · {a.wallet}</span>}
                   </span>
@@ -1189,7 +1189,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
                       <div className="h-full rounded-full transition-all duration-[1200ms] ease-out"
                         style={{ width: `${share}%`, background: "#f0b90b", opacity: 0.85 }} />
                     </div>
-                    <span className="num text-[10px] text-[var(--hq-text-ghost)] w-32 text-right shrink-0 tabular-nums">
+                    <span className="num text-[9px] text-[var(--hq-text-ghost)] w-24 text-right shrink-0 tabular-nums">
                       {a.amount < 0.01 ? a.amount.toFixed(6) : a.amount.toFixed(2)} · ${a.usdValue.toFixed(2)}
                     </span>
                   </div>
