@@ -39,6 +39,24 @@ interface ModelUsage {
   cacheReadTokens?: number;
 }
 
+interface PlatformUsage {
+  name: string;
+  sessions: number;
+  messages: number;
+  tokens: number;
+}
+interface ToolUsage {
+  name: string;
+  calls: number;
+  pct: number;
+}
+interface SkillUsage {
+  name: string;
+  loads: number;
+  edits: number;
+  lastUsed: string;
+}
+
 interface Cost {
   summary?: string | null;
   byModel?: ModelUsage[];
@@ -46,6 +64,19 @@ interface Cost {
   totalTokens?: number | null;
   inputTokens?: number | null;
   outputTokens?: number | null;
+  sessions?: number | null;
+  messages?: number | null;
+  toolCalls?: number | null;
+  userMessages?: number | null;
+  activeTime?: string | null;
+  avgSession?: string | null;
+  avgMsgsPerSession?: number | null;
+  period?: string | null;
+  unknownSessions?: number | null;
+  platforms?: PlatformUsage[];
+  tools?: ToolUsage[];
+  skills?: SkillUsage[];
+  toolsMore?: number | null;
   syncedAt?: string | null;
 }
 
@@ -156,6 +187,109 @@ function StatusDot({ status, reduce }: { status: RunStatus; reduce: boolean }) {
   );
 }
 
+// ── Insights (native HTML rendering of the parsed insights data) ──────────
+function Insights({ cost }: { cost: Cost }) {
+  const platforms = cost.platforms ?? [];
+  const tools = cost.tools ?? [];
+  const skills = cost.skills ?? [];
+  const pMax = Math.max(...platforms.map((p) => p.tokens), 1);
+  const overview: [string, string | number | null][] = [
+    ["Sessions", cost.sessions ?? null],
+    ["Messages", cost.messages ?? null],
+    ["Tool calls", cost.toolCalls ?? null],
+    ["User msgs", cost.userMessages ?? null],
+    ["Active", cost.activeTime ?? null],
+    ["Avg session", cost.avgSession ?? null],
+  ];
+  return (
+    <div className="mt-5 pt-4 border-t border-[var(--line)] space-y-5">
+      {cost.period && (
+        <div className="num text-[11px] text-[var(--hq-text-ghost)]">{cost.period}</div>
+      )}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-3">
+        {overview.map(([label, v]) =>
+          v == null ? null : (
+            <div key={label}>
+              <div className="num text-[15px] font-semibold text-[var(--text)] leading-none">{v}</div>
+              <div className="eyebrow mt-1.5">{label}</div>
+            </div>
+          )
+        )}
+      </div>
+      {cost.unknownSessions != null && cost.unknownSessions > 0 && (
+        <p className="text-[11px] text-[var(--hq-text-ghost)]">
+          {cost.unknownSessions} session(s) without pricing data
+        </p>
+      )}
+
+      <div className="grid lg:grid-cols-2 gap-x-10 gap-y-5">
+        {platforms.length > 0 && (
+          <div className="min-w-0">
+            <Eyebrow>Platforms</Eyebrow>
+            <div className="mt-2.5 flex flex-col gap-2">
+              {platforms.map((p) => (
+                <div key={p.name} className="flex items-center gap-3 min-w-0">
+                  <span className="text-[12px] text-[var(--text-2)] w-16 shrink-0 truncate">{p.name}</span>
+                  <div className="flex-1 h-[6px] rounded-full bg-[var(--surface-2)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700 ease-out"
+                      style={{ width: `${Math.max(2, (p.tokens / pMax) * 100)}%`, background: "#38bdf8", opacity: 0.85 }}
+                    />
+                  </div>
+                  <span className="num text-[11px] text-[var(--text-3)] w-14 text-right shrink-0">{fmtTokens(p.tokens)}</span>
+                  <span className="num text-[10px] text-[var(--hq-text-ghost)] w-8 text-right shrink-0 hidden sm:block" title={`${p.sessions} sessions`}>
+                    {p.sessions}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {tools.length > 0 && (
+          <div className="min-w-0">
+            <Eyebrow>Top tools</Eyebrow>
+            <div className="mt-2.5 flex flex-col gap-2">
+              {tools.map((t) => (
+                <div key={t.name} className="flex items-center gap-3 min-w-0">
+                  <span className="text-[12px] text-[var(--text-2)] w-28 truncate">{t.name}</span>
+                  <div className="flex-1 h-[6px] rounded-full bg-[var(--surface-2)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700 ease-out"
+                      style={{ width: `${Math.max(1, t.pct)}%`, background: "#a78bfa", opacity: 0.85 }}
+                    />
+                  </div>
+                  <span className="num text-[11px] text-[var(--text-3)] w-12 text-right shrink-0">{t.calls.toLocaleString("en-US")}</span>
+                  <span className="num text-[10px] text-[var(--hq-text-ghost)] w-9 text-right shrink-0">{t.pct}%</span>
+                </div>
+              ))}
+              {cost.toolsMore != null && (
+                <p className="text-[10px] text-[var(--hq-text-ghost)]">+ {cost.toolsMore} more tools</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {skills.length > 0 && (
+        <div className="min-w-0">
+          <Eyebrow>Top skills</Eyebrow>
+          <div className="mt-2.5 grid md:grid-cols-2 gap-x-10 gap-y-1.5">
+            {skills.map((s) => (
+              <div key={s.name} className="flex items-baseline gap-2 min-w-0">
+                <span className="text-[11.5px] text-[var(--text-2)] truncate flex-1">{s.name}</span>
+                <span className="num text-[11px] text-[var(--text-3)] shrink-0 whitespace-nowrap">
+                  {s.loads} loads{s.edits > 0 ? ` · ${s.edits} edits` : ""}
+                </span>
+                <span className="num text-[10px] text-[var(--hq-text-ghost)] w-12 text-right shrink-0">{s.lastUsed}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Usage strip ───────────────────────────────────────────
 function UsageStrip({ cost }: { cost: Cost | null }) {
   const byModel = cost?.byModel ?? [];
@@ -214,11 +348,15 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
         </div>
       </div>
 
-      {cost?.summary && (
-        <p className="mt-4 text-[12.5px] text-[var(--text-2)] leading-snug">
-          {cost.summary}
-        </p>
-      )}
+      {cost && (cost.platforms?.length || cost.tools?.length || cost.skills?.length) ? (
+        <Insights cost={cost} />
+      ) : cost?.summary ? (
+        <div className="mt-4 overflow-x-auto">
+          <pre className="w-max mx-auto font-mono text-[clamp(11px,2cqw,17px)] leading-snug text-[var(--text-2)] whitespace-pre">
+            {cost.summary}
+          </pre>
+        </div>
+      ) : null}
 
       {(() => {
         // Aggregate in/cached/out — cache summed from per-model rows so the
@@ -307,8 +445,8 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
             if (m.model.includes("/")) provider = m.model.split("/")[0];
             else for (const [re, p] of KNOWN_PROVIDERS) { if (re.test(m.model)) { provider = p; break; } }
             return (
-              <div key={m.model} className="flex items-center gap-3">
-                <span className="text-[12px] text-[var(--text-2)] w-44 shrink-0 truncate">
+              <div key={m.model} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="text-[12px] text-[var(--text-2)] w-32 min-w-0 truncate sm:w-44">
                   {m.model}
                   {provider && <span className="text-[10px] text-[var(--text-3)]"> | {provider}</span>}
                 </span>
@@ -340,7 +478,7 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                     )}
                   </div>
                 </div>
-                <span className="num text-[11px] text-[var(--text-3)] shrink-0 w-48 text-right tabular-nums whitespace-nowrap">
+                <span className="num text-[11px] text-[var(--text-3)] w-full sm:w-48 sm:shrink-0 sm:text-right tabular-nums whitespace-nowrap">
                   {split ? (
                     <>
                       <span style={{ color: "#a78bfa" }}>in</span> {fmtTokens(m.inputTokens!)}

@@ -171,10 +171,22 @@ async function mirrorCrons() {
 
 // Parse the fixed-text output of `hermes insights` into structured usage data.
 // The CLI has no --json flag (verified), so this regexes the Overview block and
-// the Models Used table. Returns nulls for anything not found — never guesses.
+// the Models/Platforms/Tools/Skills tables. Returns nulls for anything not
+// found — never guesses.
 export function parseInsights(text) {
   const num = (s) => Number(String(s).replace(/,/g, ""));
   const grab = (re) => { const m = text.match(re); return m ? num(m[1]) : null; };
+  // Body of a "  <emoji> <Name>" section: everything up to the next blank line.
+  const section = (name) => {
+    const i = text.indexOf(name);
+    if (i === -1) return "";
+    const rest = text.slice(i);
+    const afterHead = rest.indexOf("\n");
+    if (afterHead === -1) return "";
+    const body = rest.slice(afterHead + 1);
+    const end = body.indexOf("\n\n");
+    return end === -1 ? body : body.slice(0, end);
+  };
   const data = {
     sessions: grab(/Sessions:\s*([\d,]+)/),
     messages: grab(/Messages:\s*([\d,]+)/),
@@ -182,17 +194,39 @@ export function parseInsights(text) {
     inputTokens: grab(/Input tokens:\s*([\d,]+)/),
     outputTokens: grab(/Output tokens:\s*([\d,]+)/),
     totalTokens: grab(/Total tokens:\s*([\d,]+)/),
+    userMessages: grab(/User messages:\s*([\d,]+)/),
+    activeTime: text.match(/Active time:\s*(~?\S+)/)?.[1] ?? null,
+    avgSession: text.match(/Avg session:\s*(~?[^\n]+?)\s*$/m)?.[1]?.trim() ?? null,
+    avgMsgsPerSession: grab(/Avg msgs\/session:\s*([\d.]+)/),
+    period: text.match(/Period:\s*([^\n]+?)(?:\s{2,}|$)/m)?.[1]?.trim() ?? null,
+    unknownSessions: grab(/Unknown:\s*([\d,]+) session/),
     byModel: [],
+    platforms: [],
+    tools: [],
+    skills: [],
   };
-  const modelsIdx = text.indexOf("Models Used");
-  if (modelsIdx !== -1) {
-    const seg = text.slice(modelsIdx);
-    const table = seg.includes("\n\n") ? seg.slice(0, seg.indexOf("\n\n")) : seg;
-    for (const line of table.split("\n")) {
-      // e.g. "  solar-pro4:free     129   136,714,672"
-      const m = line.match(/^\s{2}(\S.*?)\s{2,}(\d+)\s+([\d,]+)\s*$/);
-      if (m) data.byModel.push({ model: m[1].trim(), sessions: num(m[2]), tokens: num(m[3]) });
-    }
+  for (const line of section("Models Used").split("\n")) {
+    // e.g. "  solar-pro4:free     129   136,714,672"
+    const m = line.match(/^\s{2}(\S.*?)\s{2,}(\d+)\s+([\d,]+)\s*$/);
+    if (m) data.byModel.push({ model: m[1].trim(), sessions: num(m[2]), tokens: num(m[3]) });
+  }
+  for (const line of section("Platforms").split("\n")) {
+    // e.g. "  cli                 204      1,838     31,562,108"
+    const m = line.match(/^\s{2}(\S.*?)\s{2,}([\d,]+)\s{2,}([\d,]+)\s{2,}([\d,]+)\s*$/);
+    if (m) data.platforms.push({ name: m[1].trim(), sessions: num(m[2]), messages: num(m[3]), tokens: num(m[4]) });
+  }
+  const toolsSection = section("Top Tools");
+  for (const line of toolsSection.split("\n")) {
+    // e.g. "  terminal                        4,190    64.6%"
+    const m = line.match(/^\s{2}(\S.*?)\s{2,}([\d,]+)\s+([\d.]+)%\s*$/);
+    if (m) data.tools.push({ name: m[1].trim(), calls: num(m[2]), pct: Number(m[3]) });
+  }
+  const more = toolsSection.match(/\.\.\.\s*and (\d+) more tools/);
+  data.toolsMore = more ? Number(more[1]) : null;
+  for (const line of section("Top Skills").split("\n")) {
+    // e.g. "  hermes-agent                      16       0      Aug 25"
+    const m = line.match(/^\s{2}(\S.*?)\s{2,}([\d,]+)\s{2,}([\d,]+)\s+(\S.*?)\s*$/);
+    if (m) data.skills.push({ name: m[1].trim(), loads: num(m[2]), edits: num(m[3]), lastUsed: m[4].trim() });
   }
   return data;
 }
