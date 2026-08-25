@@ -79,6 +79,7 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
       tabIndex={0}
       role="button"
       aria-expanded={isExpanded}
+      aria-controls={isExpanded ? `${agent.id}-panel` : undefined}
     >
       {/* Main card */}
       <div className="p-5 cursor-pointer" onClick={onToggle}>
@@ -127,7 +128,7 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
 
       {/* Expanded activity feed */}
       {isExpanded && (
-        <div className="px-5 py-4 space-y-2.5" style={{ borderTop: "1px solid var(--line)" }}>
+        <div id={`${agent.id}-panel`} className="px-5 py-4 space-y-2.5" style={{ borderTop: "1px solid var(--line)" }}>
           <h4 className="eyebrow">Recent Activity</h4>
           {agent.recentActivity.length === 0 ? (
             <p className="text-[12px] text-[var(--text-3)] py-2">No activity yet</p>
@@ -280,7 +281,7 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && send()}
             placeholder={`Message ${agent.name}…`}
-            className="flex-1 rounded-full px-4 py-2 text-[13px] text-[var(--text)] focus:outline-none transition-colors"
+            className="flex-1 rounded-full px-4 py-2 text-[13px] text-[var(--text)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
             style={{ background: "var(--surface-1)", border: "1px solid var(--line)" }}
             aria-label={`Message ${agent.name}`}
           />

@@ -152,6 +152,12 @@ body {
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* PaletteRow: suppress focus ring when active to avoid visual conflict */
+[data-active="true"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* Force LTR everywhere */
 *, *::before, *::after {
   direction: ltr !important;
@@ -365,4 +371,5 @@ textarea, input {
   .panel-interactive:active,
   .btn-primary:active,
   .btn-ghost:active { transform: none; }
+  .animate-pulse { animation: none !important; opacity: 1 !important; }
 }
