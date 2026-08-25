@@ -746,16 +746,13 @@ let hlBalance = 0;
     sessions: null, toolCalls: null, byModel: [], days: [],
   };
   const costData = store["hermes-cost"] as Record<string, unknown> | undefined;
-  const histData = (store["hermes-cost-history"] as { days?: { date: string; totalTokens?: number | null }[] } | null)?.days ?? [];
-  // Day-over-day deltas of the bridge's daily snapshots ≈ daily usage.
-  const days = histData.map((d, i) => {
-    const prev = i > 0 ? histData[i - 1] : undefined;
-    const tokens =
-      prev?.totalTokens != null && d.totalTokens != null
-        ? Math.max(0, d.totalTokens - prev.totalTokens)
-        : 0;
-    return { date: d.date, tokens };
-  });
+  const histData = (store["hermes-cost-history"] as { days?: { date: string; tokens?: number | null; totalTokens?: number | null }[] } | null)?.days ?? [];
+  // Bridge now stores real daily token counts as {date, tokens}; older entries
+  // used {date, totalTokens}. Read whichever is present, preferring the new field.
+  const days = histData
+    .filter((d) => d.tokens != null || d.totalTokens != null)
+    .map((d) => ({ date: d.date, tokens: d.tokens ?? d.totalTokens ?? 0 }));
+
   spend = {
     syncedAt: (costData?.syncedAt as string) ?? null,
     totalTokens: (costData?.totalTokens as number) ?? null,

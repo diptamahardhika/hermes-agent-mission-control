@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type DaySnap = { date: string; totalTokens?: number | null };
+type DaySnap = { date: string; tokens?: number | null };
 
 export async function GET() {
   const [row, hist] = await Promise.all([
@@ -11,18 +11,11 @@ export async function GET() {
   const cur = (row?.data ?? {}) as Record<string, unknown>;
   const rawDays = ((hist?.data as { days?: DaySnap[] } | null)?.days ?? []) as DaySnap[];
 
-  // The bridge snapshots each day's trailing-7-day totals; day-over-day deltas
-  // between consecutive snapshots approximate daily usage.
+  // Bridge now stores real daily token counts (by session started_at), not
+  // trailing-7-day rolling totals. Serve them directly.
   const days = rawDays
-    .map((d, i) => {
-      const prev = i > 0 ? rawDays[i - 1] : undefined;
-      const tokens =
-        prev?.totalTokens != null && d.totalTokens != null
-          ? Math.max(0, d.totalTokens - prev.totalTokens)
-          : 0;
-      return { date: d.date, tokens };
-    })
-    .filter((d) => d.tokens > 0 || d.date === rawDays[rawDays.length - 1]?.date);
+    .filter((d) => d.tokens != null)
+    .map((d) => ({ date: d.date, tokens: d.tokens as number }));
 
   return NextResponse.json({
     summary: cur.summary ?? null,
