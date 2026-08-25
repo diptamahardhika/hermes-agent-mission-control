@@ -385,9 +385,9 @@ export default function AgentsPage() {
           <h1 className="text-[32px] font-semibold tracking-[-0.025em] leading-none text-[var(--text)]">Your AI Team</h1>
           <p className="text-[13px] text-[var(--text-3)] mt-3">Working 24/7</p>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 min-w-0">
           {/* Stats */}
-          <div className="flex gap-7 text-center">
+          <div className="flex gap-5 sm:gap-7 text-center">
             <div>
               <div className="num text-[22px] font-semibold leading-none" style={{ color: "var(--up)" }}>{online}<span className="text-[var(--text-4)]">/{agents.length}</span></div>
               <div className="eyebrow mt-1.5">Online</div>
