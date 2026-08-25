@@ -210,8 +210,11 @@ async function mirrorCost() {
   try {
     const { stdout } = await execFileP("sqlite3", [
       path.join(os.homedir(), ".hermes", "state.db"),
-      `SELECT model, SUM(input_tokens), SUM(output_tokens), SUM(cache_read_tokens) FROM session_model_usage
-       WHERE last_seen > strftime('%s','now') - 7*86400 GROUP BY model ORDER BY SUM(input_tokens)+SUM(output_tokens) DESC;`,
+      `SELECT u.model, SUM(u.input_tokens), SUM(u.output_tokens), SUM(u.cache_read_tokens)
+       FROM session_model_usage u
+       JOIN sessions s ON s.id = u.session_id
+       WHERE s.started_at >= strftime('%s','now') - 7*86400
+       GROUP BY u.model ORDER BY SUM(u.input_tokens)+SUM(u.output_tokens) DESC;`,
     ], { timeout: 10000 });
     const byModelMap = new Map(parsed.byModel.map((m) => [m.model, m]));
     for (const line of stdout.trim().split("\n")) {
@@ -241,29 +244,46 @@ async function mirrorCost() {
 
   await setStore("hermes-cost", { summary: out.slice(0, 4000), ...parsed, syncedAt: new Date().toISOString() });
 
-  // Daily snapshot ring buffer: each sync stamps today's trailing-7-day totals.
-  // Day-over-day deltas between snapshots approximate daily usage and power the
-  // home dashboard's spend sparkline. Only stamp when we actually parsed tokens,
-  // so a parse failure can't poison the history with zeros.
-  if (parsed.totalTokens == null) return;
-  const today = new Date().toISOString().slice(0, 10);
-  let days = [];
-  try {
-    const histRow = await q(`SELECT data FROM "DataStore" WHERE key='hermes-cost-history'`);
-    const d = histRow.rows[0]?.data;
-    const obj = typeof d === "string" ? JSON.parse(d) : d;
-    if (Array.isArray(obj?.days)) days = obj.days;
-  } catch { /* fresh history */ }
-  const entry = {
-    date: today,
-    totalTokens: parsed.totalTokens,
-    inputTokens: parsed.inputTokens,
-    outputTokens: parsed.outputTokens,
-    sessions: parsed.sessions,
-  };
-  const i = days.findIndex((d) => d.date === today);
-  if (i >= 0) days[i] = entry; else days.push(entry);
-  await setStore("hermes-cost-history", { days: days.slice(-60) });
+  // Daily usage ring buffer: real daily token counts (by session started_at),
+  // not deltas of the 7-day rolling total. Powers the spend sparkline with
+  // honest per-day usage instead of "how much did the rolling total change?".
+  if (parsed.totalTokens != null) {
+    try {
+      const { stdout: dailyStdout } = await execFileP("sqlite3", [
+        path.join(os.homedir(), ".hermes", "state.db"),
+        `SELECT date(s.started_at,'unixepoch') as day, SUM(u.input_tokens+u.output_tokens+u.cache_read_tokens) as tokens
+         FROM session_model_usage u
+         JOIN sessions s ON s.id = u.session_id
+         WHERE s.started_at >= strftime('%s','now') - 7*86400
+         GROUP BY day ORDER BY day;`,
+      ], { timeout: 10000 });
+      const dailyDays = [];
+      for (const line of dailyStdout.trim().split("\n")) {
+        if (!line) continue;
+        const sep = line.indexOf("|");
+        if (sep < 0) continue;
+        const date = line.slice(0, sep);
+        const tokens = Number(line.slice(sep + 1));
+        if (!isNaN(tokens)) dailyDays.push({ date, tokens });
+      }
+      // Merge: read existing history from DataStore, keep rows for days outside
+      // the 7d window, overwrite any day inside the window with fresh values.
+      let existingDays = [];
+      try {
+        const histRow = await q(`SELECT data FROM "DataStore" WHERE key='hermes-cost-history'`);
+        const d = histRow.rows[0]?.data;
+        const obj = typeof d === "string" ? JSON.parse(d) : d;
+        if (Array.isArray(obj?.days)) existingDays = obj.days;
+      } catch { /* fresh history */ }
+      const freshDates = new Set(dailyDays.map(d => d.date));
+      const merged = existingDays
+        .filter((d) => !freshDates.has(d.date))
+        .concat(dailyDays)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(-14);
+      await setStore("hermes-cost-history", { days: merged });
+    } catch (e) { log("daily usage unavailable:", e.message?.split("\n")[0]); }
+  }
 }
 
 async function mirrorHealth() {
