@@ -19,6 +19,7 @@ const columns = [
   { id: "Not started", label: "To Do" },
   { id: "Approved", label: "Approved" },
   { id: "In progress", label: "In Progress" },
+  { id: "Blocked", label: "Blocked" },
   { id: "Done", label: "Done" },
 ];
 
@@ -197,7 +198,7 @@ export default function TasksPage() {
           </div>
         )}
 
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 overflow-hidden">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 overflow-hidden">
           {columns.map((column, idx) => {
             const count = tasks.filter((t) => t.status === column.id).length;
             return (
