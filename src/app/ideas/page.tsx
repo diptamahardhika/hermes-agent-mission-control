@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Clock, Lightbulb, Check, X } from "lucide-react";
+import { Plus, Clock, Lightbulb, Check, X, Loader2, Send, ListTodo } from "lucide-react";
 import { Panel, Pill, Button, Skeleton, EmptyState, rise } from "@/components/ui/kit";
+
+interface DispatchInfo {
+  state: "queued" | "running" | "board" | "working" | "done" | "failed";
+  agent: string | null;
+}
 
 interface Idea {
   id: string;
@@ -15,9 +20,19 @@ interface Idea {
   createdAt?: string;
   timestamp?: string;
   rejectionReason?: string;
+  agent?: string | null;
+  dispatch?: DispatchInfo | null;
 }
 
 type Tone = "neutral" | "up" | "down" | "warn" | "accent";
+
+const AGENTS = [
+  { id: "max", label: "Max" },
+  { id: "nova", label: "Nova" },
+  { id: "sage", label: "Sage" },
+  { id: "knox", label: "Knox" },
+  { id: "pixel", label: "Pixel" },
+];
 
 const STATUS_CONFIG: Record<string, { label: string; tone: Tone }> = {
   new:           { label: "New",         tone: "accent" },
@@ -56,6 +71,9 @@ function formatDate(dateStr?: string) {
 function IdeaCard({ idea, onUpdate }: { idea: Idea; onUpdate: () => void }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [isPickingAgent, setIsPickingAgent] = useState(false);
+  const [chosenAgent, setChosenAgent] = useState("max");
+  const [dispatching, setDispatching] = useState(false);
 
   const status = idea.status || "new";
   const statusConf = STATUS_CONFIG[status] || STATUS_CONFIG.new;
@@ -63,6 +81,7 @@ function IdeaCard({ idea, onUpdate }: { idea: Idea; onUpdate: () => void }) {
   const date = idea.createdAt || idea.timestamp || "";
   const isDead = status === "rejected" || status === "done";
   const isApproved = status === "approved";
+  const dispatch = idea.agent ? idea.dispatch : null;
 
   const updateIdea = async (updates: Partial<Idea>) => {
     await fetch("/api/ideas", {
@@ -71,6 +90,21 @@ function IdeaCard({ idea, onUpdate }: { idea: Idea; onUpdate: () => void }) {
       body: JSON.stringify({ id: idea.id, ...updates }),
     });
     onUpdate();
+  };
+
+  const handleDispatch = async () => {
+    setDispatching(true);
+    try {
+      await fetch("/api/ideas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "dispatch", id: idea.id, agent: chosenAgent }),
+      });
+      setIsPickingAgent(false);
+      onUpdate();
+    } finally {
+      setDispatching(false);
+    }
   };
 
   const handleReject = async () => {
@@ -130,10 +164,10 @@ function IdeaCard({ idea, onUpdate }: { idea: Idea; onUpdate: () => void }) {
       )}
 
       {/* Actions */}
-      {!isDead && !isApproved && !isRejecting && (
+      {!isDead && !isApproved && !isRejecting && !isPickingAgent && (
         <div className="flex gap-2">
           <button
-            onClick={() => updateIdea({ status: "approved" })}
+            onClick={() => setIsPickingAgent(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors"
             style={{ color: "var(--up)", borderColor: "color-mix(in srgb, var(--up) 24%, transparent)" }}
           >
@@ -151,11 +185,57 @@ function IdeaCard({ idea, onUpdate }: { idea: Idea; onUpdate: () => void }) {
         </div>
       )}
 
-      {isApproved && (
-        <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--up)" }}>
-          <Check className="w-3 h-3" />
-          <span>Approved</span>
+      {/* Agent picker — shown on approve, or when an approved idea has no agent yet */}
+      {isPickingAgent && !isDead && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={chosenAgent}
+            onChange={(e) => setChosenAgent(e.target.value)}
+            className="bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text)] px-2.5 py-1.5 rounded-full text-[12px] focus:outline-none focus:border-[var(--line-strong)]"
+          >
+            {AGENTS.map((a) => (
+              <option key={a.id} value={a.id}>{a.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleDispatch}
+            disabled={dispatching}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              color: "var(--up)",
+              borderColor: "color-mix(in srgb, var(--up) 24%, transparent)",
+              background: "color-mix(in srgb, var(--up) 10%, transparent)",
+            }}
+          >
+            {dispatching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+            {dispatching ? "Dispatching…" : `Dispatch to ${AGENTS.find((a) => a.id === chosenAgent)?.label}`}
+          </button>
+          {!isApproved && (
+            <button
+              onClick={() => setIsPickingAgent(false)}
+              className="px-2 py-1.5 rounded-full text-[12px] text-[var(--text-3)] hover:text-[var(--text)] transition-colors"
+            >
+              Cancel
+            </button>
+          )}
         </div>
+      )}
+
+      {/* Dispatch status */}
+      {dispatch && !isPickingAgent && (
+        <DispatchFooter dispatch={dispatch} onRetry={() => setIsPickingAgent(true)} />
+      )}
+
+      {/* Approved but never dispatched (legacy backlog) */}
+      {isApproved && !idea.agent && !isPickingAgent && (
+        <button
+          onClick={() => setIsPickingAgent(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors"
+          style={{ color: "var(--accent)", borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)" }}
+        >
+          <Send className="w-3 h-3" />
+          Send to an agent
+        </button>
       )}
 
       {/* Reject input */}
@@ -189,6 +269,65 @@ function IdeaCard({ idea, onUpdate }: { idea: Idea; onUpdate: () => void }) {
       )}
     </Panel>
   );
+}
+
+function DispatchFooter({ dispatch, onRetry }: { dispatch: DispatchInfo; onRetry: () => void }) {
+  const agent = dispatch.agent || "agent";
+  const spin = "animate-spin";
+  switch (dispatch.state) {
+    case "queued":
+      return (
+        <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--warn)" }}>
+          <Clock className="w-3 h-3" />
+          <span>Queued for @{agent}</span>
+        </div>
+      );
+    case "running":
+      return (
+        <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--accent)" }}>
+          <Loader2 className={`w-3 h-3 ${spin}`} />
+          <span>Creating board task…</span>
+        </div>
+      );
+    case "board":
+      return (
+        <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--accent)" }}>
+          <ListTodo className="w-3 h-3" />
+          <span>On @{agent}&apos;s board</span>
+        </div>
+      );
+    case "working":
+      return (
+        <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--accent)" }}>
+          <Loader2 className={`w-3 h-3 ${spin}`} />
+          <span>@{agent} working…</span>
+        </div>
+      );
+    case "done":
+      return (
+        <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--up)" }}>
+          <Check className="w-3 h-3" />
+          <span>Done by @{agent}</span>
+        </div>
+      );
+    case "failed":
+      return (
+        <div className="flex items-center gap-2 text-[12px]" style={{ color: "var(--down)" }}>
+          <span className="flex items-center gap-1.5">
+            <X className="w-3 h-3" />
+            Dispatch failed
+          </span>
+          <button
+            onClick={onRetry}
+            className="underline underline-offset-2 hover:opacity-80 transition-opacity"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    default:
+      return null;
+  }
 }
 
 export default function IdeasPage() {

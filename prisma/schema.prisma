@@ -105,14 +105,18 @@ model TweetMetric {
 }
 
 model Idea {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  category    String?
-  type        String?
-  model       String?
-  status      String?
-  timestamp   DateTime @default(now())
+  id              String    @id @default(uuid())
+  title           String
+  description     String?
+  category        String?
+  type            String?
+  model           String?
+  status          String?
+  source          String? // "manual" | scanner origin surfaced on the card
+  estimatedTime   String?
+  agent           String? // profile the idea was dispatched to (null = not yet dispatched)
+  rejectionReason String?
+  timestamp       DateTime  @default(now())
 
   @@index([category])
   @@index([type])
