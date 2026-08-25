@@ -326,6 +326,7 @@ function PaletteRow({
       onClick={onSelect}
       className="relative flex w-full items-center gap-3 rounded-[var(--r-sm)] px-3 py-2 text-left text-[13.5px] transition-colors"
       style={active ? { background: "var(--surface-1)" } : undefined}
+      data-active={active ? "true" : undefined}
     >
       {active && (
         <span

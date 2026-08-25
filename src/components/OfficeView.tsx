@@ -312,7 +312,7 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
 
         {/* Tasks badge */}
         {agent && agent.tasksCompleted > 0 && (
-          <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-neutral-700 border border-neutral-600 flex items-center justify-center z-10">
+          <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-neutral-700 border border-neutral-600 flex items-center justify-center z-10" aria-label={`${agent.tasksCompleted} tasks completed`}>
             <span className="text-[9px] font-bold text-white">{agent.tasksCompleted > 99 ? "99+" : agent.tasksCompleted}</span>
           </div>
         )}

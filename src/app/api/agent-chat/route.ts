@@ -1,116 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { homedir } from 'os';
+import { execSync } from 'child_process';
+
+const execFileP = promisify(execFile);
 
 interface AgentChatRequest {
   agentId: string;
   message: string;
-  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
-interface AgentChatResponse {
-  reply: string;
-  agentId: string;
+const AGENTS = ['max', 'sage', 'knox', 'nova', 'pixel'] as const;
+type AgentId = typeof AGENTS[number];
+
+function profileHome(agent: string): string {
+  // Max runs on the main Hermes home; others have per-profile homes.
+  return agent === 'max' ? `${homedir()}/.hermes` : `${homedir()}/.hermes/profiles/${agent}`;
 }
 
-const AGENT_PROMPTS: Record<string, string> = {
-  max: "You are Max 🐺, an AI executive assistant and COO-level strategist helping the user run their business. The user is a founder and content creator who runs AI trading bots. Be sharp, concise, strategic. Give real actionable advice.",
-  sage: "You are Sage 🌿, X/Twitter content specialist for the user. You write viral tweets in their voice — conversational, sharp, specific. Focus on hooks that make people stop scrolling. No fluff.",
-  knox: "You are Knox 🔐, operations and trading analyst for the user. You analyze Polymarket and Hyperliquid trading performance, spot patterns, suggest strategy improvements. Be data-driven and direct.",
-  nova: "You are Nova ⭐, YouTube strategy specialist for the user. You write scripts, hooks, thumbnails, titles. Think Mr Beast structure applied to the user's niche.",
-  pixel: "You are Pixel 🎨, web app product specialist for the user's products. You find UX improvements, feature ideas, competitor gaps. Think product manager + growth hacker.",
-};
+function lastAssistantId(agent: string): number {
+  const db = `${profileHome(agent)}/state.db`;
+  try {
+    const out = execSync(
+      `sqlite3 -json '${db}' "SELECT MAX(id) AS maxid FROM messages WHERE role='assistant'"`,
+      { timeout: 10_000, maxBuffer: 1024 * 1024 },
+    ).toString();
+    const rows = JSON.parse(out.trim() || '[]');
+    return rows[0]?.maxid ?? 0;
+  } catch {
+    return 0;
+  }
+}
 
-export async function POST(request: NextRequest): Promise<NextResponse<AgentChatResponse | { error: string }>> {
+function firstReplyAfter(agent: string, minId: number): string {
+  const db = `${profileHome(agent)}/state.db`;
+  try {
+    const out = execSync(
+      `sqlite3 -json '${db}' "SELECT content FROM messages WHERE role='assistant' AND id > ${minId} AND length(trim(content)) > 0 AND content NOT LIKE '{%' ORDER BY id ASC LIMIT 1"`,
+      { timeout: 10_000, maxBuffer: 1024 * 1024 },
+    ).toString();
+    const rows = JSON.parse(out.trim() || '[]');
+    return rows[0]?.content ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body: AgentChatRequest = await request.json();
-    const { agentId, message, history = [] } = body;
-
-    // Validate inputs
+    const agentId = body.agentId;
+    const message = (body.message || '').trim();
     if (!agentId || !message) {
-      return NextResponse.json(
-        { error: 'Missing agentId or message' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing agentId or message' }, { status: 400 });
+    }
+    if (!(AGENTS as readonly string[]).includes(agentId)) {
+      return NextResponse.json({ error: `Unknown agent: ${agentId}` }, { status: 400 });
     }
 
-    if (!AGENT_PROMPTS[agentId]) {
-      return NextResponse.json(
-        { error: `Unknown agent: ${agentId}` },
-        { status: 400 }
-      );
+    const home = profileHome(agentId);
+    // Snapshot the latest assistant message id BEFORE the run so concurrent
+    // writes from other processes can't pollute the reply extraction.
+    const beforeId = lastAssistantId(agentId);
+
+    // Run the real Hermes agent with its own SOUL.md persona (one-shot, tools enabled).
+    // Long replies can take a while — cap at 4 minutes.
+    // Persistent session per agent (continuity = real relationship), but frame each
+    // message as a fresh question so prior topics don't bleed into the answer.
+    const framedMessage = `[New question from Dipta — answer this directly] ${message}`;
+    await execFileP(
+      `${homedir()}/.hermes/hermes-agent/venv/bin/hermes`,
+      ['chat', '-q', framedMessage],
+      { timeout: 240_000, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, HERMES_HOME: home } },
+    );
+
+    let reply = '';
+    for (let attempt = 0; attempt < 10 && !reply; attempt++) {
+      await new Promise(res => setTimeout(res, 3000));
+      reply = firstReplyAfter(agentId, beforeId);
     }
-
-    const systemPrompt = AGENT_PROMPTS[agentId];
-    const apiKey = process.env.OPENROUTER_API_KEY;
-
-    if (!apiKey) {
-      console.error('OPENROUTER_API_KEY not configured');
-      return NextResponse.json(
-        { error: 'API configuration error' },
-        { status: 500 }
-      );
-    }
-
-    // Build messages array: system prompt + history + current message
-    const messages = [
-      ...history,
-      { role: 'user' as const, content: message },
-    ];
-
-    // Free models only — the OpenRouter account has no credits. Try in order.
-    const FREE_MODELS = [
-      "nvidia/nemotron-3-super-120b-a12b:free",
-      "google/gemma-4-31b-it:free",
-      "nvidia/nemotron-3-nano-30b-a3b:free",
-    ];
-
-    let reply = "";
-    let lastError = "";
-    for (const model of FREE_MODELS) {
-      // Call OpenRouter API
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://your-app.vercel.app',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages,
-          ],
-          max_tokens: 800,
-        }),
-      });
-
-      if (!response.ok) {
-        lastError = `${model}: ${response.status} ${(await response.text()).slice(0, 200)}`;
-        console.error('OpenRouter API error:', lastError);
-        continue;
-      }
-
-      const data = await response.json();
-      reply = data.choices?.[0]?.message?.content || '';
-      if (reply) break;
-    }
-
-    if (!reply) {
-      return NextResponse.json(
-        { error: lastError || 'No response from AI model' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      reply,
-      agentId,
-    });
+    return NextResponse.json({ reply: reply || '(no reply captured)', agentId });
   } catch (error) {
     console.error('Agent chat error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: 'Agent failed to respond', detail: String(error).slice(0, 300) },
+      { status: 502 },
     );
   }
 }
