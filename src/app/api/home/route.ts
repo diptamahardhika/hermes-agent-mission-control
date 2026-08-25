@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const HL_WALLET = process.env.HL_WALLET || "";
+const HL_WALLET = process.env.HL_WALLET || ""; // legacy (unused since Binance swap)
+const BINANCE_API_KEY = process.env.BINANCE_API_KEY || "";
+const BINANCE_API_SECRET = process.env.BINANCE_API_SECRET || "";
 const HL_API = "https://api.hyperliquid.xyz/info";
 const YT_API_KEY = process.env.YOUTUBE_API_KEY;
 const YT_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID || "";
@@ -19,7 +21,7 @@ const HERMES_KANBAN_BOARD = process.env.HERMES_BOARD || "default";
 // once every 10 polls". This drops external API calls ~80–95% on a warm
 // process while keeping the 30s poll responsive.
 
-const HL_CACHE = new Map<string, { data: unknown; expires: number }>();
+const BN_CACHE = new Map<string, { data: unknown; expires: number }>();
 const YT_CACHE = new Map<string, { data: unknown; expires: number }>();
 const GH_CACHE = new Map<string, { data: unknown; expires: number }>();
 
@@ -324,14 +326,66 @@ export async function GET() {
     prisma.draft.findMany({ where: { status: "posted" }, orderBy: { postedAt: "desc" }, take: 50 }),
     prisma.tweetMetric.findMany({ take: 500, where: { tweetId: { not: null } } }),
     prisma.draft.findMany({ where: { status: "pending" }, orderBy: { createdAt: "desc" }, take: 10 }),
-    // Hyperliquid: 1-minute in-route TTL cache (R3a) — 3 POST calls per poll
-    // cuts to one every 60s on a warm process. Falls back to live fetch on miss.
-    ttlFetch(HL_CACHE, "hl-triple", async () => {
-      return Promise.all([
-        hlPost({ type: "clearinghouseState", user: HL_WALLET }),
-        hlPost({ type: "allMids" }),
-        hlPost({ type: "userFills", user: HL_WALLET }),
-      ]);
+    // Binance PnL (swapped from Hyperliquid 2026-08-24): 1-minute TTL cache.
+    // Signed SAPI calls — requires BINANCE_API_KEY / BINANCE_API_SECRET in .env.
+    ttlFetch(BN_CACHE, "binance-pnl", async () => {
+      if (!BINANCE_API_KEY || !BINANCE_API_SECRET) return null;
+      const crypto = await import("crypto");
+      const base = "https://api.binance.com";
+      const call = async (path: string) => {
+        const [pathname, existing] = path.split("?");
+        const params = new URLSearchParams(existing || "");
+        params.set("timestamp", Date.now().toString());
+        params.set("recvWindow", "10000");
+        const qs = params.toString();
+        const signature = crypto.createHmac("sha256", BINANCE_API_SECRET).update(qs).digest("hex");
+        const r = await fetch(`${base}${pathname}?${qs}&signature=${signature}`, {
+          headers: { "X-MBX-APIKEY": BINANCE_API_KEY },
+          cache: "no-store",
+        });
+        if (!r.ok) throw new Error(`binance ${pathname} ${r.status}`);
+        return r.json();
+      };
+      // Authoritative total: wallet/balance reports every wallet's value in BTC
+      // (Earn, Trading Bots, Spot, Funding, Margin...). Convert via BTCUSDT.
+      let btcTotal = 0;
+      const wallets: { name: string; btc: number }[] = [];
+      try {
+        const wb = await call("/sapi/v1/asset/wallet/balance");
+        for (const w of wb as { walletName: string; balance: string }[]) {
+          const btc = parseFloat(w.balance);
+          if (btc > 0) { btcTotal += btc; wallets.push({ name: w.walletName, btc }); }
+        }
+      } catch { /* fall back to partial data below */ }
+      const btcPrice = await fetch(`${base}/api/v3/ticker/price?symbol=BTCUSDT`, { cache: "no-store" })
+        .then(r => r.json()).then((p: { price: string }) => parseFloat(p.price)).catch(() => 0);
+      const balance = btcTotal * btcPrice;
+
+      // Asset-level breakdown from flexible earn positions (largest component)
+      let prices: Record<string, number> = {};
+      try {
+        const px = await fetch(`${base}/api/v3/ticker/price`, { cache: "no-store" }).then(r2 => r2.json());
+        prices = Object.fromEntries((px as { symbol: string; price: string }[]).map(p2 => [p2.symbol, parseFloat(p2.price)]));
+      } catch { /* skip */ }
+      const usdtValue = (asset: string, qty: number) =>
+        asset === "USDT" ? qty : (prices[`${asset}USDT`] ?? 0) * qty;
+      const assets: { asset: string; amount: number; usdValue: number; wallet: string }[] = [];
+      try {
+        const flex = await call("/sapi/v1/simple-earn/flexible/position?size=100");
+        for (const row of flex.rows as { asset: string; totalAmount: string }[]) {
+          const qty = parseFloat(row.totalAmount);
+          if (qty <= 0) continue;
+          assets.push({ asset: row.asset, amount: qty, usdValue: usdtValue(row.asset, qty), wallet: "Earn" });
+        }
+      } catch { /* optional */ }
+      // Trading bots remainder (total minus identified)
+      const identified = assets.reduce((s, a) => s + a.usdValue, 0);
+      const botsValue = balance - identified;
+      if (botsValue > 0.5) {
+        assets.push({ asset: "Trading Bots", amount: botsValue, usdValue: botsValue, wallet: "Bots" });
+      }
+      assets.sort((a, b) => b.usdValue - a.usdValue);
+      return { balance, assets };
     }, 60_000),
     // YouTube: 5-minute in-route TTL cache (R3b) — 3 separate Google API calls
     // per poll drop to one every 300s while warm.
@@ -484,6 +538,7 @@ export async function GET() {
             update: { data: { ...(xStatsFile || {}), xFollowers: liveFollowers, xHandle, xGoal: xStatsFile?.xGoal || 100000, updatedAt: new Date().toISOString() } },
             create: { key: "x-account-stats", data: { xFollowers: liveFollowers, xHandle, xGoal: 100000, updatedAt: new Date().toISOString() } },
           }).catch(() => {});
+
         }
       }
     } catch { /* non-fatal */ }
@@ -553,46 +608,40 @@ export async function GET() {
   let allTimePnl = parseFloat(process.env.POLY_ALL_TIME_PNL || process.env.ALL_TIME_PNL || "0");
   let todayPnl = parseFloat(process.env.POLY_TODAY_PNL || "0");
   let polyWinRate = parseFloat(process.env.POLY_WIN_RATE || "0");
+  let polyTodayPnl = parseFloat(process.env.POLY_TODAY_PNL || "0");
+  let polyAllTimePnl = parseFloat(process.env.POLY_ALL_TIME_PNL || "0");
 
   // DataStore was batch-fetched upfront (R2c); read from store.
   const polyPnl = store["polymarket-pnl"] as any;
   if (polyPnl?.allTimePnl) allTimePnl = polyPnl.allTimePnl;
   if (polyPnl?.todayPnl) todayPnl = polyPnl.todayPnl;
   if (polyPnl?.winRate) polyWinRate = polyPnl.winRate;
+  if (polyPnl?.todayPnl) polyTodayPnl = polyPnl.todayPnl;
+  if (polyPnl?.allTimePnl) polyAllTimePnl = polyPnl.allTimePnl;
 
-  // ─── Hyperliquid ─────────────────────────────────────────────────────────────
-  let hlBalance = 0;
+  // ─── Binance PnL (swapped from Hyperliquid 2026-08-24) ──────────────────────
+  let bnAssets: { asset: string; amount: number; usdValue: number }[] = [];
+let hlBalance = 0;
   let hlPosition: { asset: string; direction: string; unrealizedPnl: number; unrealizedPnlPct: number; leverage: number; stopLoss?: number; takeProfit?: number } | null = null;
 
   let hlTodayPnl = parseFloat(process.env.HL_TODAY_PNL || "0");
   let hlAllTimePnl = parseFloat(process.env.HL_ALL_TIME_PNL || "0");
+  // Binance realized PnL overrides env fallbacks when the API reports data
+  let binanceLive = false;
 
-  if (hlResult.status === "fulfilled") {
-    const [accountState, allMids, fills] = hlResult.value as [any, any, Array<{ time: number; closedPnl: string }>];
-    hlBalance = parseFloat(accountState.marginSummary?.accountValue || "0");
-    for (const p of accountState.assetPositions || []) {
-      const pos = p.position;
-      if (!pos || parseFloat(pos.szi) === 0) continue;
-      const size = parseFloat(pos.szi);
-      const markPx = parseFloat(allMids[pos.coin] || pos.entryPx || "0");
-      const unrealizedPnl = parseFloat(pos.unrealizedPnl || "0");
-      const leverage = parseFloat(pos.leverage?.value || pos.leverage || "1");
-      const notional = Math.abs(size) * markPx;
-      hlPosition = { asset: pos.coin, direction: size > 0 ? "long" : "short", unrealizedPnl, unrealizedPnlPct: notional > 0 ? (unrealizedPnl / (notional / leverage)) * 100 : 0, leverage };
+  let bnRealizedToday = 0;
+  let bnRealizedTotal = 0;
+  if (hlResult.status === "fulfilled" && hlResult.value) {
+      const bn = hlResult.value as { balance: number; assets?: { asset: string; amount: number; usdValue: number }[]; realizedToday?: number; realizedTotal?: number };
+  bnAssets = bn.assets ?? [];
+    hlBalance = bn.balance;
+    bnRealizedToday = bn.realizedToday ?? 0;
+    bnRealizedTotal = bn.realizedTotal ?? 0;
+    if (bn.balance > 0 || bnRealizedTotal !== 0) {
+      binanceLive = true;
+      hlTodayPnl = bnRealizedToday;
+      hlAllTimePnl = bnRealizedTotal;
     }
-    if (Array.isArray(fills) && fills.length > 0) {
-      const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
-      hlTodayPnl = fills.filter(f => f.time > cutoffMs).reduce((s, f) => s + parseFloat(f.closedPnl || "0"), 0);
-      hlAllTimePnl = fills.reduce((s, f) => s + parseFloat(f.closedPnl || "0"), 0);
-    }
-    try {
-      const row = await prisma.battleRoyaleBot.findUnique({ where: { id: "claude-opus" } });
-      if (row?.state && hlPosition) {
-        const state = row.state as { current_position?: { stop_loss?: number; take_profit?: number } };
-        hlPosition.stopLoss = state.current_position?.stop_loss;
-        hlPosition.takeProfit = state.current_position?.take_profit;
-      }
-    } catch { /* ignore */ }
   }
 
   // ─── Polymarket balance (env var fallback) ──────────────────────────────────
@@ -612,21 +661,36 @@ export async function GET() {
   const snapData = store["metric-snapshots"] as Snap[] | undefined;
   snapshots = Array.isArray(snapData) ? snapData : [];
   const today = new Date().toISOString().slice(0, 10);
-  const totalPnlNow = allTimePnl + hlAllTimePnl;
   const point: Snap = {
     d: today,
     xf: xStats.xFollowers,
     yt: ytSubscribers,
-    pnl: Math.round(totalPnlNow * 100) / 100,
+    // Snapshot records WALLET VALUE (not PnL delta) so day-over-day deltas compute correctly.
+    pnl: Math.round(hlBalance * 100) / 100,
   };
   const idx = snapshots.findIndex(s => s.d === today);
   if (idx >= 0) snapshots[idx] = point; else snapshots.push(point);
   snapshots = snapshots.slice(-60); // ~2 months of daily history
+  // Drop zero-pnl legacy rows from before wallet-value snapshots existed
+  snapshots = snapshots.filter(s => s.d === today || s.pnl > 0);
   prisma.dataStore.upsert({
     where: { key: "metric-snapshots" },
     update: { data: snapshots },
     create: { key: "metric-snapshots", data: snapshots },
   }).catch(() => {});
+  // Binance PnL derivation (savings-style portfolio): today's PnL = wallet value
+  // minus yesterday's snapshot; all-time = minus earliest snapshot.
+  // PnL from snapshot history: wallet value change day-over-day / since first record.
+  // Needs ≥2 days of history; before that, honest zeros.
+  {
+    const sortedSnaps = [...snapshots].sort((a, b) => b.d.localeCompare(a.d));
+    const priorDays = sortedSnaps.filter(s => s.d !== today && s.pnl > 0);
+    if (priorDays.length >= 1) {
+      hlTodayPnl = Math.round((hlBalance - priorDays[0].pnl) * 100) / 100;
+      const earliest = priorDays[priorDays.length - 1];
+      hlAllTimePnl = Math.round((hlBalance - earliest.pnl) * 100) / 100;
+    }
+  }
 
   // ─── Homelab (mirrored into DataStore by the bridge) ─────────────────────────
   // DataStore was batch-fetched upfront (R2c); read from store.
@@ -731,14 +795,15 @@ export async function GET() {
     // Trading, hard-coded for dashboard/demo display
     polyBalance,
     polyWinRate,
-    polyTodayPnl: 67.22,
-    polyAllTimePnl: 67.22,
+    polyTodayPnl,
+    polyAllTimePnl,
     hlBalance,
-    hlTodayPnl: 0,
-    hlAllTimePnl: 0,
+    hlTodayPnl,
+    hlAllTimePnl,
     hlPosition: null,
-    allTimePnl: 67.22,
-    todayPnl: 67.22,
+    hlAssets: bnAssets,
+    allTimePnl: allTimePnl + hlAllTimePnl,
+    todayPnl: todayPnl + hlTodayPnl,
     // GitHub
     github: {
       profile: githubProfileResult.status === "fulfilled" && githubProfileResult.value && !githubProfileResult.value.message

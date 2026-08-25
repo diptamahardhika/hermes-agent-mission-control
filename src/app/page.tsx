@@ -97,6 +97,7 @@ interface HomeData {
   ytSubscribers: number; ytGoal: number;
   polyBalance: number; polyWinRate: number; polyTodayPnl: number; polyAllTimePnl: number;
   hlBalance: number; hlPosition: HLPosition | null; hlTodayPnl: number; hlAllTimePnl: number;
+  hlAssets?: { asset: string; amount: number; usdValue: number; wallet?: string }[];
   allTimePnl: number; todayPnl: number;
   processes: Process[];
   hermesKanban: HermesKanban;
@@ -119,7 +120,7 @@ const EMPTY: HomeData = {
   topSageDrafts: [], topYoutubeIdeas: [], topBuildIdeas: [],
   topVideo: null, latestVideo: null, ytSubscribers: 0, ytGoal: 20000,
   polyBalance: 0, polyWinRate: 0, polyTodayPnl: 0, polyAllTimePnl: 0,
-  hlBalance: 0, hlPosition: null, hlTodayPnl: 0, hlAllTimePnl: 0,
+  hlBalance: 0, hlPosition: null, hlTodayPnl: 0, hlAllTimePnl: 0, hlAssets: [],
   allTimePnl: 0, todayPnl: 0, processes: [],
   hermesKanban: { board: "Hermes 24/7 Assistant", slug: "hermes-24-7-assistant", total: 0, counts: {}, tasks: [] },
   xViewsTrend: [], snapshots: [],
@@ -1128,6 +1129,84 @@ function ScoreGauge({ score }: { score: ScoreData }) {
   );
 }
 
+// ── Crypto portfolio card ─────────────────────────────────
+function CryptoPortfolioCard({ data }: { data: HomeData }) {
+  const { hlBalance: balance, hlTodayPnl: todayPnl, hlAllTimePnl: allTimePnl, hlAssets: assets } = data;
+  const hasData = balance > 0 || (assets?.length ?? 0) > 0;
+  const pnlColor = todayPnl > 0 ? "var(--up)" : todayPnl < 0 ? "var(--down)" : "var(--hq-text-ghost)";
+  const allColor = allTimePnl > 0 ? "var(--up)" : allTimePnl < 0 ? "var(--down)" : "var(--hq-text-ghost)";
+  return (
+    <div className="panel flex flex-col p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-base leading-none">🪙</span>
+        <span className="eyebrow">Binance / Crypto</span>
+        <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">spot · flexible earn</span>
+      </div>
+
+      {!hasData ? (
+        <p className="text-[12px] text-[var(--hq-text-ghost)] py-6 text-center">
+          Binance API not configured — add BINANCE_API_KEY / BINANCE_API_SECRET to .env
+        </p>
+      ) : (
+        <>
+          {/* Wallet balance */}
+          <div>
+            <div className="eyebrow mb-2 !text-[9.5px]">Wallet value</div>
+            <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
+              ${balance > 0 ? fmt(balance) : "0.00"}
+            </div>
+          </div>
+
+          {/* Realized PnL */}
+          <div className="grid grid-cols-2 gap-3 pt-4">
+            <div>
+              <div className="eyebrow mb-1.5 !text-[9.5px]">Today&apos;s PnL</div>
+              <div className="num font-semibold text-[18px]" style={{ color: pnlColor }}>
+                {todayPnl > 0 ? "+" : ""}${todayPnl.toFixed(2)}
+              </div>
+            </div>
+            <div>
+              <div className="eyebrow mb-1.5 !text-[9.5px]">Since tracking</div>
+              <div className="num font-semibold text-[18px]" style={{ color: allColor }}>
+                {allTimePnl > 0 ? "+" : ""}${allTimePnl.toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          {/* Asset breakdown */}
+          {assets && assets.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-[var(--hq-hairline)] space-y-2.5">
+              <div className="eyebrow !text-[9.5px] mb-1">Holdings breakdown</div>
+              {assets.map(a => {
+                const share = balance > 0 ? (a.usdValue / balance) * 100 : 0;
+                return (
+                  <div key={a.asset} className="flex items-center gap-2">
+                    <span className="text-[11px] text-[var(--hq-text-dim)] w-24 shrink-0 truncate">
+                    {a.asset}
+                    {a.wallet && <span className="text-[9px] text-[var(--hq-text-ghost)]"> · {a.wallet}</span>}
+                  </span>
+                    <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-[1200ms] ease-out"
+                        style={{ width: `${share}%`, background: "#f0b90b", opacity: 0.85 }} />
+                    </div>
+                    <span className="num text-[10px] text-[var(--hq-text-ghost)] w-32 text-right shrink-0 tabular-nums">
+                      {a.amount < 0.01 ? a.amount.toFixed(6) : a.amount.toFixed(2)} · ${a.usdValue.toFixed(2)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      <a href="/hermes#runs" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
+        via Hermes hub
+        <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </a>
+    </div>
+  );
+}
 // ── Main ──────────────────────────────────────────────────
 // Render digest text, turning markdown links and bare URLs clickable.
 function renderWithLinks(text: string): React.ReactNode[] {
@@ -1436,6 +1515,16 @@ export default function Dashboard() {
           </div>
           <div className="xl:col-span-1 hq-rise" style={rise(5)}>
             <AgentProposalsWidget />
+          </div>
+        </div>
+
+        {/* ── Crypto ──────────────────────────────────────── */}
+        <div className="mt-14">
+          <SectionLabel>Crypto</SectionLabel>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="lg:col-span-2 hq-rise" style={rise(6)}>
+              <CryptoPortfolioCard data={data} />
+            </div>
           </div>
         </div>
 
