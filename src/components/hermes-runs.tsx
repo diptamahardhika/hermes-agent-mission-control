@@ -232,7 +232,7 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
         return (
           <div className="mt-4">
             <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
-              {cacheTotal > 0 && <div style={{ width: seg(cacheTotal), background: "#fbbf24", opacity: 0.8 }} />}
+              {cacheTotal > 0 && <div style={{ width: seg(cacheTotal), background: "#f472b6", opacity: 0.8 }} />}
               <div style={{ width: seg(input), background: "#a78bfa" }} />
               <div style={{ width: seg(output), background: "#38bdf8" }} />
             </div>
@@ -245,7 +245,7 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                 {cacheTotal > 0 && (
                   <>
                     cached {fmtTokens(cacheTotal)}
-                    <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#fbbf24" }} />
+                    <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#f472b6" }} />
                   </>
                 )}
               </span>
@@ -273,7 +273,7 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                   out
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#fbbf24" }} />
+                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#f472b6" }} />
                   cached
                 </span>
                 <span className="opacity-60">· √ scale</span>
@@ -322,7 +322,7 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                         {cacheRead > 0 && (
                           <div
                             className="h-full"
-                            style={{ width: `${segOf(cacheRead)}%`, background: "#fbbf24", opacity: 0.8 }}
+                            style={{ width: `${segOf(cacheRead)}%`, background: "#f472b6", opacity: 0.8 }}
                             title={`cached: ${fmtTokens(cacheRead)}`}
                           />
                         )}
@@ -345,7 +345,7 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                     <>
                       <span style={{ color: "#a78bfa" }}>in</span> {fmtTokens(m.inputTokens!)}
                       {cacheRead > knownSum * 0.01 && (
-                        <>{" "}<span style={{ color: "#fbbf24" }}>·c</span> {fmtTokens(cacheRead)}</>
+                        <>{" "}<span style={{ color: "#f472b6" }}>·c</span> {fmtTokens(cacheRead)}</>
                       )}
                       {" "}
                       <span style={{ color: "#38bdf8" }}>out</span> {fmtTokens(m.outputTokens!)}

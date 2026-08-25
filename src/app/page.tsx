@@ -570,7 +570,7 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
         const cacheRead = (m as { cacheReadTokens?: number }).cacheReadTokens ?? 0;
         const parts = [
           { label: "in", v: m.inputTokens ?? 0, color: "#a78bfa" },
-          { label: "cached", v: cacheRead, color: "#fbbf24" },
+          { label: "cached", v: cacheRead, color: "#f472b6" },
           { label: "out", v: m.outputTokens ?? 0, color: "#38bdf8" },
         ];
         const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
@@ -599,7 +599,7 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
               {split ? (
                 <>
                   <span style={{ color: "#a78bfa" }}>in</span> {fmt(m.inputTokens ?? 0)}{" "}
-                  {hasCache && <><span style={{ color: "#fbbf24" }}>·c</span> {fmt(cacheRead)}{" "}</>}
+                  {hasCache && <><span style={{ color: "#f472b6" }}>·c</span> {fmt(cacheRead)}{" "}</>}
                   <span style={{ color: "#38bdf8" }}>out</span> {fmt(m.outputTokens ?? 0)}
                 </>
               ) : `${pct}%`}
@@ -619,7 +619,7 @@ function TokenIOSplit({ input, output, cache = 0 }: { input: number | null; outp
   return (
     <div className="mt-auto pt-3">
       <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
-        {cache > 0 && <div style={{ width: seg(cache), background: "#fbbf24", opacity: 0.8 }} />}
+        {cache > 0 && <div style={{ width: seg(cache), background: "#f472b6", opacity: 0.8 }} />}
         <div style={{ width: seg(input), background: "#a78bfa" }} />
         <div style={{ width: seg(output), background: "#38bdf8" }} />
       </div>
@@ -632,7 +632,7 @@ function TokenIOSplit({ input, output, cache = 0 }: { input: number | null; outp
           {cache > 0 && (
             <>
               cached {fmt(cache)}
-              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#fbbf24" }} />
+              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#f472b6" }} />
             </>
           )}
         </span>
