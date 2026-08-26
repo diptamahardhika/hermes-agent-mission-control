@@ -513,7 +513,7 @@ function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
   return (
     <div className="panel flex flex-col p-6">
       <div className="flex items-center gap-2 mb-4">
-        <Waypoints className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
+        <Waypoints className="w-3.5 h-3.5" style={{ color: "#2dd4bf" }} />
         <span className="eyebrow">OmniRoute Compute · 7d</span>
         {omni.syncedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">synced {timeAgo(omni.syncedAt)}</span>}
       </div>
@@ -523,7 +523,7 @@ function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
           <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
             {omni.totalTokens != null ? fmtExact(omni.totalTokens) : "—"}
           </div>
-          {series.some(v => v > 0) && <Sparkline data={series} color="#fbbf24" area idSeed="omni-spend" className="h-9 mt-3" />}
+          {series.some(v => v > 0) && <Sparkline data={series} color="#2dd4bf" area idSeed="omni-spend" className="h-9 mt-3" />}
         </div>
         <div className="grid grid-cols-2 gap-3 pt-1">
           <div>
@@ -1741,7 +1741,7 @@ export default function Dashboard() {
                 delta={null} deltaPct={null} deltaLabel={undefined}
                 trend={undefined}
                 goal={undefined} goalFormat={undefined}
-                icon={<Waypoints className="w-4 h-4" />} accent="#fbbf24" href="/hermes#runs" loaded={loaded}
+                icon={<Waypoints className="w-4 h-4" />} accent="#2dd4bf" href="/hermes#runs" loaded={loaded}
               >
                 <OmniShareBars omni={data.omniSpend} />
                 <TokenIOSplit
