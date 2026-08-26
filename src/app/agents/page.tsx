@@ -359,6 +359,39 @@ export default function AgentsPage() {
     loadProposals();
   }
 
+  async function handleUnblock(taskId: string, message: string) {
+    try {
+      await fetch("/api/agent-proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unblock", taskId, message }),
+      });
+    } finally {
+      loadProposals();
+      loadAgents?.();
+    }
+  }
+
+  async function handleReply(taskId: string, agent: string, message: string) {
+    // Send guidance via the agent's real Hermes chat. This takes 30-120s (real LLM
+    // run), so the card UI shows an optimistic "sent" state while it processes;
+    // the proposal list refreshes when both steps finish.
+    try {
+      await fetch("/api/agent-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: agent === "max" ? "max" : agent, message }),
+      });
+      await fetch("/api/agent-proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "createTask", proposalId: taskId }),
+      });
+    } finally {
+      loadProposals();
+    }
+  }
+
   if (loading) {
     return (
       <div className="relative min-h-screen p-8">
@@ -468,6 +501,8 @@ export default function AgentsPage() {
                     proposal={p}
                     onReject={handleReject}
                     onCreateTask={handleCreateTask}
+                    onReply={handleReply}
+                    onUnblock={handleUnblock}
                   />
                 ))}
               </div>
@@ -483,7 +518,7 @@ export default function AgentsPage() {
           {loadError ? (
             <>
               <div className="text-2xl mb-3">⚠</div>
-              <h3 className="text-[14px] font-semibold text-[var(--text)]">Couldn't load agents</h3>
+              <h3 className="text-[14px] font-semibold text-[var(--text)]">Couldn&apos;t load agents</h3>
               <p className="text-[12px] text-[var(--text-3)] mt-2 max-w-xs mx-auto">{loadError}</p>
               <button onClick={loadAgents} className="btn-primary mt-5 px-5 py-2 text-[13px]">Retry</button>
             </>
@@ -491,7 +526,7 @@ export default function AgentsPage() {
             <>
               <div className="text-2xl mb-3">👤</div>
               <h3 className="text-[14px] font-semibold text-[var(--text)]">No agents yet</h3>
-              <p className="text-[12px] text-[var(--text-3)] mt-2">Your AI team will appear here once they're connected.</p>
+              <p className="text-[12px] text-[var(--text-3)] mt-2">Your AI team will appear here once they&apos;re connected.</p>
             </>
           )}
         </div>

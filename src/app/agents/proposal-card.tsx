@@ -16,6 +16,7 @@ interface Proposal {
   taskStatus?: string;
   followUpTaskId?: string | null;
   followUpStatus?: string | null;   // live kanban status of the created task
+  followUpBlockKind?: string | null; // why a blocked task is blocked (e.g. needs_input)
   followUpResult?: string | null;
 }
 
@@ -43,12 +44,46 @@ function ProposalCard({
   proposal,
   onReject,
   onCreateTask,
+  onReply,
+  onUnblock,
 }: {
   proposal: Proposal;
   onReject: (id: string) => void;
   onCreateTask: (id: string) => void;
+  onReply?: (id: string, agent: string, message: string) => Promise<void>;
+  onUnblock?: (taskId: string, message: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [replying, setReplying] = useState(false);
+  const [showReply, setShowReply] = useState(false);
+  const [sentNote, setSentNote] = useState<string | null>(null);
+
+  async function sendReply() {
+    const text = replyText.trim();
+    if (!text || replying) return;
+    const blocked = proposal.followUpStatus === "blocked" && proposal.followUpBlockKind === "needs_input";
+    if (blocked && !onUnblock) return;
+    if (!blocked && !onReply) return;
+    setReplying(true);
+    // Collapse input right away — the send keeps running in the background.
+    setReplyText("");
+    setShowReply(false);
+    setSentNote(blocked
+      ? `${proposal.agent} got your answer and is resuming the task.`
+      : `${proposal.agent} received your input and is continuing with it.`);
+    try {
+      if (blocked) {
+        await onUnblock!(proposal.followUpTaskId!, text);
+      } else {
+        await onReply!(proposal.taskId, proposal.agent, text);
+      }
+    } catch {
+      setSentNote("Send failed — try again.");
+    } finally {
+      setReplying(false);
+    }
+  }
   // Detect actual clamping instead of guessing by character count: a body that
   // fits in 4 lines (or wraps to exactly ≤4) gets no "Read more…" button.
   const bodyRef = useRef<HTMLParagraphElement | null>(null);
@@ -113,6 +148,43 @@ function ProposalCard({
           )}
         </div>
 
+        {/* Blocked for input — make it actionable instead of a dead end */}
+        {proposal.followUpStatus === "blocked" && proposal.followUpBlockKind === "needs_input" && (
+          <div className="space-y-2 rounded-[var(--r-sm)] px-3 py-2.5" style={{ background: "color-mix(in srgb, var(--down) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--down) 25%, transparent)" }}>
+            <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-2)" }}>
+              <span style={{ color: "var(--down)", fontWeight: 500 }}>⚠ {proposal.agent} paused and needs your input.</span>{" "}
+              The task context was incomplete — answer below and they&apos;ll continue with your guidance.
+            </p>
+            {!showReply && (
+              <button onClick={() => setShowReply(true)} className="text-[11px] px-2.5 py-1 rounded-full font-medium" style={{ color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" }}>
+                💬 Answer {proposal.agent}
+              </button>
+            )}
+            {showReply && (
+              <div className="space-y-2">
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={`e.g. "The codebase is ~/hermes-agent-mission-control — implement X in Y"…`}
+                  rows={3}
+                  disabled={replying}
+                  className="w-full text-[12px] leading-relaxed rounded-[var(--r-sm)] px-3 py-2 resize-y"
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--text)" }}
+                  autoFocus
+                />
+                <button
+                  onClick={sendReply}
+                  disabled={!replyText.trim() || replying}
+                  className="text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-40"
+                  style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" }}
+                >
+                  {replying ? "Sending…" : `Send & unblock ${proposal.agent}`}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <p ref={bodyRef} className={`text-[12px] text-[var(--text-2)] leading-relaxed whitespace-pre-line ${expanded ? "" : "line-clamp-4"}`}>{proposal.body}</p>
         {overflows && (
           <button
@@ -136,15 +208,51 @@ function ProposalCard({
           {proposal.reviewedAt && <span className="text-[10px] text-[var(--text-4)]">Reviewed {new Date(proposal.reviewedAt).toLocaleDateString()}</span>}
         </div>
 
+        {sentNote && (
+          <p className="text-[11px] leading-relaxed rounded-[var(--r-sm)] px-2.5 py-1.5" style={{ background: "color-mix(in srgb, var(--accent) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)", color: "var(--accent)" }}>
+            📨 {sentNote}
+          </p>
+        )}
+
         {/* Action buttons */}
-        {proposal.status === "pending" && (
-          <div className="flex gap-2 mt-1">
-            <button onClick={() => onCreateTask(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ background: "color-mix(in srgb, var(--up) 12%, transparent)", color: "var(--up)", border: "1px solid color-mix(in srgb, var(--up) 30%, transparent)" }}>
-              ✓ Implement — create task for {proposal.agent}
-            </button>
-            <button onClick={() => onReject(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--down)", border: "1px solid color-mix(in srgb, var(--down) 30%, transparent)" }}>
-              Dismiss
-            </button>
+        {proposal.status === "pending" && !replying && (
+          <div className="flex flex-col gap-2 mt-1">
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => onCreateTask(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ background: "color-mix(in srgb, var(--up) 12%, transparent)", color: "var(--up)", border: "1px solid color-mix(in srgb, var(--up) 30%, transparent)" }}>
+                ✓ Implement — create task for {proposal.agent}
+              </button>
+              <button onClick={() => setShowReply(s => !s)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }}>
+                💬 Reply with guidance
+              </button>
+              <button onClick={() => onReject(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--down)", border: "1px solid color-mix(in srgb, var(--down) 30%, transparent)" }}>
+                Dismiss
+              </button>
+            </div>
+            {showReply && (
+              <div className="space-y-2">
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={`Answer ${proposal.agent}'s questions or give direction — they'll see this before proceeding…`}
+                  rows={3}
+                  disabled={replying}
+                  className="w-full text-[12px] leading-relaxed rounded-[var(--r-sm)] px-3 py-2 resize-y"
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--text)" }}
+                  autoFocus
+                />
+                <div className="flex gap-2 items-center">
+                  <button
+                    onClick={sendReply}
+                    disabled={!replyText.trim() || replying}
+                    className="text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-40"
+                    style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" }}
+                  >
+                    {replying ? "Sending…" : `Send to ${proposal.agent}`}
+                  </button>
+                  <span className="text-[10px] text-[var(--text-4)]">{replying ? `${proposal.agent} is reading your input…` : "They'll continue with your answers."}</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
