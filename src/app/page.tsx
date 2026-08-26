@@ -18,6 +18,16 @@ interface Video  { title: string; thumbnail: string; url: string; publishedAt: s
 interface Draft  { id: string; text: string }
 interface YTIdea { title: string; hook: string }
 interface BuildIdea { title: string; description: string; effort: string }
+interface BoardIdea {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  source: string | null;
+  estimatedTime: string | null;
+  agent: string | null;
+}
 interface Process { name: string; status: string; uptime: string }
 // ── GitHub types ───────────────────────────────────────────────
 interface GitHubProfile {
@@ -93,6 +103,7 @@ interface HomeData {
   topSageDrafts: Draft[];
   topYoutubeIdeas: YTIdea[];
   topBuildIdeas: BuildIdea[];
+  topIdeas: BoardIdea[];
   topVideo: Video | null; latestVideo: Video | null;
   ytSubscribers: number; ytGoal: number;
   polyBalance: number; polyWinRate: number; polyTodayPnl: number; polyAllTimePnl: number;
@@ -118,6 +129,7 @@ const EMPTY: HomeData = {
   topTweets: [], topTweet: null, xViewsThisWeek: 0, totalTweets: 0,
   daysSincePost: 999, bestPostingDay: "—", bestPostingHourStr: "—",
   topSageDrafts: [], topYoutubeIdeas: [], topBuildIdeas: [],
+  topIdeas: [],
   topVideo: null, latestVideo: null, ytSubscribers: 0, ytGoal: 20000,
   polyBalance: 0, polyWinRate: 0, polyTodayPnl: 0, polyAllTimePnl: 0,
   hlBalance: 0, hlPosition: null, hlTodayPnl: 0, hlAllTimePnl: 0, hlAssets: [],
@@ -227,17 +239,18 @@ function SectionLabel({ children, right }: { children: React.ReactNode; right?: 
 }
 
 // ── Ideas section ─────────────────────────────────────────
-type IdeaTab = "x" | "youtube" | "builds";
-function IdeasPanel({ sageDrafts, ytIdeas, buildIdeas }: {
-  sageDrafts: Draft[]; ytIdeas: YTIdea[]; buildIdeas: BuildIdea[];
+type IdeaTab = "board" | "x" | "youtube" | "builds";
+
+function IdeasPanel({ boardIdeas, sageDrafts, ytIdeas, buildIdeas }: {
+  boardIdeas: BoardIdea[]; sageDrafts: Draft[]; ytIdeas: YTIdea[]; buildIdeas: BuildIdea[];
 }) {
-  const [tab, setTab] = useState<IdeaTab>("x");
+  const [tab, setTab] = useState<IdeaTab>("board");
   const tabs: { key: IdeaTab; label: string; count: number }[] = [
+    { key: "board", label: "Board", count: boardIdeas.length },
     { key: "x", label: "X", count: sageDrafts.length },
     { key: "youtube", label: "YouTube", count: ytIdeas.length },
     { key: "builds", label: "Builds", count: buildIdeas.length },
   ];
-
   return (
     <div className="panel flex flex-col p-6">
       <div className="flex items-center justify-between mb-4">
@@ -259,6 +272,42 @@ function IdeasPanel({ sageDrafts, ytIdeas, buildIdeas }: {
       </div>
 
       <div className="space-y-1 min-h-[172px]">
+        {tab === "board" && (boardIdeas.length > 0 ? (
+          <div>
+            <div className="space-y-0">
+              {boardIdeas.map((it, i) => {
+                const catLabel = CATEGORY_LABEL[it.category] || it.category || "Build";
+                const catColor = CATEGORY_COLOR[it.category] || "#34d399";
+                const src = it.source && it.source !== "manual" ? `via ${it.source}` : null;
+                return (
+                  <a key={it.id} href="/ideas" className="group flex gap-3 items-start py-2.5 border-b border-[var(--hq-hairline)] last:border-0">
+                    <span className="num text-[11px] text-[var(--hq-text-ghost)] w-5 shrink-0 mt-0.5">{String(i + 1).padStart(2, "0")}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-[var(--hq-text-dim)] text-[13px] font-medium leading-snug line-clamp-1 group-hover:text-[var(--hq-text)] transition-colors flex-1">{it.title}</p>
+                        <span className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full num"
+                          style={{ color: catColor, background: `${catColor}14`, border: `1px solid ${catColor}30` }}>
+                          {catLabel}
+                        </span>
+                      </div>
+                      {it.description && <p className="text-[var(--hq-text-ghost)] text-[12px] leading-snug line-clamp-2 mb-1.5">{it.description}</p>}
+                      <div className="flex items-center gap-2 text-[10px] num text-[var(--hq-text-faint)]">
+                        {src && <span>{src}</span>}
+                        {it.estimatedTime && <span>· {it.estimatedTime}</span>}
+                        {it.agent && <span>· @{it.agent}</span>}
+                      </div>
+                    </div>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[var(--hq-text-ghost)] group-hover:text-[var(--hq-text-dim)] shrink-0 mt-0.5 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </a>
+                );
+              })}
+            </div>
+            <a href="/ideas" className="mt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
+              Open idea board <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </a>
+          </div>
+        ) : <Empty>No active ideas on the board yet.</Empty>)}
+
         {tab === "x" && (sageDrafts.length > 0 ? sageDrafts.map((d, i) => (
           <a key={d.id} href="/x-content" className="group flex gap-3 items-center py-2 border-b border-[var(--hq-hairline)] last:border-0 hover:opacity-100 transition-opacity">
             <span className="num text-[11px] text-[var(--hq-text-ghost)] w-5 shrink-0">{String(i + 1).padStart(2, "0")}</span>
@@ -297,6 +346,22 @@ function IdeasPanel({ sageDrafts, ytIdeas, buildIdeas }: {
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="text-[var(--hq-text-ghost)] text-[13px] py-8 text-center">{children}</p>;
 }
+
+// ── Idea board rows (shared by the Board tab in IdeasPanel) ────────────────
+const CATEGORY_LABEL: Record<string, string> = {
+  build: "Build",
+  content: "Content",
+  feature: "Feature",
+  thread: "Thread",
+  experiment: "Experiment",
+};
+const CATEGORY_COLOR: Record<string, string> = {
+  build: "#34d399",
+  content: "#38bdf8",
+  feature: "#a78bfa",
+  thread: "#f0b132",
+  experiment: "#fb7185",
+};
 
 // ── Top tweets ────────────────────────────────────────────
 function TopTweetsPanel({ tweets }: { tweets: Tweet[] }) {
@@ -1296,6 +1361,9 @@ function SageFindingsPanel() {
   }, []);
 
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Sentinel: "user explicitly collapsed". Distinct from null (= auto-open
+  // first AI finding) so clicking the auto-opened row can actually close it.
+  const CLOSED = "__closed__";
 
   const GROUPS: { key: "ai" | "security"; label: string; dot: string }[] = [
     { key: "ai", label: "AI Models & Market", dot: "#38bdf8" },
@@ -1329,12 +1397,12 @@ function SageFindingsPanel() {
                 <div className="space-y-3">
                   {items.map((f, i) => {
                     const key = f.taskId;
-                    const open = expanded === key || (expanded === null && i === 0 && group.key === "ai");
+                    const open = expanded !== CLOSED && (expanded === key || (expanded === null && i === 0 && group.key === "ai"));
                     const bullets = f.summary.split(/\n+/).filter(l => l.trim());
                     return (
                       <div key={key} className="border-b border-[var(--hq-hairline)] last:border-0 pb-3 last:pb-0">
                         <button
-                          onClick={() => setExpanded(open ? null : key)}
+                          onClick={() => setExpanded(open ? CLOSED : key)}
                           className="w-full flex items-center gap-2 text-left group"
                         >
                           <span className="flex-1 text-[12px] font-medium text-[var(--hq-text-dim)] group-hover:text-[var(--hq-text)] transition-colors truncate">
@@ -1580,7 +1648,7 @@ export default function Dashboard() {
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="hq-rise" style={rise(6)}><SageFindingsPanel /></div>
-            <div className="hq-rise" style={rise(6)}><IdeasPanel sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
+            <div className="hq-rise" style={rise(6)}><IdeasPanel boardIdeas={data.topIdeas} sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
           </div>
         </div>
 

@@ -4,6 +4,18 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+// Shape of the top-ideas slice returned to the dashboard.
+type BoardIdeaRoute = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  source: string | null;
+  estimatedTime: string | null;
+  agent: string | null;
+};
+
 const HL_WALLET = process.env.HL_WALLET || ""; // legacy (unused since Binance swap)
 const BINANCE_API_KEY = process.env.BINANCE_API_KEY || "";
 const BINANCE_API_SECRET = process.env.BINANCE_API_SECRET || "";
@@ -574,6 +586,27 @@ export async function GET() {
     }));
   }
 
+  // ─── Top ideas from the Idea board (active: not done/rejected) ──────────────
+  let topIdeas: BoardIdeaRoute[] = [];
+  try {
+    const rows = await prisma.idea.findMany({
+      where: { status: { notIn: ["done", "rejected", "dismissed"] } },
+      orderBy: { timestamp: "desc" },
+      take: 5,
+      select: { id: true, title: true, description: true, category: true, status: true, source: true, estimatedTime: true, agent: true },
+    });
+    topIdeas = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      description: r.description || "",
+      category: r.category || "build",
+      status: r.status || "new",
+      source: r.source,
+      estimatedTime: r.estimatedTime,
+      agent: r.agent,
+    }));
+  } catch { /* non-fatal */ }
+
   // ─── YouTube ─────────────────────────────────────────────────────────────────
   type YTItem = { id?: { videoId?: string }; snippet?: { title?: string; thumbnails?: { high?: { url?: string } }; publishedAt?: string } };
   type YTResult = { items?: YTItem[] };
@@ -784,6 +817,7 @@ let hlBalance = 0;
     topSageDrafts,
     topYoutubeIdeas,
     topBuildIdeas,
+    topIdeas,
     // YouTube
     topVideo,
     latestVideo,
