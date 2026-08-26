@@ -193,3 +193,25 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    if (!id || path.basename(id) !== id) {
+      return NextResponse.json({ error: "Invalid task id" }, { status: 400 });
+    }
+    const dir = tasksDir();
+    const filePath = path.join(dir, `${id}.md`);
+    try {
+      await fs.rm(filePath);
+    } catch {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete task error:", error);
+    const message = error instanceof Error ? error.message : "Failed to delete task";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

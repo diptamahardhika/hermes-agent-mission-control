@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Pencil, Sparkles, Trash2, X } from "lucide-react";
 import { Button, Pill, rise } from "@/components/ui/kit";
 
 interface Task {
@@ -13,6 +13,15 @@ interface Task {
   category: string;
   tags?: string[];
   dueDate?: string;
+}
+
+interface TaskDraft {
+  name: string;
+  details: string;
+  status: string;
+  priority: string;
+  category: string;
+  tags: string;
 }
 
 const columns = [
@@ -30,6 +39,8 @@ export default function TasksPage() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formattingIds, setFormattingIds] = useState<Set<string>>(new Set());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     fetchTasks();
@@ -125,6 +136,49 @@ export default function TasksPage() {
     }
   }
 
+  async function saveTaskEdit(taskId: string, draft: TaskDraft) {
+    setSavingEdit(true);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: taskId,
+          name: draft.name,
+          details: draft.details,
+          status: draft.status,
+          priority: draft.priority,
+          category: draft.category,
+          tags: draft.tags.split(",").map((t) => t.trim().replace(/^#/, "")).filter(Boolean),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Failed to save task");
+      setEditingId(null);
+      setError(null);
+      fetchTasks();
+    } catch (e) {
+      console.error("Failed to save task", e);
+      setError(e instanceof Error ? e.message : "Failed to save task");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function deleteTask(taskId: string) {
+    try {
+      const res = await fetch(`/api/tasks?id=${encodeURIComponent(taskId)}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Failed to delete task");
+      setEditingId(null);
+      setError(null);
+      fetchTasks();
+    } catch (e) {
+      console.error("Failed to delete task", e);
+      setError(e instanceof Error ? e.message : "Failed to delete task");
+    }
+  }
+
   if (loading) {
     return (
       <>
@@ -217,8 +271,14 @@ export default function TasksPage() {
                         task={task}
                         done={column.id === "Done"}
                         formatting={formattingIds.has(task.id)}
+                        editing={editingId === task.id}
+                        savingEdit={savingEdit}
                         onStatusChange={(status) => updateTaskStatus(task.id, status)}
                         onTidy={() => tidyTask(task.id, [task.name, task.details].filter(Boolean).join("\n"))}
+                        onEdit={() => setEditingId(task.id)}
+                        onCancelEdit={() => setEditingId(null)}
+                        onSave={(draft) => saveTaskEdit(task.id, draft)}
+                        onDelete={() => deleteTask(task.id)}
                       />
                     ))}
                   {count === 0 && (
@@ -234,18 +294,41 @@ export default function TasksPage() {
   );
 }
 
+function taskToDraft(task: Task): TaskDraft {
+  return {
+    name: task.name,
+    details: task.details || "",
+    status: task.status,
+    priority: task.priority || "",
+    category: task.category || "",
+    tags: (task.tags || []).join(", "),
+  };
+}
+
 function TaskCard({
   task,
   done,
   formatting,
+  editing,
+  savingEdit,
   onStatusChange,
   onTidy,
+  onEdit,
+  onCancelEdit,
+  onSave,
+  onDelete,
 }: {
   task: Task;
   done?: boolean;
   formatting?: boolean;
+  editing?: boolean;
+  savingEdit?: boolean;
   onStatusChange: (status: string) => void;
   onTidy: () => void;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onSave: (draft: TaskDraft) => void;
+  onDelete: () => void;
 }) {
   const priorityTone: Record<string, "warn" | "neutral"> = {
     High: "warn",
@@ -253,8 +336,26 @@ function TaskCard({
     Low: "neutral",
   };
 
+  if (editing) {
+    return (
+      <TaskEditor
+        task={task}
+        saving={!!savingEdit}
+        onCancel={onCancelEdit}
+        onSave={onSave}
+        onDelete={onDelete}
+      />
+    );
+  }
+
   return (
-    <div className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-1)] p-3.5 transition-colors hover:border-[var(--line-strong)] hover:bg-[var(--surface-2)] cursor-pointer group">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onEdit}
+      onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) onEdit(); }}
+      className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-1)] p-3.5 transition-colors hover:border-[var(--line-strong)] hover:bg-[var(--surface-2)] cursor-pointer group"
+    >
       <p className={`font-medium text-[13px] leading-relaxed ${done ? "text-[var(--text-3)] line-through" : "text-[var(--text)]"} ${task.details ? "mb-1.5" : "mb-3"}`}>
         {task.name}
       </p>
@@ -284,11 +385,15 @@ function TaskCard({
           </span>
         ))}
       </div>
-      <div className="mt-3 pt-3 border-t border-[var(--line)] opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+      <div className="mt-3 pt-3 border-t border-[var(--line)] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-2">
         <select
           className="flex-1 min-w-0 text-[12px] bg-[var(--surface-1)] text-[var(--text-2)] rounded-[var(--r-sm)] px-3 py-2 border border-[var(--line)] focus:outline-none focus:border-[var(--line-strong)]"
           value={task.status}
-          onChange={(e) => onStatusChange(e.target.value)}
+          onChange={(e) => {
+            e.stopPropagation();
+            onStatusChange(e.target.value);
+          }}
+          onClick={(e) => e.stopPropagation()}
         >
           {columns.map((col) => (
             <option key={col.id} value={col.id}>
@@ -298,13 +403,132 @@ function TaskCard({
         </select>
         <button
           type="button"
-          onClick={onTidy}
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          title="Edit task"
+          className="shrink-0 inline-flex items-center justify-center rounded-[var(--r-sm)] border border-[var(--line)] bg-[var(--surface-1)] px-2.5 text-[var(--text-2)] hover:text-[var(--text)] hover:border-[var(--line-strong)] transition-colors"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onTidy(); }}
           disabled={formatting}
           title="Tidy with hermes"
           className="shrink-0 inline-flex items-center justify-center rounded-[var(--r-sm)] border border-[var(--line)] bg-[var(--surface-1)] px-2.5 text-[var(--text-2)] hover:text-[var(--text)] hover:border-[var(--line-strong)] transition-colors disabled:opacity-40"
         >
           <Sparkles className="w-3.5 h-3.5" />
         </button>
+      </div>
+    </div>
+  );
+}
+
+function TaskEditor({
+  task,
+  saving,
+  onCancel,
+  onSave,
+  onDelete,
+}: {
+  task: Task;
+  saving: boolean;
+  onCancel: () => void;
+  onSave: (draft: TaskDraft) => void;
+  onDelete: () => void;
+}) {
+  const [draft, setDraft] = useState<TaskDraft>(() => taskToDraft(task));
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const valid =
+    draft.name.trim().length > 0
+    && ["Not started", "Approved", "In progress", "Blocked", "Done"].includes(draft.status);
+
+  return (
+    <div
+      className="rounded-[var(--r-md)] border border-[var(--line-strong)] bg-[var(--surface-2)] p-3.5 space-y-2.5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between">
+        <span className="eyebrow">Edit task</span>
+        <button
+          type="button"
+          onClick={onCancel}
+          title="Cancel"
+          className="text-[var(--text-3)] hover:text-[var(--text)] transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <input
+        value={draft.name}
+        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+        onKeyDown={(e) => { if (e.key === "Enter" && valid && !saving) onSave(draft); }}
+        placeholder="Task name"
+        autoFocus
+        className="w-full bg-[var(--surface-1)] border border-[var(--line)] text-[var(--text)] placeholder-[var(--text-4)] rounded-[var(--r-sm)] px-3 py-2 text-[13px] focus:outline-none focus:border-[var(--line-strong)]"
+      />
+      <textarea
+        value={draft.details}
+        onChange={(e) => setDraft({ ...draft, details: e.target.value })}
+        placeholder="Details (optional)"
+        rows={3}
+        className="w-full bg-[var(--surface-1)] border border-[var(--line)] text-[var(--text)] placeholder-[var(--text-4)] rounded-[var(--r-sm)] px-3 py-2 text-[12px] focus:outline-none focus:border-[var(--line-strong)] resize-none"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <select
+          value={draft.status}
+          onChange={(e) => setDraft({ ...draft, status: e.target.value })}
+          className="bg-[var(--surface-1)] border border-[var(--line)] text-[var(--text)] rounded-[var(--r-sm)] px-2 py-2 text-[12px] focus:outline-none focus:border-[var(--line-strong)]"
+        >
+          {columns.map((col) => (
+            <option key={col.id} value={col.id}>{col.label}</option>
+          ))}
+        </select>
+        <select
+          value={draft.priority}
+          onChange={(e) => setDraft({ ...draft, priority: e.target.value })}
+          className="bg-[var(--surface-1)] border border-[var(--line)] text-[var(--text)] rounded-[var(--r-sm)] px-2 py-2 text-[12px] focus:outline-none focus:border-[var(--line-strong)]"
+        >
+          <option value="">No priority</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+        <input
+          value={draft.category}
+          onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+          placeholder="Category"
+          className="bg-[var(--surface-1)] border border-[var(--line)] text-[var(--text)] placeholder-[var(--text-4)] rounded-[var(--r-sm)] px-2 py-2 text-[12px] focus:outline-none focus:border-[var(--line-strong)]"
+        />
+        <input
+          value={draft.tags}
+          onChange={(e) => setDraft({ ...draft, tags: e.target.value })}
+          placeholder="tags, comma-sep"
+          className="bg-[var(--surface-1)] border border-[var(--line)] text-[var(--text)] placeholder-[var(--text-4)] rounded-[var(--r-sm)] px-2 py-2 text-[12px] focus:outline-none focus:border-[var(--line-strong)]"
+        />
+      </div>
+      <div className="flex items-center gap-2 pt-0.5">
+        <Button variant="primary" onClick={() => onSave(draft)} disabled={!valid || saving}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        {confirmDelete ? (
+          <button
+            type="button"
+            onClick={() => { if (!saving) onDelete(); }}
+            className="ml-auto text-[11.5px] font-medium text-red-400 hover:text-red-300 transition-colors"
+          >
+            Confirm delete?
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            title="Delete task (deletes the Obsidian note)"
+            className="ml-auto inline-flex items-center justify-center rounded-[var(--r-sm)] border border-[var(--line)] bg-[var(--surface-1)] px-2.5 py-2 text-[var(--text-3)] hover:text-red-400 hover:border-red-500/40 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
