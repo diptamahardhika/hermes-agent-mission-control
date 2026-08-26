@@ -166,7 +166,62 @@ async function mirrorCrons() {
     const out = await hermes(["cron", "list", "--all"], { timeout: 15000 });
     const lines = out.split("\n").map((l) => l.trimEnd()).filter(Boolean);
     await setStore("hermes-crons", { jobs: lines, raw: out.slice(0, 8000), syncedAt: new Date().toISOString() });
-  } catch (e) { log("cron list failed:", e.message.split("\n")[0]); }
+    return out;
+  } catch (e) { log("cron list failed:", e.message.split("\n")[0]); return null; }
+}
+
+/* ─────────────── self-healing: cron drift_skip auto-pin ─────────────── */
+// Hermes refuses to run unpinned cron jobs after the global inference config
+// drifts ([drift_skip] guard) to prevent unintended spend. No inference is
+// made while skipped, and the skip message itself names the new config
+// ("model 'old' -> 'new'") — so pinning the job to the named config is safe
+// and exactly what the operator would do by hand. Runs on every mirror tick
+// using the cron-list output we already fetched.
+const driftHealedAt = new Map(); // jobId -> last heal ts; retry at most hourly
+// Read Hermes's live inference routing — the drift message names a MODEL, but
+// that model usually runs through a routed provider (e.g. nous omniroute),
+// NOT the native vendor in the model name ("upstage/..." ≠ provider upstage).
+// Guessing provider from the model prefix produces [blocked_config]
+// credential errors; asking config show gives the provider that actually works.
+let cachedInfCfg = { at: 0, provider: null };
+async function currentInferenceProvider() {
+  if (Date.now() - cachedInfCfg.at < 300_000) return cachedInfCfg.provider;
+  try {
+    const out = await hermes(["config", "show"], { timeout: 20000 });
+    const line = out.split("\n").find((l) => /Model:\s*\{/.test(l)) ?? "";
+    cachedInfCfg = { at: Date.now(), provider: line.match(/'provider':\s*'([^']+)'/)?.[1] ?? null };
+  } catch { /* keep previous cache */ }
+  return cachedInfCfg.provider;
+}
+async function healCronDrift(cronListOutput) {
+  if (!cronListOutput) return;
+  // Each job block starts with "  <12-hex id> [active|paused]".
+  const blocks = cronListOutput.split(/(?=^  [0-9a-f]{12} \[)/m);
+  for (const block of blocks) {
+    const id = block.match(/^  ([0-9a-f]{12}) \[active\]/m)?.[1];
+    if (!id) continue;
+    if (!block.includes("[drift_skip]") || !block.includes("this job is unpinned")) continue;
+    const drift = block.match(/model '([^']+)' -> '([^']+)'/);
+    if (!drift) { log(`drift_skip on ${id} but no target model in message — leaving for manual fix`); continue; }
+    if (Date.now() - (driftHealedAt.get(id) ?? 0) < 3600_000) continue;
+    driftHealedAt.set(id, Date.now());
+    const model = drift[2];
+    const provider = (await currentInferenceProvider()) ?? (model.includes("/") ? model.split("/")[0] : null);
+    const args = ["cron", "edit", id, "--model", model];
+    if (provider) args.push("--provider", provider);
+    try {
+      await hermes(args, { timeout: 20000 });
+      log(`self-healed drift_skip: ${id} pinned to ${provider ?? "(default)"}/${model}`);
+      await emit("status", `Self-healed cron drift: ${id} pinned to ${model}`, {
+        detail: `Job was skipped by drift_skip guard; pinned provider=${provider ?? "default"} model=${model}.`,
+        level: "up",
+        meta: { jobId: id, model, provider },
+      });
+    } catch (e) {
+      log(`drift heal failed for ${id}:`, e.message?.split("\n")[0]);
+      driftHealedAt.delete(id); // allow retry next tick
+    }
+  }
 }
 
 // Parse the fixed-text output of `hermes insights` into structured usage data.
@@ -641,7 +696,9 @@ async function processQueue() {
 /* ─────────────── loops ─────────────── */
 async function mirrorTick() {
   try { await mirrorKanban(); } catch (e) { log("mirrorKanban err", e.message); }
-  try { await mirrorCrons(); } catch (e) { log("mirrorCrons err", e.message); }
+  let cronOut = null;
+  try { cronOut = await mirrorCrons(); } catch (e) { log("mirrorCrons err", e.message); }
+  try { healCronDrift(cronOut).catch((e) => log("healCronDrift err", e.message)); } catch (e) { log("healCronDrift err", e.message); }
   try { await mirrorHealth(); } catch (e) { log("mirrorHealth err", e.message); }
   try { await mirrorWiki(); } catch (e) { log("mirrorWiki err", e.message); }
   try { await mirrorCost(); } catch (e) { log("mirrorCost err", e.message); }
