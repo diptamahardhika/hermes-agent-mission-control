@@ -743,7 +743,10 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
   );
 }
 
-// ── OmniRoute per-model share bars (provider comes straight from the mirror) ──
+// ── OmniRoute per-model share bars (provider straight from the mirror) ──
+// Cyan-family triad resonating with the card's teal accent:
+//   in = deep cyan · cached = soft aqua · out = pale ice
+const OMNI_TOK_COLORS = { input: "#22d3ee", cache: "#5eead4", output: "#a5f3fc" };
 function OmniShareBars({ omni }: { omni: OmniSpendData }) {
   const total = omni.totalTokens;
   const top = [...omni.byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
@@ -753,9 +756,9 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
       {top.map(m => {
         const pct = Math.round((m.tokens / total) * 100);
         const parts = [
-          { label: "in", v: m.inputTokens ?? 0, color: "#a78bfa" },
-          { label: "cached", v: m.cacheReadTokens ?? 0, color: "#f472b6" },
-          { label: "out", v: m.outputTokens ?? 0, color: "#38bdf8" },
+          { label: "in", v: m.inputTokens ?? 0, color: OMNI_TOK_COLORS.input },
+          { label: "cached", v: m.cacheReadTokens ?? 0, color: OMNI_TOK_COLORS.cache },
+          { label: "out", v: m.outputTokens ?? 0, color: OMNI_TOK_COLORS.output },
         ];
         const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
         const split = knownSum > 0;
@@ -776,15 +779,15 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
                   ))}
                 </div>
               ) : (
-                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: "#a78bfa", opacity: 0.9 }} />
+                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: OMNI_TOK_COLORS.input, opacity: 0.9 }} />
               )}
             </div>
             <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
               {split ? (
                 <>
-                  <span style={{ color: "#a78bfa" }}>in</span> {fmt(m.inputTokens ?? 0)}{" "}
-                  {hasCache && <><span style={{ color: "#f472b6" }}>·c</span> {fmt(m.cacheReadTokens ?? 0)}{" "}</>}
-                  <span style={{ color: "#38bdf8" }}>out</span> {fmt(m.outputTokens ?? 0)}
+                  <span style={{ color: OMNI_TOK_COLORS.input }}>in</span> {fmt(m.inputTokens ?? 0)}{" "}
+                  {hasCache && <><span style={{ color: OMNI_TOK_COLORS.cache }}>·c</span> {fmt(m.cacheReadTokens ?? 0)}{" "}</>}
+                  <span style={{ color: OMNI_TOK_COLORS.output }}>out</span> {fmt(m.outputTokens ?? 0)}
                 </>
               ) : `${pct}%`}
             </span>
@@ -795,34 +798,37 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
   );
 }
 
-function TokenIOSplit({ input, output, cache = 0 }: { input: number | null; output: number | null; cache?: number }) {
+function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | null; output: number | null; cache?: number; colors?: { input: string; cache: string; output: string } }) {
   if (input == null || output == null) return null;
+  // Default legend = the Hermes purple/pink/blue; the OmniRoute card passes its
+  // cyan triad so each card keeps one coherent color story.
+  const c = { input: "#a78bfa", cache: "#f472b6", output: "#38bdf8", ...colors };
   const sum = input + output + cache;
   if (sum === 0) return null;
   const seg = (v: number) => `${(v / sum) * 100}%`;
   return (
     <div className="mt-auto pt-3">
       <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
-        {cache > 0 && <div style={{ width: seg(cache), background: "#f472b6", opacity: 0.8 }} />}
-        <div style={{ width: seg(input), background: "#a78bfa" }} />
-        <div style={{ width: seg(output), background: "#38bdf8" }} />
+        {cache > 0 && <div style={{ width: seg(cache), background: c.cache, opacity: 0.8 }} />}
+        <div style={{ width: seg(input), background: c.input }} />
+        <div style={{ width: seg(output), background: c.output }} />
       </div>
       <div className="flex items-center justify-between mt-1.5 text-[10px] num text-[var(--hq-text-ghost)]">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#a78bfa" }} />
+          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.input }} />
           in {fmt(input)}
         </span>
         <span className="flex items-center gap-1.5">
           {cache > 0 && (
             <>
               cached {fmt(cache)}
-              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#f472b6" }} />
+              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.cache }} />
             </>
           )}
         </span>
         <span className="flex items-center gap-1.5">
           out {fmt(output)}
-          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#38bdf8" }} />
+          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.output }} />
         </span>
       </div>
     </div>
@@ -1748,6 +1754,7 @@ export default function Dashboard() {
                   input={data.omniSpend.inputTokens}
                   output={data.omniSpend.outputTokens}
                   cache={data.omniSpend.cacheReadTokens}
+                  colors={OMNI_TOK_COLORS}
                 />
               </MetricCard>
               <OmniRoutePanel omni={data.omniSpend} />
