@@ -1,6 +1,7 @@
 # hermes-agent-mission-control
 
 ## Operator mandates
+- **"Shipped it" means the full release flow, every time:** commit → open PR → merge into `main` → delete the branch (remote and local) if one was created. Never stop at commit or push and call it shipped.
 - **Self-healing is a first-class requirement for this dashboard.** When a failure mode is detected (cron drift_skip, failed enqueues, stale syncs), prefer wiring automatic detection + repair into the hermes-bridge mirror loop or watchdog jobs over one-off manual fixes. Manual fixes are acceptable only as stopgaps until automated.
 - After editing `hermes-bridge/bridge.mjs`, the running bridge process must be restarted to pick up changes — it does not hot-reload. Mirror tick interval is 30s (`MIRROR_MS`).
 
