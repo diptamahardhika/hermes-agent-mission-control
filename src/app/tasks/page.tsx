@@ -32,6 +32,18 @@ const columns = [
   { id: "Done", label: "Done" },
 ];
 
+/* Status → shared theme tokens, matching the dashboard's semantic palette
+   (accent = active, up = done, down = blocked/failed, warn = waiting,
+   neutral = backlog). Same mapping language as hermes-runs + home kanban. */
+const STATUS_COLORS: Record<string, string> = {
+  "Not started": "var(--text-3)",
+  Approved: "var(--warn)",
+  "In progress": "var(--accent)",
+  Blocked: "var(--down)",
+  Done: "var(--up)",
+};
+const statusColor = (s: string) => STATUS_COLORS[s] || "var(--text-3)";
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -257,9 +269,30 @@ export default function TasksPage() {
             const count = tasks.filter((t) => t.status === column.id).length;
             return (
               <div key={column.id} className="hq-rise panel flex flex-col overflow-hidden" style={rise(idx + 1)}>
-                <div className="px-4 py-3.5 flex items-center justify-between">
-                  <span className="eyebrow">{column.label}</span>
-                  <span className="num text-[11px] text-[var(--text-3)]">{count}</span>
+                <div className="px-4 py-3.5 flex items-center justify-between gap-2">
+                  <span className="eyebrow inline-flex items-center gap-1.5 min-w-0">
+                    <span
+                      aria-hidden
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{
+                        background: statusColor(column.id),
+                        boxShadow: `0 0 0 3px color-mix(in srgb, ${statusColor(column.id)} 15%, transparent)`,
+                      }}
+                    />
+                    {column.label}
+                  </span>
+                  <span
+                    className="num text-[11px] px-1.5 rounded-full"
+                    style={{
+                      color: count > 0 ? statusColor(column.id) : "var(--text-4)",
+                      background:
+                        count > 0
+                          ? `color-mix(in srgb, ${statusColor(column.id)} 12%, transparent)`
+                          : "transparent",
+                    }}
+                  >
+                    {count}
+                  </span>
                 </div>
                 <div className="rule" />
                 <div className="flex-1 p-2.5 space-y-2 overflow-y-auto">
@@ -354,8 +387,15 @@ function TaskCard({
       tabIndex={0}
       onClick={onEdit}
       onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) onEdit(); }}
-      className="rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-1)] p-3.5 transition-colors hover:border-[var(--line-strong)] hover:bg-[var(--surface-2)] cursor-pointer group"
+      className="relative rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-1)] p-3.5 pl-4 transition-colors hover:border-[var(--line-strong)] hover:bg-[var(--surface-2)] cursor-pointer group overflow-hidden"
     >
+      <span
+        aria-hidden
+        className="absolute left-0 top-0 bottom-0 w-[3px]"
+        style={{
+          background: `color-mix(in srgb, ${statusColor(task.status)} 55%, transparent)`,
+        }}
+      />
       <p className={`font-medium text-[13px] leading-relaxed ${done ? "text-[var(--text-3)] line-through" : "text-[var(--text)]"} ${task.details ? "mb-1.5" : "mb-3"}`}>
         {task.name}
       </p>
