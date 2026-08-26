@@ -504,6 +504,59 @@ function SpendPanel({ spend }: { spend: SpendData }) {
   );
 }
 
+// ── OmniRoute compute spend panel — twin of SpendPanel for the router ──
+function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
+  const series = omni.days.map(d => d.tokens);
+  const topModel = [...omni.byModel].sort((a, b) => b.tokens - a.tokens)[0];
+  const topCache = topModel?.cacheReadTokens ?? 0;
+  const topCachePct = topModel && topModel.tokens ? Math.round((topCache / topModel.tokens) * 100) : 0;
+  return (
+    <div className="panel flex flex-col p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Waypoints className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
+        <span className="eyebrow">OmniRoute Compute · 7d</span>
+        {omni.syncedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">synced {timeAgo(omni.syncedAt)}</span>}
+      </div>
+      <div className="space-y-4">
+        <div>
+          <div className="eyebrow mb-2 !text-[9.5px]">Total tokens · 7d</div>
+          <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
+            {omni.totalTokens != null ? fmtExact(omni.totalTokens) : "—"}
+          </div>
+          {series.some(v => v > 0) && <Sparkline data={series} color="#fbbf24" area idSeed="omni-spend" className="h-9 mt-3" />}
+        </div>
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div>
+            <div className="eyebrow mb-1.5 !text-[9.5px]">Calls</div>
+            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{fmtExact(omni.totalCalls)}</div>
+          </div>
+          <div>
+            <div className="eyebrow mb-1.5 !text-[9.5px]">Models</div>
+            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{fmtExact(omni.byModel.length)}</div>
+          </div>
+        </div>
+        {omni.cacheReadTokens > 0 && (
+          <div className="text-[12px] text-[var(--hq-text-dim)]">
+            Cached reads <span className="num text-[var(--hq-text)] font-medium">{fmt(omni.cacheReadTokens)}</span>
+            <span className="num text-[var(--hq-text-ghost)]"> · {Math.round((omni.cacheReadTokens / (omni.totalTokens || 1)) * 100)}% of total</span>
+          </div>
+        )}
+        {topModel && (
+          <div className="text-[12px] text-[var(--hq-text-dim)]">
+            Top model <span className="text-[var(--hq-text)] font-medium">{topModel.model}</span>
+            <span className="num text-[var(--hq-text-ghost)]">
+               · {fmt(topModel.tokens)} tok{topCache > 0 ? ` (${topCachePct}% cached)` : ""}
+            </span>
+          </div>
+        )}
+      </div>
+      <a href="/api/omniroute/link" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
+        Open OmniRoute analytics <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </a>
+    </div>
+  );
+}
+
 // ── AI model news panel ────────────────────────────────────
 interface ModelCard {
   id: string; name: string; provider: string;
@@ -1697,33 +1750,7 @@ export default function Dashboard() {
                   cache={data.omniSpend.cacheReadTokens}
                 />
               </MetricCard>
-              <div className="panel flex flex-col p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="eyebrow">OmniRoute Router · by provider</span>
-                  <span className="num text-[11px] text-[var(--hq-text-ghost)]">{data.omniSpend.totalCalls} calls</span>
-                </div>
-                <div className="space-y-1.5">
-                  {[...data.omniSpend.byModel.reduce((acc, m) => {
-                    const k = m.provider || "direct";
-                    acc.set(k, (acc.get(k) || 0) + m.tokens);
-                    return acc;
-                  }, new Map<string, number>())]
-                    .sort((a, b) => b[1] - a[1]).slice(0, 6)
-                    .map(([provider, tokens]) => (
-                      <div key={provider} className="flex items-center gap-2 justify-between">
-                        <span className="text-[10px] text-[var(--hq-text-dim)] truncate w-28 sm:w-48 shrink-0">{provider}</span>
-                        <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-[1200ms] ease-out"
-                            style={{ width: `${Math.max((tokens / (data.omniSpend!.totalTokens || 1)) * 100, 1)}%`, background: "#fbbf24", opacity: 0.9 }} />
-                        </div>
-                        <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-20">{fmt(tokens)}</span>
-                      </div>
-                    ))}
-                </div>
-                <div className="mt-auto pt-3 text-[10px] num text-[var(--hq-text-ghost)]">
-                  {data.omniSpend.byModel.length} models · synced {data.omniSpend.syncedAt ? timeAgo(data.omniSpend.syncedAt) : "—"}
-                </div>
-              </div>
+              <OmniRoutePanel omni={data.omniSpend} />
             </div>
           ) : null}
         </div>
