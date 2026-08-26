@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles } from "lucide-react";
+import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles, Waypoints } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
@@ -95,6 +95,18 @@ interface SpendData {
   days: { date: string; tokens: number }[];
 }
 
+// OmniRoute router usage — mirrored by the bridge from ~/.omniroute SQLite.
+interface OmniSpendData {
+  syncedAt: string | null;
+  totalTokens: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number;
+  totalCalls: number;
+  byModel: { model: string; provider: string; calls: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; tokens: number }[];
+  days: { date: string; tokens: number }[];
+}
+
 interface HomeData {
   xFollowers: number; xGoal: number; xHandle: string;
   topTweets: Tweet[]; topTweet: Tweet | null; xViewsThisWeek: number;
@@ -122,6 +134,7 @@ interface HomeData {
     system: { hostname: string; os: string; uptime: string; cpu_usage_percent: number; memory_used_percent: number; disk_used_percent: number } | null;
   };
   spend: SpendData;
+  omniSpend?: OmniSpendData | null;
 }
 
 const EMPTY: HomeData = {
@@ -146,6 +159,7 @@ const EMPTY: HomeData = {
     syncedAt: null, totalTokens: null, inputTokens: null, outputTokens: null,
     sessions: null, toolCalls: null, byModel: [], days: [],
   },
+  omniSpend: null,
 };
 
 // ── Animated counter ──────────────────────────────────────
@@ -665,6 +679,58 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
                 <>
                   <span style={{ color: "#a78bfa" }}>in</span> {fmt(m.inputTokens ?? 0)}{" "}
                   {hasCache && <><span style={{ color: "#f472b6" }}>·c</span> {fmt(cacheRead)}{" "}</>}
+                  <span style={{ color: "#38bdf8" }}>out</span> {fmt(m.outputTokens ?? 0)}
+                </>
+              ) : `${pct}%`}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── OmniRoute per-model share bars (provider comes straight from the mirror) ──
+function OmniShareBars({ omni }: { omni: OmniSpendData }) {
+  const total = omni.totalTokens;
+  const top = [...omni.byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
+  if (!top.length || !total) return null;
+  return (
+    <div className="mt-4 space-y-1.5">
+      {top.map(m => {
+        const pct = Math.round((m.tokens / total) * 100);
+        const parts = [
+          { label: "in", v: m.inputTokens ?? 0, color: "#a78bfa" },
+          { label: "cached", v: m.cacheReadTokens ?? 0, color: "#f472b6" },
+          { label: "out", v: m.outputTokens ?? 0, color: "#38bdf8" },
+        ];
+        const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
+        const split = knownSum > 0;
+        const pctOf = (v: number) => split ? (v / knownSum) * 100 : 0;
+        const hasCache = (m.cacheReadTokens ?? 0) > 0;
+        return (
+          <div key={`${m.provider}/${m.model}`} className="flex items-center gap-2 justify-between"
+            title={split ? `${parts.map(p2 => `${p2.label}: ${fmt(p2.v)}`).join(" · ")} · ${m.calls} calls` : undefined}>
+            <span className="text-[10px] text-[var(--hq-text-dim)] truncate w-28 sm:w-48 shrink-0">
+              {m.model}
+              <span className="text-[9.5px] text-[var(--hq-text-ghost)]"> | {m.provider}</span>
+            </span>
+            <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+              {split ? (
+                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%` }}>
+                  {parts.filter(p2 => p2.v > 0).map(p2 => (
+                    <div key={p2.label} className="h-full" style={{ width: `${pctOf(p2.v)}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: "#a78bfa", opacity: 0.9 }} />
+              )}
+            </div>
+            <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
+              {split ? (
+                <>
+                  <span style={{ color: "#a78bfa" }}>in</span> {fmt(m.inputTokens ?? 0)}{" "}
+                  {hasCache && <><span style={{ color: "#f472b6" }}>·c</span> {fmt(m.cacheReadTokens ?? 0)}{" "}</>}
                   <span style={{ color: "#38bdf8" }}>out</span> {fmt(m.outputTokens ?? 0)}
                 </>
               ) : `${pct}%`}
@@ -1613,6 +1679,53 @@ export default function Dashboard() {
             </MetricCard>
             <SpendPanel spend={data.spend} />
           </div>
+          {data.omniSpend && data.omniSpend.totalTokens ? (
+            <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-5 hq-rise" style={rise(3.5)}>
+              <MetricCard
+                label="OmniRoute Tokens · 7d"
+                value={data.omniSpend.totalTokens ?? 0}
+                format={fmt}
+                delta={null} deltaPct={null} deltaLabel={undefined}
+                trend={undefined}
+                goal={undefined} goalFormat={undefined}
+                icon={<Waypoints className="w-4 h-4" />} accent="#fbbf24" href="/hermes#runs" loaded={loaded}
+              >
+                <OmniShareBars omni={data.omniSpend} />
+                <TokenIOSplit
+                  input={data.omniSpend.inputTokens}
+                  output={data.omniSpend.outputTokens}
+                  cache={data.omniSpend.cacheReadTokens}
+                />
+              </MetricCard>
+              <div className="panel flex flex-col p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="eyebrow">OmniRoute Router · by provider</span>
+                  <span className="num text-[11px] text-[var(--hq-text-ghost)]">{data.omniSpend.totalCalls} calls</span>
+                </div>
+                <div className="space-y-1.5">
+                  {[...data.omniSpend.byModel.reduce((acc, m) => {
+                    const k = m.provider || "direct";
+                    acc.set(k, (acc.get(k) || 0) + m.tokens);
+                    return acc;
+                  }, new Map<string, number>())]
+                    .sort((a, b) => b[1] - a[1]).slice(0, 6)
+                    .map(([provider, tokens]) => (
+                      <div key={provider} className="flex items-center gap-2 justify-between">
+                        <span className="text-[10px] text-[var(--hq-text-dim)] truncate w-28 sm:w-48 shrink-0">{provider}</span>
+                        <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-[1200ms] ease-out"
+                            style={{ width: `${Math.max((tokens / (data.omniSpend!.totalTokens || 1)) * 100, 1)}%`, background: "#fbbf24", opacity: 0.9 }} />
+                        </div>
+                        <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-20">{fmt(tokens)}</span>
+                      </div>
+                    ))}
+                </div>
+                <div className="mt-auto pt-3 text-[10px] num text-[var(--hq-text-ghost)]">
+                  {data.omniSpend.byModel.length} models · synced {data.omniSpend.syncedAt ? timeAgo(data.omniSpend.syncedAt) : "—"}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* ── Brief + Approval inbox (side-by-side on wide) ─ */}

@@ -141,6 +141,7 @@ export async function GET() {
   const DS_KEYS = [
     "x-account-stats", "pixel-ideas", "polymarket-pnl", "metric-snapshots",
     "homelab-monitor", "hermes-cost", "hermes-cost-history",
+    "omniroute-cost",
   ];
   let store: Record<string, unknown> = {};
   try {
@@ -799,6 +800,32 @@ let hlBalance = 0;
     days,
   };
 
+  // ─── OmniRoute usage (mirrored by the bridge from ~/.omniroute SQLite) ──────
+  // Same shape as `spend` plus per-provider info; served alongside the Hermes
+  // agent tokens so the home page can render a sibling OmniRoute card.
+  const omniRaw = store["omniroute-cost"] as
+    | {
+        syncedAt?: string;
+        totalTokens?: number | null;
+        inputTokens?: number | null;
+        outputTokens?: number | null;
+        cacheReadTokens?: number;
+        totalCalls?: number;
+        byModel?: { model: string; provider: string; calls: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; tokens: number }[];
+        days?: { date: string; tokens: number }[];
+      }
+    | undefined;
+  const omniSpend = omniRaw && Array.isArray(omniRaw.byModel) ? {
+    syncedAt: omniRaw.syncedAt ?? null,
+    totalTokens: omniRaw.totalTokens ?? null,
+    inputTokens: omniRaw.inputTokens ?? null,
+    outputTokens: omniRaw.outputTokens ?? null,
+    cacheReadTokens: omniRaw.cacheReadTokens ?? 0,
+    totalCalls: omniRaw.totalCalls ?? 0,
+    byModel: omniRaw.byModel.map(m => ({ ...m })),
+    days: Array.isArray(omniRaw.days) ? omniRaw.days : [],
+  } : null;
+
   return NextResponse.json({
     // X
     xFollowers: xStats.xFollowers,
@@ -856,6 +883,7 @@ let hlBalance = 0;
     homelab,
     // Agent compute spend
     spend,
+    omniSpend,
     // Legacy
     pendingDrafts: rawPendingDrafts.length,
     tweetIdeas: await prisma.idea.count({ where: { status: { notIn: ["done", "dismissed"] } } }).catch(() => 0),

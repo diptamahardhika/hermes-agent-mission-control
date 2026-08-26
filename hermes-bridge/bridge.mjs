@@ -375,6 +375,94 @@ async function mirrorCost() {
   }
 }
 
+/* ─────────────── OmniRoute usage (local SQLite → Postgres) ─────────────── */
+// OmniRoute (http://localhost:20128) persists every proxied LLM call in
+// ~/.omniroute/storage.sqlite (call_logs). Its dashboard API needs an
+// authenticated session, but the bridge runs on this machine — so read the
+// SQLite store directly and mirror a 7d usage summary into DataStore for
+// /api/home. Same pattern as mirrorCost(): never fatal, log + skip on error.
+async function mirrorOmniRoute() {
+  const db = path.join(os.homedir(), ".omniroute", "storage.sqlite");
+  if (!fs.existsSync(db)) return;
+  const sql = (query) => execFileP("sqlite3", ["-readonly", db, query], { timeout: 10000 });
+
+  // Per-model totals over the trailing 7 days (in/out/cache split).
+  const { stdout: byModelOut } = await sql(
+    `SELECT model, provider, COUNT(*), SUM(tokens_in), SUM(tokens_out),
+            COALESCE(SUM(tokens_cache_read),0)
+     FROM call_logs
+     WHERE timestamp >= datetime('now','-7 days')
+       AND status BETWEEN 200 AND 299
+     GROUP BY model, provider ORDER BY SUM(tokens_in)+SUM(tokens_out)+COALESCE(SUM(tokens_cache_read),0) DESC;`
+  );
+  const byModel = [];
+  let totalTokens = 0, inputTokens = 0, outputTokens = 0, cacheReadTokens = 0, totalCalls = 0;
+  for (const line of byModelOut.trim().split("\n")) {
+    if (!line) continue;
+    const [model, provider, calls, tin, tout, tcache] = line.split("|");
+    if (!model || !/^\d+$/.test(tin ?? "") || !/^\d+$/.test(tout ?? "")) continue;
+    const inTok = Number(tin), outTok = Number(tout);
+    const cacheTok = /^\d+$/.test(tcache ?? "") ? Number(tcache) : 0;
+    const nCalls = /^\d+$/.test(calls ?? "") ? Number(calls) : 0;
+    byModel.push({
+      model,
+      provider,
+      calls: nCalls,
+      inputTokens: inTok,
+      outputTokens: outTok,
+      cacheReadTokens: cacheTok,
+      tokens: inTok + outTok + cacheTok,
+    });
+    totalTokens += inTok + outTok + cacheTok;
+    inputTokens += inTok;
+    outputTokens += outTok;
+    cacheReadTokens += cacheTok;
+    totalCalls += nCalls;
+  }
+
+  // Daily series for the sparkline/history strip (same merge strategy as
+  // hermes-cost-history: fresh window overwrites, older rows are kept).
+  const { stdout: dailyOut } = await sql(
+    `SELECT date(timestamp) as day, SUM(tokens_in+tokens_out+COALESCE(tokens_cache_read,0))
+     FROM call_logs
+     WHERE timestamp >= datetime('now','-7 days') AND status BETWEEN 200 AND 299
+     GROUP BY day ORDER BY day;`
+  );
+  const dailyDays = [];
+  for (const line of dailyOut.trim().split("\n")) {
+    if (!line) continue;
+    const sep = line.indexOf("|");
+    if (sep < 0) continue;
+    const date = line.slice(0, sep);
+    const tokens = Number(line.slice(sep + 1));
+    if (!isNaN(tokens)) dailyDays.push({ date, tokens });
+  }
+  let existingDays = [];
+  try {
+    const histRow = await q(`SELECT data FROM "DataStore" WHERE key='omniroute-cost-history'`);
+    const d2 = histRow.rows[0]?.data;
+    const obj = typeof d2 === "string" ? JSON.parse(d2) : d2;
+    if (Array.isArray(obj?.days)) existingDays = obj.days;
+  } catch { /* fresh history */ }
+  const freshDates = new Set(dailyDays.map((d3) => d3.date));
+  const mergedDays = existingDays
+    .filter((d3) => !freshDates.has(d3.date))
+    .concat(dailyDays)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-14);
+
+  await setStore("omniroute-cost", {
+    syncedAt: new Date().toISOString(),
+    totalTokens: byModel.length ? totalTokens : null,
+    inputTokens: byModel.length ? inputTokens : null,
+    outputTokens: byModel.length ? outputTokens : null,
+    cacheReadTokens,
+    totalCalls,
+    byModel,
+    days: mergedDays,
+  });
+}
+
 async function mirrorHealth() {
   let online = false, gateway = "unknown", detail = "";
   try {
@@ -705,6 +793,7 @@ async function mirrorTick() {
   try { await mirrorHealth(); } catch (e) { log("mirrorHealth err", e.message); }
   try { await mirrorWiki(); } catch (e) { log("mirrorWiki err", e.message); }
   try { await mirrorCost(); } catch (e) { log("mirrorCost err", e.message); }
+  try { await mirrorOmniRoute(); } catch (e) { log("mirrorOmniRoute err", e.message); }
   try { await mirrorBrief(); } catch (e) { log("mirrorBrief err", e.message); }
   try { await mirrorHomelab(); } catch (e) { log("mirrorHomelab err", e.message); }
 }
