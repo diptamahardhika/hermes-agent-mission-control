@@ -718,24 +718,32 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
 const GH_LEVEL_COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
 
 function GitHubContributionMatrix({ weeks }: { weeks: GitHubContribDay[][] }) {
+  // GitHub-details style orientation: rows = weeks flowing down (oldest top → newest bottom),
+  // columns = weekdays Sun..Sat left→right — time reads like text, newest at bottom-right.
+  const paddedWeeks = weeks.map((week) => {
+    const padded = [...week];
+    while (padded.length < 7) padded.unshift({ date: "", count: 0, level: 0 });
+    return padded;
+  });
+  // Build 7 rows; row di = weekday index, cells across = weeks in order.
+  const rows: { date: string; count: number; level: number }[][] = [];
+  for (let di = 0; di < 7; di++) {
+    rows.push(paddedWeeks.map((week) => week[di]));
+  }
   return (
-    <div className="flex gap-[3px] w-full">
-      {weeks.map((week, wi) => {
-        const padded = [...week];
-        while (padded.length < 7) padded.unshift({ date: "", count: 0, level: 0 });
-        return (
-          <div key={wi} className="flex flex-col gap-[3px] flex-1 min-w-0">
-            {padded.map((day, di) => (
-              <div
-                key={day.date || `${wi}-${di}`}
-                title={day.date ? `${day.date}: ${day.count} contribution${day.count === 1 ? "" : "s"}` : ""}
-                className="flex-1 w-full aspect-square rounded-[3px] min-h-[3px]"
-                style={{ background: GH_LEVEL_COLORS[day.level] ?? GH_LEVEL_COLORS[0] }}
-              />
-            ))}
-          </div>
-        );
-      })}
+    <div className="flex flex-col gap-[3px] w-full">
+      {rows.map((row, ri) => (
+        <div key={ri} className="flex gap-[3px] w-full">
+          {row.map((day, ci) => (
+            <div
+              key={day.date || `${ri}-${ci}`}
+              title={day.date ? `${day.date}: ${day.count} contribution${day.count === 1 ? "" : "s"}` : ""}
+              className="flex-1 w-full aspect-square rounded-[3px] min-h-[3px]"
+              style={{ background: GH_LEVEL_COLORS[day.level] ?? GH_LEVEL_COLORS[0] }}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
