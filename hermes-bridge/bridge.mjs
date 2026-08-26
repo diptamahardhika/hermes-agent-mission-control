@@ -620,6 +620,9 @@ async function runRequest(r) {
       const cleanTitle = m ? (r.title || "").slice(m[0].length) : r.title;
       const args = ["kanban", "--board", BOARD, "create", "--json", cleanTitle];
       if (assignee) args.push("--assignee", assignee);
+      // Pass the request prompt as the task body so workers get full context
+      // (proposal details, questions, guidance) — not just a bare title.
+      if (r.prompt && r.prompt.trim()) args.push("--body", r.prompt.trim());
       result = (await hermes(args, { timeout: 20000 })).trim();
     } else if (r.kind.startsWith("cron.")) {
       const op = r.kind.split(".")[1];

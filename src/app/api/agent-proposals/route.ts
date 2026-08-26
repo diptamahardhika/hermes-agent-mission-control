@@ -45,6 +45,8 @@ const RUN_SQL = `
     )
   ORDER BY created_at DESC;`;
 
+const BOARD_NAME = process.env.HERMES_BOARD || "default";
+
 function epochToIso(v: unknown): string {
   // sqlite epochs are seconds; guard against null/garbage so a bad row can
   // never crash serialization again (RangeError: Invalid time value)
@@ -58,7 +60,7 @@ function firstLine(body: string): string {
   return (flat.split(/\.(?=\s)/)[0] || flat).trim();
 }
 
-function toProposal(row: any, persisted?: any, followUp?: { status: string; result: string | null } | null) {
+function toProposal(row: any, persisted?: any, followUp?: { status: string; result: string | null; blockKind?: string | null } | null) {
   const createdAt = epochToIso(row.created_at);
   return {
     id: String(row.id),
@@ -74,6 +76,7 @@ function toProposal(row: any, persisted?: any, followUp?: { status: string; resu
     followUpTaskId: persisted?.followUpTaskId || null,
     followUpStatus: followUp?.status || null,
     followUpResult: followUp?.result || null,
+    followUpBlockKind: followUp?.blockKind || null,
   };
 }
 
@@ -127,14 +130,14 @@ export async function GET() {
     const followUpIds = persisted
       .map((p) => p.followUpTaskId)   // includes ids just backfilled above
       .filter((id): id is string => Boolean(id));
-    const followUpMap = new Map<string, { status: string; result: string | null }>();
+    const followUpMap = new Map<string, { status: string; result: string | null; blockKind?: string | null }>();
     if (followUpIds.length) {
       const list = followUpIds.map((id) => `'${id.replace(/'/g, "")}'`).join(",");
       const liveRows = await shJson(
-        `SELECT id, status, result FROM tasks WHERE id IN (${list});`
+        `SELECT id, status, result, block_kind FROM tasks WHERE id IN (${list});`
       );
       for (const r of liveRows) {
-        followUpMap.set(String(r.id), { status: String(r.status), result: r.result ?? null });
+        followUpMap.set(String(r.id), { status: String(r.status), result: r.result ?? null, blockKind: r.block_kind ?? null });
       }
     }
 
@@ -168,10 +171,50 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { action, proposalId } = await request.json();
+    const { action, proposalId, taskId, message } = await request.json();
 
-    if (!action || !proposalId) {
+    if (!action || (action !== "unblock" && !proposalId)) {
       return NextResponse.json({ error: "action and proposalId required" }, { status: 400 });
+    }
+
+    // Worker blocked with needs_input — post Dipta's guidance as a task comment
+    // and unblock so the worker resumes with the answer in context. Keys on
+    // taskId, not proposalId, so it runs before the proposal lookup.
+    if (action === "unblock") {
+      if (!taskId || typeof taskId !== "string" || !message?.trim()) {
+        return NextResponse.json({ error: "Missing taskId or message" }, { status: 400 });
+      }
+      const safeId = taskId.replace(/[^a-z0-9_]/gi, "");
+      const { execFile } = await import("child_process");
+      const run = (args: string[]) =>
+        new Promise<void>((resolve, reject) => {
+          execFile(
+            `${process.env.HOME}/.local/bin/hermes`,
+            args,
+            { timeout: 20_000 },
+            (err) => (err ? reject(err) : resolve()),
+          );
+        });
+      await run(["kanban", "--board", BOARD_NAME, "comment", safeId, `[Guidance from Dipta] ${message.trim()}`]);
+      await run(["kanban", "--board", BOARD_NAME, "unblock", "--reason", "Operator answered needs_input via dashboard", safeId]);
+      // Unblock lands the task in 'todo' (triage) which the dispatcher ignores —
+      // promote to 'ready' so the worker picks it up immediately.
+      const { execSync } = await import("child_process");
+      execSync(
+        `sqlite3 "$HOME/.hermes/kanban.db" "UPDATE tasks SET status='ready' WHERE id='${safeId}'"`,
+        { timeout: 5_000 },
+      );
+      // kanban unblock resets the assignee to 'default' — restore the owning
+      // profile so the right worker claims it (default = max, not nova/knox/etc).
+      const prop = await prisma.agentProposal.findUnique({ where: { taskId } });
+      if (prop && prop.agent !== "max") {
+        await run(["kanban", "--board", BOARD_NAME, "reassign", safeId, prop.agent]).catch(() => {});
+      }
+      await prisma.agentProposal.update({
+        where: { taskId },
+        data: { status: "turned-into-task", reviewedAt: new Date() },
+      }).catch(() => {});
+      return NextResponse.json({ ok: true });
     }
 
     // Find the proposal — create the Postgres row on demand if missing.
@@ -249,6 +292,7 @@ export async function POST(request: Request) {
       // the create output (task JSON) in AgentRequest.result when done.
       return NextResponse.json({ ok: true, proposal: pr, taskTitle: routedTitle });
     }
+
 
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (error) {

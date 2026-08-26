@@ -238,10 +238,11 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
   const spriteSize = isMax ? 56 : 44;
   const walk = WALK[agent?.id as keyof typeof WALK] ?? WALK.sage;
 
-  // Pick bubble text: currentTask > last activity > null
-  const bubbleText = agent?.currentTask
-    || agent?.recentActivity?.[0]?.action
-    || null;
+  // Bubble text only while actually working — stale "last activity" lines
+  // made idle desks look mid-task. Working prefers the live currentTask.
+  const bubbleText = isWorking
+    ? agent?.currentTask || agent?.recentActivity?.[0]?.action || null
+    : null;
 
   // Bubble cycle delay — stagger so not all pop at once
   const bubbleDelay = isMax ? "0.5s" : walk.wanderDelay;
@@ -280,20 +281,21 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
           </div>
 
           {/* Horizontal wander wrapper */}
+          {/* NB: only WORKING agents animate like they're busy. Idle agents sit
+              at their desk (gentle breathing bob) — wandering around + popping
+              activity bubbles made them look mid-task when they weren't. */}
           <div
             style={
               isWorking
                 ? { animation: `agent-type 0.55s ease-in-out infinite` }
-                : isOffline
-                ? undefined
-                : { animation: `agent-wander ${walk.wanderDur} ${walk.wanderDelay} infinite ease-in-out` }
+                : undefined
             }
           >
             {/* Vertical bob wrapper */}
             <div
               style={
-                !isOffline && !isWorking
-                  ? { animation: `agent-bob ${walk.bobDur} ${walk.bobDelay} infinite ease-in-out` }
+                !isWorking && !isOffline
+                  ? { animation: `agent-bob 3.2s ${walk.wanderDelay} infinite ease-in-out` }
                   : undefined
               }
             >

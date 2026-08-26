@@ -106,6 +106,52 @@ async function hermesKanbanLive(): Promise<Record<string, Live>> {
 
 type Live = { status: string; currentTask?: string; lastActive?: string };
 
+type Activity = { timestamp: string; action: string; result?: string };
+
+// ── Recent activity + completed-task counts, derived live from kanban.db ──
+// recentActivity used to depend on cron jobs POSTing an `action` to this
+// route — nothing did, so every card showed empty history despite a full
+// task board. Now we read the board directly (self-healing): every done
+// task becomes an activity entry; done counts feed tasksCompleted.
+// NB: Max runs on Hermes profile 'default' — remap here.
+const ACTIVITY_PROFILE_MAP: Record<string, string> = { default: "max" };
+
+async function hermesKanbanActivity(): Promise<{
+  activity: Record<string, Activity[]>;
+  doneCounts: Record<string, number>;
+}> {
+  const out = await sh("sqlite3", [
+    KANBAN_DB,
+    `SELECT assignee, title, completed_at, created_at FROM tasks
+     WHERE status = 'done' AND assignee IS NOT NULL
+     ORDER BY COALESCE(completed_at, created_at) DESC LIMIT 200;`,
+  ]);
+  const activity: Record<string, Activity[]> = {};
+  const doneCounts: Record<string, number> = {};
+  if (!out) return { activity, doneCounts };
+  for (const line of out.trim().split("\n")) {
+    if (!line) continue;
+    // Title may itself contain '|': last two fields are the timestamps.
+    const parts = line.split("|");
+    if (parts.length < 4) continue;
+    const rawAssignee = parts[0];
+    const createdAt = parts[parts.length - 1];
+    const completedAt = parts[parts.length - 2];
+    const title = parts.slice(1, -2).join("|");
+    const agentId = ACTIVITY_PROFILE_MAP[rawAssignee] ?? rawAssignee;
+    if (!(KANBAN_PROFILES as readonly string[]).includes(agentId)) continue;
+    doneCounts[agentId] = (doneCounts[agentId] || 0) + 1;
+    if ((activity[agentId]?.length ?? 0) >= 10) continue;
+    const tsRaw = Number(completedAt) || Number(createdAt);
+    if (!tsRaw || !title) continue;
+    (activity[agentId] ||= []).push({
+      timestamp: new Date(tsRaw * 1000).toISOString(),
+      action: title.slice(0, 120),
+    });
+  }
+  return { activity, doneCounts };
+}
+
 // ── Hermes interactive sessions (local state.db) → Max ─────
 // A row in session_turn_leases with expires_at in the future means a turn is
 // generating RIGHT NOW.
@@ -135,10 +181,11 @@ async function hermesSessionLive(): Promise<Live> {
 
 export async function GET() {
   try {
-    const [states, sessionLive, kanbanLive] = await Promise.all([
+    const [states, sessionLive, kanbanLive, kanbanActivity] = await Promise.all([
       prisma.agentState.findMany(),
       hermesSessionLive(),
       hermesKanbanLive(),
+      hermesKanbanActivity(),
     ]);
     const stateMap: Record<string, any> = {};
     for (const s of states) {
@@ -169,9 +216,9 @@ export async function GET() {
         status,
         currentTask: status === "working" ? currentTask : undefined,
         lastActive,
-        tasksCompleted: s.tasksCompleted || agent.tasksCompleted,
+        tasksCompleted: kanbanActivity.doneCounts[agent.id] || s.tasksCompleted || agent.tasksCompleted,
         totalCost: s.totalCost || agent.totalCost,
-        recentActivity: s.recentActivity || agent.recentActivity,
+        recentActivity: kanbanActivity.activity[agent.id] || s.recentActivity || agent.recentActivity,
       };
     });
 
