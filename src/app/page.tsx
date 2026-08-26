@@ -1181,6 +1181,37 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
             </div>
           </div>
 
+          {/* Wallet value sparkline — daily snapshot history */}
+          {(() => {
+            const days = (data.snapshots || []).filter(s => s.pnl > 0).sort((a,b) => a.d.localeCompare(b.d));
+            if (days.length < 2) return null;
+            const vals = days.map(s => s.pnl);
+            const min = Math.min(...vals), max = Math.max(...vals);
+            const range = max - min || 1;
+            const W = 100, H = 28;
+            const pts = vals.map((v,i) => `${(i/(vals.length-1))*W},${H - 3 - ((v - min)/range)*(H - 6)}`).join(" ");
+            const up = vals[vals.length-1] >= vals[0];
+            return (
+              <div className="mt-4">
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-7" preserveAspectRatio="none" aria-hidden>
+                  <polyline
+                    points={pts}
+                    fill="none"
+                    stroke={up ? "#f0b90b" : "var(--down)"}
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+                <div className="flex justify-between mt-1 text-[8.5px] num text-[var(--hq-text-ghost)]">
+                  <span>{days[0].d.slice(5)}</span>
+                  <span>{days[days.length-1].d.slice(5)}</span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Asset breakdown */}
           {assets && assets.length > 0 && (
             <div className="mt-5 pt-4 border-t border-[var(--hq-hairline)] space-y-2.5">
