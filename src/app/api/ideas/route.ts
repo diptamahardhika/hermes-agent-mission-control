@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import ideasJson from "@/data/ideas.json" assert { type: "json" };
 
 // Agent roster mirrors hermes profiles (see bridge.mjs "[agent]" routing).
 // Max's cast id is "max" but his real Hermes profile is "default".
@@ -70,14 +71,24 @@ async function enrichWithDispatch(ideas: Array<{ id: string; agent: string | nul
 }
 
 export async function GET() {
-  const ideas = await prisma.idea.findMany({
+  let ideas = await prisma.idea.findMany({
     orderBy: { timestamp: "desc" },
   });
+
+  // Fall back to static data if Prisma Idea table is empty (no migrations run yet)
+  if (!ideas.length) {
+    ideas = ideasJson.map((i) => ({
+      ...i,
+      _source: "static-data",
+    }));
+  }
+
   const dispatch = await enrichWithDispatch(ideas);
   return NextResponse.json(
     ideas.map((i) => ({ ...i, dispatch: dispatch.get(i.id) ?? null })),
     { headers: { "Cache-Control": "no-store" } },
-  );}
+  );
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);

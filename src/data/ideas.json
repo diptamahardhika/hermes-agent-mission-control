@@ -1,0 +1,58 @@
+[
+  {
+    "id": "idea-001",
+    "title": "Agents Page UI Improvements",
+    "description": "Three UI improvements for the agents page: show collapsed activity preview on each AgentCard, add empty/failure state, make chat discoverable from Cards view",
+    "category": "build",
+    "type": "ui",
+    "model": "max",
+    "status": "approved",
+    "source": "kanban",
+    "estimatedTime": "2-3 hours",
+    "agent": "max"
+  },
+  {
+    "id": "idea-002",
+    "title": "Sage Daily Digest Automation",
+    "description": "Automate the daily AI news and cybersecurity digests that Sage generates, with proper source linking and formatting for the dashboard",
+    "category": "build",
+    "type": "automation",
+    "model": "sage",
+    "status": "pending",
+    "source": "kanban",
+    "estimatedTime": "4-6 hours"
+  },
+  {
+    "id": "idea-003",
+    "title": "Proposal Board Enhancements",
+    "description": "Filter out pure status notifications from the proposal board, surface only actionable pending proposals, and add better sorting by creation date",
+    "category": "build",
+    "type": "proposal",
+    "model": "nova",
+    "status": "pending",
+    "source": "kanban",
+    "estimatedTime": "1-2 hours"
+  },
+  {
+    "id": "idea-004",
+    "title": "Bridge Mirror Improvements",
+    "description": "Ensure the hermes-bridge properly mirrors task comments and task runs as agent proposals in the Postgres DataStore, with better error handling and logging",
+    "category": "build",
+    "type": "infrastructure",
+    "model": "default",
+    "status": "pending",
+    "source": "kanban",
+    "estimatedTime": "3-4 hours"
+  },
+  {
+    "id": "idea-005",
+    "title": "Sage Findings API Data Population",
+    "description": "Fix the /api/sage-findings API to reliably return completed research findings from the kanban database, including digest file integration",
+    "category": "build",
+    "type": "api",
+    "model": "sage",
+    "status": "pending",
+    "source": "kanban",
+    "estimatedTime": "2-3 hours"
+  }
+]
