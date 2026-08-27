@@ -24,6 +24,8 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 
+import { Logo } from "./logo";
+
 const navGroups = [
   {
     name: "Overview",
@@ -79,22 +81,11 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
     }
   }, [pathname, setIsOpen]);
 
-  const Logo = () => (
-    <div className={`flex items-center transition-all duration-300 ease-out ${isOpen ? "gap-3 opacity-100" : "gap-0 opacity-100 justify-center"}`}>
-      <div className="w-8 h-8 rounded-[10px] bg-[var(--text)] flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
-        <span className="text-[#0a0b0d] font-bold text-[13px] tracking-tight">H</span>
-      </div>
-      <span className={`font-medium text-[var(--text)] tracking-tight text-[14px] transition-all duration-300 ease-out ${isOpen ? "opacity-100 w-auto" : "opacity-0 w-0 overflow-hidden pointer-events-none"}`}>
-        Hermy HQ
-      </span>
-    </div>
-  );
-
   return (
     <>
       {/* Mobile header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-b border-[var(--line)] px-4 py-3 flex items-center justify-between">
-        <Logo />
+        <Logo isOpen={isOpen} />
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 text-[var(--text-2)] hover:text-[var(--text)] transition-colors rounded-lg hover:bg-[var(--surface-1)]"
@@ -149,8 +140,8 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
           ${!isOpen ? "overflow-hidden" : ""}
         `}
       >
-        <div className={`hidden md:flex transition-all duration-300 ease-out relative ${isOpen ? "px-4 pt-5 pb-5" : "px-0 pt-5 pb-5 justify-center"} bg-gradient-to-b from-white/[0.035] via-white/[0.012] to-transparent border-b border-[var(--line)]/60 z-10`}>
-          <Logo />
+        <div className={`hidden md:flex transition-all duration-300 ease-out relative ${isOpen ? "flex-row px-4 pt-5 pb-5" : "flex-col items-center px-0 pt-5 pb-5"} bg-gradient-to-b from-white/[0.035] via-white/[0.012] to-transparent border-b border-[var(--line)]/60 z-10`}>
+          <Logo isOpen={isOpen} />
           <button
             onClick={() => setIsOpen(!isOpen)}
             className={`md:flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-3)] hover:text-[var(--text)] hover:bg-[var(--surface-1)] transition-all duration-200 ease-out ${isOpen ? "ml-auto mr-1 mt-0.5" : "mt-10"}`}
