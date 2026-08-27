@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import {
   Home,
   Twitter,
@@ -14,12 +14,14 @@ import {
   ClipboardList,
   HeartPulse,
   Cpu,
-  BookOpen,
   Workflow,
   Menu,
   X,
   Github,
   Server,
+  Notebook,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 const navGroups = [
@@ -52,14 +54,13 @@ const navGroups = [
     items: [
       { href: "/agents", label: "Agents", icon: Bot },
       { href: "/homelab", label: "Homelab", icon: Server },
-      { href: "/memory-wiki", label: "Memory Wiki", icon: BookOpen },
+      { href: "/memory-wiki", label: "Memory Wiki", icon: Notebook },
       { href: "/ideas", label: "Ideas", icon: Lightbulb },
       { href: "/garden", label: "Garden", icon: Flower2 },
     ],
   },
 ];
 
-// Mobile tab bar - only show the 5 most important
 const mobileTabsRaw = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/x", label: "X", icon: Twitter },
@@ -68,41 +69,24 @@ const mobileTabsRaw = [
   { href: "/agents", label: "Agents", icon: Bot },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (open: boolean) => void }) {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
 
-  // Close sidebar on route change (mobile)
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setIsOpen(false));
-    return () => cancelAnimationFrame(frame);
-  }, [pathname]);
-
-  // Close sidebar when resizing to desktop
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768) setIsOpen(false);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      const frame = requestAnimationFrame(() => setIsOpen(false));
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [pathname, setIsOpen]);
 
   const Logo = () => (
-    <div className="flex items-center gap-2.5">
-      <div className="w-8 h-8 rounded-[10px] bg-gradient-to-b from-[#1c2029] to-[#0a0b0d] border border-white/15 flex items-center justify-center relative shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_4px_12px_rgba(0,0,0,0.5)]">
-        <span
-          className="font-bold text-[17px] leading-none tracking-tight bg-clip-text text-transparent"
-          style={{
-            backgroundImage: "linear-gradient(135deg, #5EEAD4 0%, #38BDF8 55%, #818CF8 100%)",
-            filter: "drop-shadow(0 0 6px rgba(56,189,248,0.45))",
-          }}
-          aria-hidden
-        >
-          H
-        </span>
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#34D399] shadow-[0_0_6px_rgba(52,211,153,0.9)]"/>
+    <div className={`flex items-center transition-all duration-300 ease-out ${isOpen ? "gap-3 opacity-100" : "gap-0 opacity-100 justify-center"}`}>
+      <div className="w-8 h-8 rounded-[10px] bg-[var(--text)] flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+        <span className="text-[#0a0b0d] font-bold text-[13px] tracking-tight">H</span>
       </div>
-      <span className="font-semibold text-[var(--text)] tracking-[-0.01em] text-[15px]">Hermy HQ</span>
+      <span className={`font-medium text-[var(--text)] tracking-tight text-[14px] transition-all duration-300 ease-out ${isOpen ? "opacity-100 w-auto" : "opacity-0 w-0 overflow-hidden pointer-events-none"}`}>
+        Hermy HQ
+      </span>
     </div>
   );
 
@@ -156,28 +140,33 @@ export function Sidebar() {
       <aside
         className={`
           fixed md:relative z-50 md:z-10
-          w-64 md:w-[15rem] h-full
-          bg-[var(--bg)] md:bg-transparent border-r border-[var(--line)]
+          ${isOpen ? "w-64 md:w-[15rem]" : "w-0 md:w-14"} h-full
+          bg-[var(--bg)] md:bg-transparent border-r ${isOpen ? "border-[var(--line)]" : "border-none"}
           flex flex-col
-          transition-transform duration-300 ease-in-out
+          transition-all duration-300 ease-out
           ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
           top-0 left-0
+          ${!isOpen ? "overflow-hidden" : ""}
         `}
       >
-        {/* Logo */}
-        <div className="hidden md:block px-5 pt-6 pb-8">
+        <div className={`hidden md:flex transition-all duration-300 ease-out relative ${isOpen ? "px-4 pt-5 pb-5" : "px-0 pt-5 pb-5 justify-center"} bg-gradient-to-b from-white/[0.035] via-white/[0.012] to-transparent border-b border-[var(--line)]/60 z-10`}>
           <Logo />
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className={`md:flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-3)] hover:text-[var(--text)] hover:bg-[var(--surface-1)] transition-all duration-200 ease-out ${isOpen ? "ml-auto mr-1 mt-0.5" : "mt-10"}`}
+            aria-label={isOpen ? "Collapse Sidebar" : "Expand Sidebar"}
+          >
+            {isOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+          </button>
         </div>
 
-        {/* Spacer for mobile header */}
         <div className="h-16 md:hidden" />
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 overflow-y-auto">
+        <nav className={`flex-1 overflow-y-auto transition-all duration-300 ${isOpen ? "px-3" : "px-0"}`}>
           <div className="space-y-5">
             {navGroups.map((group) => (
               <div key={group.name}>
-                <h3 className="eyebrow px-3 mb-1.5 !text-[10px] !text-[var(--text-4)]">
+                <h3 className={`eyebrow px-3 mb-1.5 !text-[10px] !text-[var(--text-4)] transition-all duration-300 ${isOpen ? "opacity-100 h-auto" : "opacity-0 h-0 overflow-hidden mb-0"}`}>
                   {group.name}
                 </h3>
                 <div className="space-y-0.5">
@@ -186,43 +175,33 @@ export function Sidebar() {
                       pathname === item.href || pathname.startsWith(item.href + "/");
                     const Icon = item.icon;
                     return (
-                      <div key={item.href}>
-                        <Link
-                          href={item.href}
-                          className={`group relative flex items-center gap-3 px-3 py-[7px] rounded-[10px] transition-all duration-150 ${
-                            isActive
-                              ? "bg-[var(--surface-2)] text-[var(--text)]"
-                              : "text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--surface-1)]"
-                          }`}
-                        >
-                          {isActive && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-[var(--accent)]" />
-                          )}
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`group relative flex items-center transition-all duration-300 rounded-[10px] py-[7px] ${
+                          isOpen 
+                            ? "px-3 gap-3" 
+                            : "px-0 justify-center w-10 mx-auto"
+                        } ${
+                          isActive
+                            ? "bg-[var(--surface-2)] text-[var(--text)]"
+                            : "text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--surface-1)]"
+                        }`}
+                      >
+                        {isActive && (
+                          <span className={`absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-[var(--accent)] transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0"}`} />
+                        )}
+                        <div className={`flex items-center justify-center transition-all duration-300 ${!isOpen ? "w-6 h-6" : "w-auto h-auto"}`}>
                           <Icon
-                            className={`w-[17px] h-[17px] shrink-0 ${
+                            className={`w-[17px] h-[17px] shrink-0 transition-all duration-300 ${
                               isActive ? "text-[var(--text)]" : "text-[var(--text-3)] group-hover:text-[var(--text-2)]"
-                            }`}
+                            } ${!isOpen ? "scale-110" : ""}`}
                           />
-                          <span className="text-[13.5px] font-medium">{item.label}</span>
-                        </Link>
-                        {"anchors" in group &&
-                          isActive &&
-                          (group as { anchors?: { href: string; label: string }[] }).anchors && (
-                            <div className="ml-[26px] mt-0.5 space-y-0.5 border-l border-[var(--line)] pl-3">
-                              {(group as { anchors: { href: string; label: string }[] }).anchors.map(
-                                (a) => (
-                                  <a
-                                    key={a.href}
-                                    href={a.href}
-                                    className="block text-[12px] text-[var(--text-3)] hover:text-[var(--text-2)] py-1 transition-colors"
-                                  >
-                                    {a.label}
-                                  </a>
-                                )
-                              )}
-                            </div>
-                          )}
-                      </div>
+                        </div>
+                        <span className={`text-[13.5px] font-medium transition-all duration-300 ${isOpen ? "opacity-100 w-auto ml-0" : "opacity-0 w-0 overflow-hidden pointer-events-none"}`}>
+                          {item.label}
+                        </span>
+                      </Link>
                     );
                   })}
                 </div>
@@ -231,14 +210,15 @@ export function Sidebar() {
           </div>
         </nav>
 
-        {/* Footer */}
-        <div className="px-4 py-4 border-t border-[var(--line)]">
-          <div className="flex items-center gap-2 text-[var(--text-3)] text-[11.5px]">
-            <span className="relative flex w-1.5 h-1.5">
+        <div className={`px-4 py-4 border-t border-[var(--line)] transition-all duration-300 ${isOpen ? "" : "px-0 flex justify-center"}`}>
+          <div className={`flex items-center gap-2 text-[var(--text-3)] text-[11.5px] transition-all duration-300 ${isOpen ? "" : "justify-center"}`}>
+            <span className="relative flex w-1.5 h-1.5 shrink-0">
               <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--up)] opacity-60 animate-ping" />
               <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-[var(--up)]" />
             </span>
-            <span>All systems online</span>
+            <span className={`transition-all duration-300 ${isOpen ? "opacity-100 w-auto" : "opacity-0 w-0 overflow-hidden pointer-events-none"}`}>
+              All systems online
+            </span>
           </div>
         </div>
       </aside>
