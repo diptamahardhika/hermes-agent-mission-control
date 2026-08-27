@@ -11,6 +11,9 @@ import path from "path";
 const execFileP = promisify(execFile);
 const KANBAN_DB = `${homedir()}/.hermes/kanban.db`;
 
+// Digest directory — may not exist on first run; keep path consistent
+const DIGEST_DIR = `${homedir()}/.hermes/sage-digests`;
+
 export type SageCategory = "ai" | "security";
 
 type Finding = {
@@ -20,10 +23,6 @@ type Finding = {
   completedAt: string;
   category: SageCategory;
 };
-
-// NB: no -readonly — macOS sqlite3 can't open a WAL db readonly if it needs
-// recovery, and this DB is actively written by the gateway dispatcher.
-const DIGEST_DIR = `${homedir()}/.hermes/sage-digests`;
 
 async function sageFindings(): Promise<Finding[]> {
   try {
@@ -42,10 +41,19 @@ async function sageFindings(): Promise<Finding[]> {
       // Prefer the durable digest file (full markdown with source links) over
       // the completion summary, which can get compressed by the dispatcher.
       try {
-        const file = title.toLowerCase().includes("cyber")
-          ? await readFile(path.join(DIGEST_DIR, "security-digest.md"), "utf8")
-          : await readFile(path.join(DIGEST_DIR, "ai-digest.md"), "utf8");
-        if (file.trim().length > summary.length) summary = file.trim();
+        const cyberPath = path.join(DIGEST_DIR, "security-digest.md");
+        const aiPath = path.join(DIGEST_DIR, "ai-digest.md");
+        let digestContent = "";
+        try {
+          digestContent = await readFile(cyberPath, "utf8");
+        } catch (e1) {
+          try {
+            digestContent = await readFile(aiPath, "utf8");
+          } catch (e2) {
+            // Neither digest file exists yet — fall back to summary
+          }
+        }
+        if (digestContent.trim().length > summary.length) summary = digestContent.trim();
       } catch { /* no digest file yet — fall back to summary */ }
       return {
         taskId: String(r.task_id),
@@ -56,7 +64,8 @@ async function sageFindings(): Promise<Finding[]> {
       };
     }));
     return findings;
-  } catch {
+  } catch (err) {
+    console.error("sage-findings API error:", err);
     return [];
   }
 }

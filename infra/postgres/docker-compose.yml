@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  # ─── Primary PostgreSQL ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-bookworm
+    container_name: hermy-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hermy_hq
+      POSTGRES_USER: hermy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
+      - ./init/02-performance.sql:/docker-entrypoint-initdb.d/02-performance.sql:ro
+      - ./init/03-monitoring.sql:/docker-entrypoint-initdb.d/03-monitoring.sql:ro
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c shared_preload_libraries=pg_stat_statements,auto_explain,pg_cron
+      -c cron.database_name=hermy_hq
+    ports:
+      - "127.0.0.1:5432:5432"  # Only bind to localhost; expose via tunnel/SSH
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermy -d hermy_hq"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ─── PgBouncer (Connection Pooler - Neon-style) ─────────────────────
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: hermy-pgbouncer
+    restart: unless-stopped
+    environment:
+      DATABASES_HOST: postgres
+      DATABASES_PORT: "5432"
+      DATABASES_DBNAME: hermy_hq
+      DATABASES_USER: hermy
+      DATABASES_PASSWORD: ${POSTGRES_PASSWORD}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 25
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 5
+      SERVER_RESET_QUERY: DISCARD ALL
+      SERVER_LIFETIME: 3600
+      SERVER_IDLE_TIMEOUT: 600
+      QUERY_TIMEOUT: 0
+      QUERY_WAIT_TIMEOUT: 120
+    ports:
+      - "127.0.0.1:6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "6432", "-U", "hermy", "-d", "hermy_hq"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── pgBackRest (Automated Backups) ─────────────────────────────────
+  pgbackrest:
+    image: ghcr.io/pgbackrest/pgbackrest:2.53-bookworm
+    container_name: hermy-pgbackrest
+    restart: unless-stopped
+    environment:
+      PGBACKREST_STANZA: hermy_hq
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_RETENTION_FULL: "2"
+      PGBACKREST_REPO1_RETENTION_DIFF: "7"
+      PGBACKREST_LOG_LEVEL_CONSOLE: info
+      PGBACKREST_PROCESS_MAX: 2
+      PGBACKREST_COMPRESS_TYPE: lz4
+      PGBACKREST_COMPRESS_LEVEL: 3
+    volumes:
+      - pgbackrest_data:/var/lib/pgbackrest
+      - ./pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - postgres_data:/var/lib/postgresql/data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: >
+      /bin/bash -c "
+        pgbackrest --stanza=hermy_hq stanza-create &&
+        pgbackrest --stanza=hermy_hq check &&
+        echo '0 2 * * * pgbackrest --stanza=hermy_hq --type=full backup' | crontab - &&
+        echo '0 3 * * 0 pgbackrest --stanza=hermy_hq --type=diff backup' | crontab - &&
+        cron -f
+      "
+
+  # ─── pgAdmin (Web UI) ───────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: hermy-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@hermy.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./servers.json:/pgadmin4/servers.json:ro
+    ports:
+      - "127.0.0.1:5050:80"
+    depends_on:
+      - postgres
+
+  # ─── Prometheus Exporter (Monitoring) ───────────────────────────────
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: hermy-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://hermy:${POSTGRES_PASSWORD}@postgres:5432/hermy_hq?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /queries.yaml
+      PG_EXPORTER_WEB_LISTEN_ADDRESS: ":9187"
+    volumes:
+      - ./queries.yaml:/queries.yaml:ro
+    ports:
+      - "127.0.0.1:9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
+  pgbackrest_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  default:
+    name: hermy-infra

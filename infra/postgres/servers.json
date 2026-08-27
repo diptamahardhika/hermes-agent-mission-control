@@ -1,0 +1,24 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "Hermy HQ PostgreSQL",
+            "Group": "Hermy",
+            "Host": "postgres",
+            "Port": 5432,
+            "MaintenanceDB": "hermy_hq",
+            "Username": "hermy",
+            "SSLMode": "prefer",
+            "Comment": "Primary PostgreSQL for Hermy HQ Dashboard"
+        },
+        "2": {
+            "Name": "Hermy HQ via PgBouncer",
+            "Group": "Hermy",
+            "Host": "pgbouncer",
+            "Port": 6432,
+            "MaintenanceDB": "hermy_hq",
+            "Username": "hermy",
+            "SSLMode": "disable",
+            "Comment": "Connection pooled access (use for apps)"
+        }
+    }
+}

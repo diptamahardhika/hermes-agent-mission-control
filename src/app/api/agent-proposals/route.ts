@@ -10,8 +10,19 @@ const KANBAN_DB = `${homedir()}/.hermes/kanban.db`;
 function shJson<T = any>(sql: string): Promise<T[]> {
   // -json makes sqlite3 emit one JSON array — no pipe/newline parsing issues
   return execFileP("sqlite3", ["-json", KANBAN_DB, sql], { timeout: 5000, maxBuffer: 1024 * 1024 })
-    .then((r) => (r.stdout.trim() ? JSON.parse(r.stdout.trim()) : []))
-    .catch(() => []);
+    .then((r) => {
+      const text = r.stdout.trim();
+      if (!text) return [];
+      try {
+        return JSON.parse(text);
+      } catch {
+        return [];
+      }
+    })
+    .catch((err) => {
+      console.error("shJson SQL error:", err.message, "- SQL:", sql.substring(0, 100));
+      return [];
+    });
 }
 
 const COMMENT_SQL = `
@@ -165,7 +176,15 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Agent proposals API error:", error);
-    return NextResponse.json([], { status: 200 });
+    // Return persisted data if available, otherwise empty array
+    try {
+      const persisted = await prisma.agentProposal.findMany();
+      return NextResponse.json(persisted, {
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+      });
+    } catch {
+      return NextResponse.json([], { status: 500 });
+    }
   }
 }
 

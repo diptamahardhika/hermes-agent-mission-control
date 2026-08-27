@@ -1,0 +1,133 @@
+# ─── Custom Prometheus Queries for PostgreSQL ────────────────────────
+
+# Cache hit ratio
+- name: pg_cache_hit_ratio
+  query: |
+    SELECT
+      'buffer' AS cache_type,
+      blks_hit::float / nullif(blks_hit + blks_read, 0) AS ratio
+    FROM pg_stat_database WHERE datname = 'hermy_hq'
+    UNION ALL
+    SELECT
+      'index' AS cache_type,
+      idx_blks_hit::float / nullif(idx_blks_hit + idx_blks_read, 0)
+    FROM pg_stat_database WHERE datname = 'hermy_hq'
+  metrics:
+    - cache_type: {type: "label"}
+    - ratio: {type: "gauge", usage: "GAUGE", description: "Cache hit ratio (0-1)"}
+
+# Table bloat
+- name: pg_table_bloat
+  query: |
+    SELECT
+      n.nspname AS schema,
+      c.relname AS table,
+      CASE WHEN c.relpages = 0 THEN 0
+           ELSE round((c.relpages - otta)::numeric / nullif(c.relpages,0), 2) END AS bloat_ratio
+    FROM (
+      SELECT
+        c.oid, c.relname, c.relpages,
+        ceil(c.reltuples * (c.relpages::numeric / nullif(c.relpages,0))) AS otta
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog','information_schema')
+    ) c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+  metrics:
+    - schema: {type: "label"}
+    - table: {type: "label"}
+    - bloat_ratio: {type: "gauge", usage: "GAUGE", description: "Table bloat ratio"}
+
+# Index usage
+- name: pg_index_usage
+  query: |
+    SELECT
+      s.schemaname,
+      s.relname AS table,
+      s.indexrelname AS index,
+      s.idx_scan,
+      pg_relation_size(s.indexrelid) AS size_bytes
+    FROM pg_stat_user_indexes s
+    JOIN pg_index i ON i.indexrelid = s.indexrelid
+    WHERE NOT i.indisunique
+  metrics:
+    - schemaname: {type: "label"}
+    - table: {type: "label"}
+    - index: {type: "label"}
+    - idx_scan: {type: "counter", usage: "COUNTER", description: "Number of index scans"}
+    - size_bytes: {type: "gauge", usage: "GAUGE", description: "Index size in bytes"}
+
+# Active connections
+- name: pg_connections
+  query: |
+    SELECT
+      state,
+      count(*) AS count
+    FROM pg_stat_activity
+    WHERE datname = 'hermy_hq'
+    GROUP BY state
+  metrics:
+    - state: {type: "label"}
+    - count: {type: "gauge", usage: "GAUGE", description: "Connections by state"}
+
+# Long running queries count
+- name: pg_long_running_queries
+  query: |
+    SELECT count(*) AS count
+    FROM pg_stat_activity
+    WHERE state IN ('active','idle in transaction')
+      AND now() - query_start > interval '30s'
+      AND pid <> pg_backend_pid()
+  metrics:
+    - count: {type: "gauge", usage: "GAUGE", description: "Queries running > 30s"}
+
+# Replication lag (if replica)
+- name: pg_replication_lag
+  query: |
+    SELECT
+      application_name,
+      EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) AS lag_seconds
+    FROM pg_stat_replication
+  metrics:
+    - application_name: {type: "label"}
+    - lag_seconds: {type: "gauge", usage: "GAUGE", description: "Replication lag in seconds"}
+
+# WAL stats
+- name: pg_wal_stats
+  query: |
+    SELECT
+      'wal_lsn' AS metric,
+      pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0')::float AS value
+    UNION ALL
+    SELECT
+      'wal_size_mb' AS metric,
+      pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0') / 1024 / 1024
+  metrics:
+    - metric: {type: "label"}
+    - value: {type: "gauge", usage: "GAUGE", description: "WAL metrics"}
+
+# Autovacuum stats
+- name: pg_autovacuum
+  query: |
+    SELECT
+      n.nspname AS schema,
+      c.relname AS table,
+      last_vacuum,
+      last_autovacuum,
+      last_analyze,
+      last_autoanalyze,
+      vacuum_count,
+      autovacuum_count,
+      analyze_count,
+      autoanalyze_count
+    FROM pg_stat_user_tables s
+    JOIN pg_class c ON c.oid = s.relid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname NOT IN ('pg_catalog','information_schema')
+  metrics:
+    - schema: {type: "label"}
+    - table: {type: "label"}
+    - vacuum_count: {type: "counter", usage: "COUNTER"}
+    - autovacuum_count: {type: "counter", usage: "COUNTER"}
+    - analyze_count: {type: "counter", usage: "COUNTER"}
+    - autoanalyze_count: {type: "counter", usage: "COUNTER"}
