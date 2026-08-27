@@ -707,11 +707,11 @@ let hlBalance = 0;
   snapshots = snapshots.slice(-60); // ~2 months of daily history
   // Drop zero-pnl legacy rows from before wallet-value snapshots existed
   snapshots = snapshots.filter(s => s.d === today || s.pnl > 0);
-  prisma.dataStore.upsert({
+  await prisma.dataStore.upsert({
     where: { key: "metric-snapshots" },
     update: { data: snapshots },
     create: { key: "metric-snapshots", data: snapshots },
-  }).catch(() => {});
+  }).catch((e) => { console.warn("[home] snapshot upsert failed:", e); });
   // Binance PnL derivation (savings-style portfolio): today's PnL = wallet value
   // minus yesterday's snapshot; all-time = minus earliest snapshot.
   // PnL from snapshot history: wallet value change day-over-day / since first record.
