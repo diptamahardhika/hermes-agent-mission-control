@@ -707,7 +707,7 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
         ];
         const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
         const split = knownSum > 0;
-        const pctOf = (v: number) => split ? (v / knownSum) * 100 : 0;
+        const pctOf = (v: number) => split ? (v / m.tokens) * 100 : 0;
         const hasCache = cacheRead > 0;
         return (
           <div key={m.model} className="flex items-center gap-2 justify-between"
@@ -762,7 +762,7 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
         ];
         const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
         const split = knownSum > 0;
-        const pctOf = (v: number) => split ? (v / knownSum) * 100 : 0;
+        const pctOf = (v: number) => split ? (v / m.tokens) * 100 : 0;
         const hasCache = (m.cacheReadTokens ?? 0) > 0;
         return (
           <div key={`${m.provider}/${m.model}`} className="flex items-center gap-2 justify-between"
