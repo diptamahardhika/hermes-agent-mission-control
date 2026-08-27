@@ -1,0 +1,8 @@
+# PgBouncer userlist format: "username" "scram-sha-256$<iterations>:<salt>$<storedkey>:<serverkey>"
+# Generate the hash:
+#   docker exec -e PGPASSWORD='your_password' postgres \
+#     pg_dumpall --roles-only | grep "hermy" | cut -d" " -f3
+# Or use: SELECT rolpassword FROM pg_authid WHERE rolname='hermy';
+#
+# Example (replace with actual hash from your Postgres):
+# "hermy" "SCRAM-SHA-256$4096:<salt>$<storedkey>:<serverkey>"

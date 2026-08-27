@@ -56,3 +56,4 @@ data/*.db*
 
 # local prisma dev database
 prisma/dev.db
+infra/postgres/userlist.txt

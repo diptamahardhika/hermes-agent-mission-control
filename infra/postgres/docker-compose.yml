@@ -20,8 +20,7 @@ services:
     command: >
       postgres
       -c config_file=/etc/postgresql/postgresql.conf
-      -c shared_preload_libraries=pg_stat_statements,auto_explain,pg_cron
-      -c cron.database_name=hermy_hq
+      -c shared_preload_libraries=pg_stat_statements,auto_explain
     ports:
       - "127.0.0.1:5432:5432"  # Only bind to localhost; expose via tunnel/SSH
     healthcheck:
@@ -43,11 +42,7 @@ services:
     container_name: hermy-pgbouncer
     restart: unless-stopped
     environment:
-      DATABASES_HOST: postgres
-      DATABASES_PORT: "5432"
-      DATABASES_DBNAME: hermy_hq
-      DATABASES_USER: hermy
-      DATABASES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: "postgresql://hermy:${POSTGRES_PASSWORD}@postgres:5432/hermy_hq"
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 1000
       DEFAULT_POOL_SIZE: 25
@@ -61,6 +56,9 @@ services:
       QUERY_WAIT_TIMEOUT: 120
     ports:
       - "127.0.0.1:6432:6432"
+    volumes:
+      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./userlist.txt:/etc/pgbouncer/userlist.txt:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,35 +68,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # ─── pgBackRest (Automated Backups) ─────────────────────────────────
-  pgbackrest:
-    image: ghcr.io/pgbackrest/pgbackrest:2.53-bookworm
-    container_name: hermy-pgbackrest
-    restart: unless-stopped
-    environment:
-      PGBACKREST_STANZA: hermy_hq
-      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
-      PGBACKREST_REPO1_RETENTION_FULL: "2"
-      PGBACKREST_REPO1_RETENTION_DIFF: "7"
-      PGBACKREST_LOG_LEVEL_CONSOLE: info
-      PGBACKREST_PROCESS_MAX: 2
-      PGBACKREST_COMPRESS_TYPE: lz4
-      PGBACKREST_COMPRESS_LEVEL: 3
-    volumes:
-      - pgbackrest_data:/var/lib/pgbackrest
-      - ./pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
-      - postgres_data:/var/lib/postgresql/data:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-    entrypoint: >
-      /bin/bash -c "
-        pgbackrest --stanza=hermy_hq stanza-create &&
-        pgbackrest --stanza=hermy_hq check &&
-        echo '0 2 * * * pgbackrest --stanza=hermy_hq --type=full backup' | crontab - &&
-        echo '0 3 * * 0 pgbackrest --stanza=hermy_hq --type=diff backup' | crontab - &&
-        cron -f
-      "
+  # ─── pgBackRest (Automated Backups) — disabled: GHCR pull denied ───
+  # pgbackrest:
+  #   image: ghcr.io/pgbackrest/pgbackrest:2.53-bookworm
+  #   ... (re-enable once GHCR auth is configured)
 
   # ─── pgAdmin (Web UI) ───────────────────────────────────────────────
   pgadmin:
@@ -106,7 +79,7 @@ services:
     container_name: hermy-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@hermy.local}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@hermy.dev}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: "False"
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
