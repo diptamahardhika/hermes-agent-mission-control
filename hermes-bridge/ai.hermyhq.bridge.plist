@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   launchd service for the Hermy HQ ↔ Hermes bridge.
-  Edit the CAPITALIZED placeholders, then:
-    cp ai.hermyhq.bridge.plist ~/Library/LaunchAgents/
-    launchctl load ~/Library/LaunchAgents/ai.hermyhq.bridge.plist
   Logs: /tmp/hermes-bridge.out.log  /tmp/hermes-bridge.err.log
 -->
 <plist version="1.0">
@@ -15,7 +12,7 @@
   <array>
     <string>/usr/bin/env</string>
     <string>node</string>
-    <string>/ABSOLUTE/PATH/TO/hermes-bridge/bridge.mjs</string>
+    <string>/Users/pradiptamahardika/hermes-agent-mission-control/hermes-bridge/bridge.mjs</string>
   </array>
 
   <key>EnvironmentVariables</key>
@@ -24,12 +21,13 @@
          hermes-bridge/.env (gitignored). See bridge.mjs. -->
     <key>HERMES_BOARD</key>
     <string>default</string>
-    <!-- Briefs routinely run 2-10 min (slower when Hermes falls back to free
-         models). The 600s default killed healthy runs at exactly 10 min. -->
+    <!-- Briefs routinely run 2-10 min. The 600s default killed healthy runs at exactly 10 min. -->
     <key>BRIDGE_RUN_TIMEOUT_MS</key>
     <string>900000</string>
+    <key>HERMES_BIN</key>
+    <string>/Users/pradiptamahardika/.local/bin/hermes</string>
     <key>PATH</key>
-    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/YOU/.local/bin</string>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/pradiptamahardika/.local/bin</string>
   </dict>
 
   <key>RunAtLoad</key>

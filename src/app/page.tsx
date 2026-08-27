@@ -921,14 +921,14 @@ function GitHubContributionMatrix({ weeks }: { weeks: GitHubContribDay[][] }) {
     rows.push(paddedWeeks.map((week) => week[di]));
   }
   return (
-    <div className="flex flex-col gap-[3px] w-full">
+    <div className="flex flex-col gap-[3px] w-full max-w-full">
       {rows.map((row, ri) => (
-        <div key={ri} className="flex gap-[3px] w-full">
+        <div key={ri} className="flex gap-[3px] w-full max-w-full">
           {row.map((day, ci) => (
             <div
               key={day.date || `${ri}-${ci}`}
               title={day.date ? `${day.date}: ${day.count} contribution${day.count === 1 ? "" : "s"}` : ""}
-              className="flex-1 w-full aspect-square rounded-[3px] min-h-[3px]"
+              className="flex-1 aspect-square rounded-[3px] min-h-[3px] min-w-0"
               style={{ background: GH_LEVEL_COLORS[day.level] ?? GH_LEVEL_COLORS[0] }}
             />
           ))}
