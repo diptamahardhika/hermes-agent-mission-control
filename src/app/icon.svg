@@ -1,27 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1c2029"/>
-      <stop offset="1" stop-color="#0a0b0d"/>
-    </linearGradient>
-    <linearGradient id="h" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#5EEAD4"/>
-      <stop offset="0.55" stop-color="#38BDF8"/>
-      <stop offset="1" stop-color="#818CF8"/>
+    <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="white" stop-opacity="1" />
+      <stop offset="100%" stop-color="#818CF8" stop-opacity="0.8" />
     </linearGradient>
   </defs>
-  <!-- tile -->
-  <rect width="64" height="64" rx="15" fill="url(#tile)"/>
-  <rect x="1" y="1" width="62" height="62" rx="14" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="2"/>
-  <!-- H: Geist-like proportions (bold, tight), centered -->
-  <g fill="url(#h)">
-    <!-- left stem: slightly wider, rounded ends via rects -->
-    <rect x="17" y="16" width="9" height="32" rx="4.5"/>
-    <!-- right stem -->
-    <rect x="38" y="16" width="9" height="32" rx="4.5"/>
-    <!-- crossbar -->
-    <rect x="21" y="27.5" width="22" height="9" rx="4.5"/>
-  </g>
-  <!-- live dot -->
-  <circle cx="49" cy="15" r="6" fill="#34D399"/>
+  <!-- Outer Hexagon/Shield frame -->
+  <path
+    d="M32 4L56 16V48L32 60L8 48V16L32 4Z"
+    stroke="url(#logo-grad)"
+    stroke-width="4"
+    fill="none"
+  />
+  <!-- Stylized 'H' center -->
+  <path
+    d="M22 18V46M42 18V46M22 32H42"
+    stroke="white"
+    stroke-width="4"
+    stroke-linecap="round"
+  />
+  <!-- Status Dot (The 'Pulse' of the HQ) -->
+  <circle cx="46" cy="18" r="4" fill="#34D399" />
 </svg>
