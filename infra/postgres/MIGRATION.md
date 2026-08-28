@@ -2,12 +2,13 @@
 
 ## Overview
 This stack gives you **Neon-like DX** (auto-tuning, connection pooling, branching-ready) **fully self-hosted** with:
-- **PostgreSQL 16** with 15+ extensions pre-loaded
+- **PostgreSQL 16** with key extensions pre-loaded
 - **PgBouncer** for connection pooling (transaction mode, like Neon)
-- **pgBackRest** for incremental, encrypted, compressed backups
 - **pgAdmin 4** for web-based management
 - **Prometheus exporter** for monitoring
 - **Auto-tuned config** for mixed OLTP/analytics workloads
+
+> **Status as of 2026-08-29:** pgBackRest is **disabled** (GHCR auth denied anonymous pull). Re-enable when you have a Docker Hub image or GHCR auth — see TODO at bottom of this file. **Backups are NOT yet automated.** Configure a stopgap (`pg_dump` cron) before relying on this stack for anything you can't recreate.
 
 ---
 
@@ -19,11 +20,13 @@ cd infra/postgres
 ```
 
 This will:
-1. Create `.env` from template (you'll edit passwords)
-2. Pull all Docker images
-3. Start the stack
-4. Initialize pgBackRest
-5. Run initial backup
+1. Create `.env` from template (you fill in passwords)
+2. Create data dirs with correct perms
+3. Pull all Docker images
+4. Generate `userlist.txt` (scram hash for PgBouncer auth)
+5. Start the stack
+6. Wait for health checks
+7. Print connection strings
 
 ---
 
@@ -31,70 +34,64 @@ This will:
 
 ### For Next.js App (use pooled - **recommended**)
 ```env
-DATABASE_URL="postgresql://hermy:YOUR_PASSWORD@localhost:6432/hermy_hq?sslmode=disable&pgbouncer=true"
-POSTGRES_URL="postgresql://hermy:YOUR_PASSWORD@localhost:6432/hermy_hq?sslmode=disable&pgbouncer=true"
+DATABASE_URL="postgres://hermy:YOUR_PASSWORD@localhost:6432/hermy_hq?sslmode=disable&pgbouncer=true"
+POSTGRES_URL="postgres://hermy:YOUR_PASSWORD@localhost:5432/hermy_hq?sslmode=disable"
 ```
 
 ### For Prisma Migrations / Admin (direct)
 ```env
-DATABASE_URL="postgresql://hermy:YOUR_PASSWORD@localhost:5432/hermy_hq?sslmode=prefer"
+DATABASE_URL="postgres://hermy:YOUR_PASSWORD@localhost:5432/hermy_hq?sslmode=disable"
 ```
 
 ### For hermes-bridge (direct is fine - local only)
 ```env
 # hermes-bridge/.env
-DATABASE_URL="postgresql://hermy:YOUR_PASSWORD@localhost:5432/hermy_hq?sslmode=prefer"
+DATABASE_URL="postgres://hermy:YOUR_PASSWORD@localhost:5432/hermy_hq?sslmode=disable"
 ```
+
+> **Note:** `sslmode=disable` is intentional for local dev — Postgres is bound to `127.0.0.1` only and the pg_hba uses scram-sha-256 for auth. For Umbrel/remote, re-enable SSL (see Hardening section).
 
 ---
 
 ## Migration from Prisma Postgres
 
-### 1. Export current data
-```bash
-# From project root
-npx prisma db pull --print > schema-backup.sql
-# Or use pg_dump if you have direct access
-pg_dump "prisma://..." > hermy_backup.sql
-```
+### What we did (Aug 2026)
 
-### 2. Start new stack
-```bash
-cd infra/postgres
-./setup.sh
-```
+We migrated the dashboard from Prisma Cloud (free tier hit limit) to this self-hosted stack. Since the Prisma Cloud instance had no real application data (it was a fresh account), the migration was schema-only — no `pg_dump` import was needed. The 27 Prisma models were materialized via `npx prisma db push`.
 
-### 3. Import data
-```bash
-# Option A: Via psql (if you have SQL dump)
-docker compose exec -T postgres psql -U hermy -d hermy_hq < hermy_backup.sql
+### If you ever need to import data from Prisma Cloud
 
-# Option B: Prisma migrate deploy (if schema matches)
-DATABASE_URL="postgresql://hermy:PASS@localhost:5432/hermy_hq?sslmode=prefer" npx prisma migrate deploy
+1. Export from Prisma:
+   ```bash
+   # Prisma Cloud's free tier does not provide pg_dump, so this only works
+   # if you upgraded to a paid plan or use the Prisma Data Browser export.
+   ```
 
-# Option C: Prisma db push (development only)
-DATABASE_URL="postgresql://hermy:PASS@localhost:5432/hermy_hq?sslmode=prefer" npx prisma db push
-```
+2. Start the local stack:
+   ```bash
+   cd infra/postgres
+   ./setup.sh
+   ```
 
-### 4. Update .env files
-```bash
-# Main app .env
-DATABASE_URL="postgresql://hermy:PASS@localhost:6432/hermy_hq?sslmode=disable&pgbouncer=true"
-POSTGRES_URL="postgresql://hermy:PASS@localhost:6432/hermy_hq?sslmode=disable&pgbouncer=true"
+3. Import:
+   ```bash
+   # Option A: Via psql (if you have a SQL dump)
+   docker compose exec -T postgres psql -U hermy -d hermy_hq < hermy_backup.sql
 
-# hermes-bridge/.env
-DATABASE_URL="postgresql://hermy:PASS@localhost:5432/hermy_hq?sslmode=prefer"
-```
+   # Option B: Prisma db push (sync schema to fresh DB)
+   DATABASE_URL="postgres://hermy:PASS@localhost:5432/hermy_hq?sslmode=disable" npx prisma db push
+   ```
 
-### 5. Regenerate Prisma Client
-```bash
-npx prisma generate
-```
+4. Update `.env` files in repo root + `hermes-bridge/.env` (see Connection Strings above)
 
-### 6. Restart app
-```bash
-npm run dev
-```
+5. Regenerate Prisma Client + restart:
+   ```bash
+   npx prisma generate
+   launchctl kickstart -k gui/$(id -u)/ai.hermyhq.dashboard   # restart the dashboard
+   # Restart the bridge:
+   pkill -f "hermes-bridge/bridge.mjs"
+   cd hermes-bridge && nohup node bridge.mjs > /tmp/hermes-bridge.log 2>&1 &
+   ```
 
 ---
 
@@ -119,38 +116,25 @@ npm run dev
 ```bash
 docker compose logs -f postgres      # Database
 docker compose logs -f pgbouncer     # Connection pooler
-docker compose logs -f pgbackrest    # Backups
 ```
 
 ### Connect via psql
 ```bash
 # Direct
-docker compose exec postgres psql -U hermy -d hermy_hq
+docker compose exec -T postgres env PGPASSWORD=$POSTGRES_PASSWORD psql -U hermy -d hermy_hq
 
 # Via PgBouncer (what your app uses)
-docker compose exec pgbouncer psql -U hermy -d hermy_hq -h localhost -p 6432
+docker compose exec -T pgbouncer psql -U hermy -d hermy_hq -h localhost -p 6432
 ```
 
-### Manual Backup
+### Manual Backup (stopgap until pgBackRest is re-enabled)
 ```bash
-# Full backup
-docker compose exec pgbackrest pgbackrest --stanza=hermy_hq --type=full backup
-
-# Differential backup (faster)
-docker compose exec pgbackrest pgbackrest --stanza=hermy_hq --type=diff backup
+# One-off full dump to host:
+mkdir -p ~/backups/hermy
+docker compose exec -T postgres pg_dump -U hermy -d hermy_hq -Fc > ~/backups/hermy/$(date +%Y%m%d).dump
 ```
 
-### Restore from Backup
-```bash
-# List backups
-docker compose exec pgbackrest pgbackrest --stanza=hermy_hq info
-
-# Restore latest (delta restore = faster)
-docker compose exec pgbackrest pgbackrest --stanza=hermy_hq --type=full --delta restore
-
-# Restore to specific time (PITR)
-docker compose exec pgbackrest pgbackrest --stanza=hermy_hq --type=time --target="2025-01-15 10:00:00" --delta restore
-```
+> **TODO:** Re-enable pgBackRest (GHCR auth or Docker Hub image) and wire daily full + diff backups. Until then, run the `pg_dump` above manually or set up a cron on the host.
 
 ### Monitor Health
 ```bash
@@ -262,24 +246,56 @@ docker compose exec pgbackrest pgbackrest --stanza=hermy_hq check
 
 ## Security Hardening (Production)
 
-1. **Enable SSL properly** - Mount real certs:
-```yaml
-volumes:
-  - ./certs/server.crt:/etc/ssl/certs/server.crt:ro
-  - ./certs/server.key:/etc/ssl/private/server.key:ro
-```
-In `postgresql.conf`:
-```
-ssl = on
-ssl_cert_file = '/etc/ssl/certs/server.crt'
-ssl_key_file = '/etc/ssl/private/server.key'
-```
+**Current local state (as of Aug 2026):**
+- SSL is **off** in `postgresql.conf` (only safe because Postgres binds to `127.0.0.1`)
+- Auth uses scram-sha-256 (no `trust`, no `md5`)
+- Port 5432 binds `127.0.0.1:5432` only (PgBouncer same)
+- pgAdmin on `127.0.0.1:5050`
 
-2. **Restrict network access** - Don't bind to `0.0.0.0` in production, use Tailscale/VPN
+**Before Umbrel migration, do this:**
 
-3. **Rotate passwords periodically** - Use `ALTER USER hermy PASSWORD 'newpass';`
+1. **Enable SSL properly** — generate self-signed certs (or use Tailscale certs):
+   ```bash
+   # In infra/postgres/
+   mkdir -p certs
+   openssl req -new -x509 -days 365 -nodes -text \
+     -out certs/server.crt -keyout certs/server.key \
+     -subj "/CN=hermy-postgres"
+   chmod 600 certs/server.key
+   ```
+   Mount them in `docker-compose.yml`:
+   ```yaml
+   volumes:
+     - ./certs/server.crt:/etc/ssl/certs/server.crt:ro
+     - ./certs/server.key:/etc/ssl/private/server.key:ro
+   ```
+   Re-enable in `postgresql.conf`:
+   ```
+   ssl = on
+   ssl_cert_file = '/etc/ssl/certs/server.crt'
+   ssl_key_file = '/etc/ssl/private/server.key'
+   ```
+   Then update app/bridge `DATABASE_URL` to use `sslmode=require`.
 
-4. **Audit with pgAudit** - Add to extensions if needed
+2. **Restrict network access** — on Umbrel, bind Postgres to Tailscale interface only (not `0.0.0.0`). Update `ports` in `docker-compose.yml` to `<tailscale-ip>:5432:5432`.
+
+3. **Rotate passwords periodically** — `ALTER USER hermy PASSWORD 'newpass';` then update `.env` and `userlist.txt`.
+
+4. **Audit with pgAudit** — add to extensions if needed.
+
+---
+
+## TODO (before relying on this stack)
+
+- [ ] **Backups** — pgBackRest is disabled (GHCR auth denied). Options:
+  - Option A: Switch to Docker Hub image (search for `pgbackrest docker hub`)
+  - Option B: Configure GHCR auth (logged-in Docker Hub account can pull from GHCR)
+  - Option C: Stopgap — `pg_dump` cron on host (see Daily Operations above)
+- [ ] **pg_cron** — currently disabled (not in stock `postgres:16-bookworm` image). To re-enable: build a custom image with `pg_cron` extension, or use a `postgres` image variant that includes it.
+- [ ] **SSL on Umbrel** — currently `ssl=off` for local dev. Before exposing Postgres over network, re-enable SSL (see Security Hardening above).
+- [ ] **pgAdmin email** — use a valid email format (pgAdmin 8+ rejects `.local` TLDs). Currently set to `admin@hermy.dev` in `.env`.
+- [ ] **Boot persistence** — Docker Desktop on Mac restarts containers automatically after reboot. On Umbrel, ensure `restart: unless-stopped` is sufficient (it is).
+- [ ] **Umbrel migration** — when ready: clone repo, run `./setup.sh`, update `hermes-bridge/.env` to point at `<umbrel-tailscale-ip>:5432`.
 
 ---
 
