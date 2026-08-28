@@ -693,20 +693,28 @@ function modelProvider(model: string): string {
 function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; total: number | null }) {
   const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   if (!top.length || !total) return null;
+
+  // Use √ scale relative to max model (like Hermes page) so top model fills the bar
+  const max = Math.max(...top.map(m => m.tokens), 1);
+
   return (
     <div className="mt-4 space-y-1.5">
       {top.map(m => {
-        const pct = Math.round((m.tokens / total) * 100);
         const cacheRead = (m as { cacheReadTokens?: number }).cacheReadTokens ?? 0;
+        const modelTotal = (m.inputTokens ?? 0) + (m.outputTokens ?? 0) + cacheRead;
+        const knownSum = modelTotal;
+        const split = knownSum > 0;
+        const hasCache = cacheRead > 0;
+        // Square-root scale so the largest model hits ~100% width
+        const widthPct = Math.max(2, Math.round(Math.sqrt(m.tokens / max) * 100));
+        const sharePct = Math.round((m.tokens / total) * 100);
+
         const parts = [
           { label: "in", v: m.inputTokens ?? 0, color: "#a78bfa" },
           { label: "cached", v: cacheRead, color: "#f472b6" },
           { label: "out", v: m.outputTokens ?? 0, color: "#38bdf8" },
         ];
-        const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
-        const split = knownSum > 0;
-        const pctOf = (v: number) => split ? (v / total) * 100 : 0;
-        const hasCache = cacheRead > 0;
+
         return (
           <div key={m.model} className="flex items-center gap-2 justify-between"
             title={split ? `${parts.map(p2 => `${p2.label}: ${fmt(p2.v)}`).join(" · ")}` : undefined}>
@@ -716,13 +724,13 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
             </span>
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               {split ? (
-                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: "100%" }}>
+                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%` }}>
                   {parts.filter(p2 => p2.v > 0).map(p2 => (
-                    <div key={p2.label} className="h-full" style={{ width: `${pctOf(p2.v)}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
+                    <div key={p2.label} className="h-full" style={{ width: `${(p2.v / modelTotal) * 100}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
                   ))}
                 </div>
               ) : (
-                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: "100%", background: "#a78bfa", opacity: 0.9 }} />
+                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%`, background: "#a78bfa", opacity: 0.9 }} />
               )}
             </div>
             <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
@@ -732,7 +740,7 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
                   {hasCache && <><span style={{ color: "#f472b6" }}>·c</span> {fmt(cacheRead)}{" "}</>}
                   <span style={{ color: "#38bdf8" }}>out</span> {fmt(m.outputTokens ?? 0)}
                 </>
-              ) : `${pct}%`}
+              ) : `${sharePct}%`}
             </span>
           </div>
         );
@@ -746,22 +754,30 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
 //   in = deep cyan · cached = soft aqua · out = pale ice
 const OMNI_TOK_COLORS = { input: "#22d3ee", cache: "#5eead4", output: "#a5f3fc" };
 function OmniShareBars({ omni }: { omni: OmniSpendData }) {
-  const total = omni.totalTokens;
   const top = [...omni.byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
+  const total = omni.totalTokens;
   if (!top.length || !total) return null;
+
+  // Use √ scale relative to max model (like Hermes page) so top model fills the bar
+  const max = Math.max(...top.map(m => m.tokens), 1);
+
   return (
     <div className="mt-4 space-y-1.5">
       {top.map(m => {
-        const pct = Math.round((m.tokens / total) * 100);
+        const modelTotal = m.inputTokens + m.outputTokens + (m.cacheReadTokens ?? 0);
+        const knownSum = modelTotal;
+        const split = knownSum > 0;
+        const hasCache = (m.cacheReadTokens ?? 0) > 0;
+        // Square-root scale so the largest model hits ~100% width
+        const widthPct = Math.max(2, Math.round(Math.sqrt(m.tokens / max) * 100));
+        const sharePct = Math.round((m.tokens / total) * 100);
+
         const parts = [
           { label: "in", v: m.inputTokens ?? 0, color: OMNI_TOK_COLORS.input },
           { label: "cached", v: m.cacheReadTokens ?? 0, color: OMNI_TOK_COLORS.cache },
           { label: "out", v: m.outputTokens ?? 0, color: OMNI_TOK_COLORS.output },
         ];
-        const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
-        const split = knownSum > 0;
-        const pctOf = (v: number) => split ? (v / total) * 100 : 0;
-        const hasCache = (m.cacheReadTokens ?? 0) > 0;
+
         return (
           <div key={`${m.provider}/${m.model}`} className="flex items-center gap-2 justify-between"
             title={split ? `${parts.map(p2 => `${p2.label}: ${fmt(p2.v)}`).join(" · ")} · ${m.calls} calls` : undefined}>
@@ -771,13 +787,13 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
             </span>
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               {split ? (
-                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: "100%" }}>
+                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%` }}>
                   {parts.filter(p2 => p2.v > 0).map(p2 => (
-                    <div key={p2.label} className="h-full" style={{ width: `${pctOf(p2.v)}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
+                    <div key={p2.label} className="h-full" style={{ width: `${(p2.v / modelTotal) * 100}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
                   ))}
                 </div>
               ) : (
-                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: "100%", background: OMNI_TOK_COLORS.input, opacity: 0.9 }} />
+                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%`, background: OMNI_TOK_COLORS.input, opacity: 0.9 }} />
               )}
             </div>
             <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
@@ -787,7 +803,7 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
                   {hasCache && <><span style={{ color: OMNI_TOK_COLORS.cache }}>·c</span> {fmt(m.cacheReadTokens ?? 0)}{" "}</>}
                   <span style={{ color: OMNI_TOK_COLORS.output }}>out</span> {fmt(m.outputTokens ?? 0)}
                 </>
-              ) : `${pct}%`}
+              ) : `${sharePct}%`}
             </span>
           </div>
         );
