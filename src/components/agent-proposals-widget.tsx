@@ -80,6 +80,23 @@ export function AgentProposalsWidget() {
     load();
   };
 
+  const reply = async (taskId: string, agent: string, message: string) => {
+    try {
+      await fetch("/api/agent-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: agent, message }),
+      });
+      await fetch("/api/agent-proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "createTask", proposalId: taskId }),
+      });
+    } finally {
+      load();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -109,7 +126,7 @@ export function AgentProposalsWidget() {
         <>
           <div className="flex flex-col gap-2.5">
             {visible.map((p) => (
-              <ProposalCard key={p.taskId} proposal={p} onReject={reject} onCreateTask={createTask} />
+              <ProposalCard key={p.taskId} proposal={p} onReject={reject} onCreateTask={createTask} onReply={reply} />
             ))}
           </div>
           {proposals.length > visible.length && (

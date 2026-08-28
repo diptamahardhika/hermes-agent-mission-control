@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import OfficeView from "@/components/OfficeView";
 import { ProposalCard } from "./proposal-card";
 
@@ -230,7 +231,7 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
 
   const agentColor = roleColors[agent.id]?.split(" ")[0]?.replace("from-","text-")?.replace("/20","") || "text-[var(--text-3)]";
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
       onClick={onClose} onKeyDown={handleKeyDown} aria-modal="true" role="dialog"
       aria-label={`Chat with ${agent.name}`}>
@@ -293,7 +294,8 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
           >Send</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
