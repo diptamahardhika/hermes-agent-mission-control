@@ -697,8 +697,6 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
     <div className="mt-4 space-y-1.5">
       {top.map(m => {
         const pct = Math.round((m.tokens / total) * 100);
-        // tokens includes cache reads; show all three components so the bar
-        // segments always sum to what's being ranked.
         const cacheRead = (m as { cacheReadTokens?: number }).cacheReadTokens ?? 0;
         const parts = [
           { label: "in", v: m.inputTokens ?? 0, color: "#a78bfa" },
@@ -707,7 +705,7 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
         ];
         const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
         const split = knownSum > 0;
-        const pctOf = (v: number) => split ? (v / m.tokens) * 100 : 0;
+        const pctOf = (v: number) => split ? (v / total) * 100 : 0;
         const hasCache = cacheRead > 0;
         return (
           <div key={m.model} className="flex items-center gap-2 justify-between"
@@ -718,13 +716,13 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
             </span>
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               {split ? (
-                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%` }}>
+                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: "100%" }}>
                   {parts.filter(p2 => p2.v > 0).map(p2 => (
                     <div key={p2.label} className="h-full" style={{ width: `${pctOf(p2.v)}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
                   ))}
                 </div>
               ) : (
-                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: "#a78bfa", opacity: 0.9 }} />
+                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: "100%", background: "#a78bfa", opacity: 0.9 }} />
               )}
             </div>
             <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
@@ -762,7 +760,7 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
         ];
         const knownSum = parts.reduce((s, p2) => s + p2.v, 0);
         const split = knownSum > 0;
-        const pctOf = (v: number) => split ? (v / m.tokens) * 100 : 0;
+        const pctOf = (v: number) => split ? (v / total) * 100 : 0;
         const hasCache = (m.cacheReadTokens ?? 0) > 0;
         return (
           <div key={`${m.provider}/${m.model}`} className="flex items-center gap-2 justify-between"
@@ -773,13 +771,13 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
             </span>
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               {split ? (
-                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%` }}>
+                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: "100%" }}>
                   {parts.filter(p2 => p2.v > 0).map(p2 => (
                     <div key={p2.label} className="h-full" style={{ width: `${pctOf(p2.v)}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
                   ))}
                 </div>
               ) : (
-                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${pct}%`, background: OMNI_TOK_COLORS.input, opacity: 0.9 }} />
+                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: "100%", background: OMNI_TOK_COLORS.input, opacity: 0.9 }} />
               )}
             </div>
             <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
