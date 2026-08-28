@@ -540,20 +540,22 @@ export default function AgentsPage() {
           <div className="flex flex-wrap gap-2 pt-2">
             {agents.filter(a => a.id !== "max").map(a => (
               <button key={a.id} onClick={() => setChatAgent(a)}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] text-[var(--text-2)] transition-colors panel-interactive"
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] text-[var(--text-2)] transition-colors panel-interactive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                 style={{ background: "var(--surface-1)", border: "1px solid var(--line)" }}
                 onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setChatAgent(a); } }}
                 tabIndex={0}
+                aria-label={`Chat with ${a.name}`}
               >
                 <span>{a.emoji}</span> Chat with {a.name}
               </button>
             ))}
             {agents.find(a => a.id === "max") && (
               <button onClick={() => setChatAgent(agents.find(a => a.id === "max")!)}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] transition-colors"
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                 style={{ color: "var(--accent)", background: "color-mix(in srgb, var(--accent) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}
                 onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setChatAgent(agents.find(a => a.id === "max")!); } }}
                 tabIndex={0}
+                aria-label="Chat with Max"
               >
                 🐺 Chat with Max
               </button>
