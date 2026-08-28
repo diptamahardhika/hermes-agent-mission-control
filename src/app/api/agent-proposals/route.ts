@@ -274,8 +274,8 @@ export async function POST(request: Request) {
       });
     }
 
-    if (action === "approve" || action === "reject") {
-      const status = action === "approve" ? "approved" : "rejected";
+    if (action === "approve" || action === "reject" || action === "complete") {
+      const status = action === "approve" ? "approved" : action === "reject" ? "rejected" : "completed";
       const updated = await prisma.agentProposal.update({
         where: { taskId: proposalId },
         data: { status, reviewedAt: new Date() },

@@ -80,6 +80,24 @@ export function AgentProposalsWidget() {
     load();
   };
 
+  const complete = async (taskId: string) => {
+    await fetch("/api/agent-proposals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "complete", proposalId: taskId }),
+    });
+    load();
+  };
+
+  const approve = async (taskId: string) => {
+    await fetch("/api/agent-proposals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "approve", proposalId: taskId }),
+    });
+    load();
+  };
+
   const reply = async (taskId: string, agent: string, message: string) => {
     try {
       await fetch("/api/agent-chat", {
@@ -126,7 +144,7 @@ export function AgentProposalsWidget() {
         <>
           <div className="flex flex-col gap-2.5">
             {visible.map((p) => (
-              <ProposalCard key={p.taskId} proposal={p} onReject={reject} onCreateTask={createTask} onReply={reply} />
+              <ProposalCard key={p.taskId} proposal={p} onReject={reject} onApprove={approve} onCreateTask={createTask} onComplete={complete} onReply={reply} />
             ))}
           </div>
           {proposals.length > visible.length && (

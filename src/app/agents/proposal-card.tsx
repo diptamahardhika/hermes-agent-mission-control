@@ -43,13 +43,17 @@ function followUpBadge(p: Proposal): { label: string; color: string } | null {
 function ProposalCard({
   proposal,
   onReject,
+  onApprove,
   onCreateTask,
+  onComplete,
   onReply,
   onUnblock,
 }: {
   proposal: Proposal;
   onReject: (id: string) => void;
+  onApprove?: (id: string) => void;
   onCreateTask: (id: string) => void;
+  onComplete: (id: string) => void;
   onReply?: (id: string, agent: string, message: string) => Promise<void>;
   onUnblock?: (taskId: string, message: string) => Promise<void>;
 }) {
@@ -114,6 +118,8 @@ function ProposalCard({
     ? "var(--down)"
     : proposal.status === "turned-into-task"
     ? "var(--accent)"
+    : proposal.status === "completed"
+    ? "var(--purple-500)"
     : "var(--text-4)";
 
   const liveBadge = followUpBadge(proposal);
@@ -135,14 +141,15 @@ function ProposalCard({
       <div className="flex-1 min-w-0 space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[13px] font-medium text-[var(--text)] truncate">{proposal.title}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full num border" style={{ color: stampColor, borderColor: `${stampColor}40`, background: `${stampColor}0c` }}>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full num border flex items-center gap-1" style={{ color: stampColor, borderColor: `color-mix(in srgb, ${stampColor} 40%, transparent)`, background: `color-mix(in srgb, ${stampColor} 10%, transparent)` }}>
             {proposal.status === "pending" ? "Pending your call"
               : proposal.status === "approved" ? "Approved"
               : proposal.status === "rejected" ? "Dismissed"
+              : proposal.status === "completed" ? (<>✓ Completed</>)
               : "Task created"}
           </span>
           {liveBadge && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full num border animate-pulse" style={{ color: liveBadge.color, borderColor: `${liveBadge.color}40`, background: `${liveBadge.color}0c` }}>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full num border animate-pulse" style={{ color: liveBadge.color, borderColor: `color-mix(in srgb, ${liveBadge.color} 40%, transparent)`, background: `color-mix(in srgb, ${liveBadge.color} 10%, transparent)` }}>
               {liveBadge.label}
             </span>
           )}
@@ -220,6 +227,9 @@ function ProposalCard({
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => onCreateTask(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ background: "color-mix(in srgb, var(--up) 12%, transparent)", color: "var(--up)", border: "1px solid color-mix(in srgb, var(--up) 30%, transparent)" }}>
                 ✓ Implement — create task for {proposal.agent}
+              </button>
+              <button onClick={() => onComplete(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }}>
+                ✓ Mark as completed
               </button>
               <button onClick={() => setShowReply(s => !s)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }}>
                 💬 Reply with guidance

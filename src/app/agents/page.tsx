@@ -352,11 +352,29 @@ export default function AgentsPage() {
     loadProposals();
   }
 
+  async function handleApprove(taskId: string) {
+    await fetch("/api/agent-proposals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "approve", proposalId: taskId }),
+    });
+    loadProposals();
+  }
+
   async function handleCreateTask(taskId: string) {
     await fetch("/api/agent-proposals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "createTask", proposalId: taskId }),
+    });
+    loadProposals();
+  }
+
+  async function handleComplete(taskId: string) {
+    await fetch("/api/agent-proposals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "complete", proposalId: taskId }),
     });
     loadProposals();
   }
@@ -502,7 +520,9 @@ export default function AgentsPage() {
                     key={p.taskId}
                     proposal={p}
                     onReject={handleReject}
+                    onApprove={handleApprove}
                     onCreateTask={handleCreateTask}
+                    onComplete={handleComplete}
                     onReply={handleReply}
                     onUnblock={handleUnblock}
                   />

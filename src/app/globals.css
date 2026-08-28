@@ -197,6 +197,7 @@ textarea, input {
   --up:     #5fd0a0;
   --down:   #f28b82;
   --warn:   #f5c451;
+  --purple-500: #a855f7;
 
   /* radius — calm & precise, never toy-soft */
   --r-sm: 8px;
