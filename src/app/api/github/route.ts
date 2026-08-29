@@ -59,8 +59,14 @@ interface ActivitySummary {
   recentEvents: Array<{
     type: string;
     repo: string;
+    repoUrl: string;
     created_at: string;
     description?: string;
+    labelUrl?: string;
+    headSha?: string;
+    prNum?: number;
+    prUrl?: string;
+    commitUrl?: string;
   }>;
 }
 
@@ -70,7 +76,7 @@ export async function GET() {
   }
 
   try {
-    const [profileRes, pinnedRes, reposRes, eventsRes] = await Promise.allSettled([
+    const [profileRes, pinnedRes, reposRes, eventsRes, commitsRes] = await Promise.allSettled([
       fetch(`https://api.github.com/users/${GITHUB_USERNAME}`, { headers: headers(), next: { revalidate: 3600 } }),
       GITHUB_TOKEN
         ? fetch(`https://api.github.com/users/${GITHUB_USERNAME}/pinned/repos?per_page=6`, { headers: headers(), next: { revalidate: 3600 } })
@@ -81,9 +87,11 @@ export async function GET() {
       GITHUB_TOKEN
         ? fetch(`https://api.github.com/user/repos?type=owner&sort=pushed&per_page=100`, { headers: headers(), cache: "no-store" })
         : fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=10&type=all`, { headers: headers(), next: { revalidate: 3600 } }),
-      GITHUB_TOKEN
-        ? fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events?per_page=50`, { headers: headers(), cache: "no-store" })
-        : Promise.resolve(null),
+      fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events?per_page=50`, { headers: headers(), cache: "no-store" }),
+      fetch(
+        `https://api.github.com/repos/${GITHUB_USERNAME}/hermes-agent-mission-control/commits?per_page=12`,
+        { headers: headers(), next: { revalidate: 60 } }
+      ),
     ]);
 
     // ── Profile ──────────────────────────────────────────────────────
@@ -150,15 +158,31 @@ export async function GET() {
         }));
     }
 
-    // ── Activity summary (from public events) ───────────────────────
+    // ── Activity summary ────────────────────────────────────────────────
     let activity: ActivitySummary | null = null;
     let lastWorkedRepo = "";
-    if (eventsRes.status === "fulfilled" && eventsRes.value && eventsRes.value.ok) {
-      const events: any[] = await eventsRes.value.json();
 
-      // Latest "working on" = freshest push or merged PR within 14 days,
-      // derived live instead of a static env string. Events arrive
-      // newest-first, so the first match is the most recent.
+    // Fetch repo commits directly for accurate recent-activity display
+    // (user events feed is unreliable — it misses some pushes).
+    // Also keep fetching user events for aggregate stats.
+    const [eventsData, commitsData] = await Promise.allSettled([
+      eventsRes.status === "fulfilled" && eventsRes.value?.ok
+        ? eventsRes.value.json()
+        : Promise.reject("no events"),
+      commitsRes.status === "fulfilled" && commitsRes.value?.ok
+        ? commitsRes.value.json()
+        : Promise.reject("no commits"),
+    ]);
+
+    // Aggregate stats from events (covers all repos, reliable counts)
+    const events: any[] =
+      eventsData.status === "fulfilled" ? eventsData.value : [];
+    const commits: any[] =
+      commitsData.status === "fulfilled" ? commitsData.value : [];
+    void commits;
+
+    if (events.length > 0) {
+      // "Working on" = freshest push or merged PR within 14 days
       const workedCutoff = Date.now() - 14 * 86400000;
       for (const ev of events) {
         const t = new Date(ev.created_at).getTime();
@@ -167,92 +191,193 @@ export async function GET() {
           ev.type === "PushEvent" ||
           (ev.type === "PullRequestEvent" && ev.payload?.action === "merged");
         if (isWork) {
-          lastWorkedRepo = String(ev.repo?.name || "").split("/").pop() || "";
+          lastWorkedRepo =
+            String(ev.repo?.name || "").split("/").pop() || "";
           break;
         }
       }
+
       const now = new Date();
       const weekStart = new Date(now.getTime() - 7 * 86400000);
       const monthStart = new Date(now.getTime() - 30 * 86400000);
-
       let pushesThisWeek = 0;
       let pushesThisMonth = 0;
       const reposThisWeek = new Set<string>();
 
-      const recentEvents: ActivitySummary["recentEvents"] = [];
-
-      // NB: GitHub strips commit details (payload.commits/size) from event
-      // payloads, so a PushEvent carries no count — count each push as one.
       for (const ev of events) {
         const createdAt = new Date(ev.created_at);
-        const repoName = ev.repo?.name || "";
-
         if (ev.type === "PushEvent") {
           if (createdAt >= weekStart) {
             pushesThisWeek += 1;
-            reposThisWeek.add(repoName);
+            reposThisWeek.add(ev.repo?.name || "");
           }
           if (createdAt >= monthStart) {
             pushesThisMonth += 1;
           }
         }
-
-        // Collect recent notable events
-        if (recentEvents.length < 8) {
-          const branch =
-            typeof ev.payload?.ref === "string"
-              ? ev.payload.ref.replace(/^refs\/heads\//, "")
-              : "";
-          const nCommits = Array.isArray(ev.payload?.commits)
-            ? ev.payload.commits.length
-            : Number(ev.payload?.size) || 0;
-          const prNum = ev.payload?.pull_request?.number;
-          const prTitle: string = ev.payload?.pull_request?.title || "";
-          const issueNum = ev.payload?.issue?.number;
-          const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
-          let eventLabel: string | undefined;
-          switch (ev.type) {
-            case "PushEvent":
-              eventLabel = `Pushed${branch ? ` ${branch}` : ""}${nCommits ? ` · ${nCommits} commit${nCommits !== 1 ? "s" : ""}` : ""}`;
-              break;
-            case "CreateEvent":
-              eventLabel = `Created ${ev.payload?.ref_type || "resource"}${branch && ev.payload?.ref_type !== "repository" ? ` ${branch}` : ""}`;
-              break;
-            case "PullRequestEvent":
-              eventLabel = `${cap(ev.payload?.action || "updated")} PR${prNum ? ` #${prNum}` : ""}${prTitle ? ` · ${prTitle}` : ""}`;
-              break;
-            case "IssuesEvent":
-              eventLabel = `${cap(ev.payload?.action || "updated")} issue${issueNum ? ` #${issueNum}` : ""}`;
-              break;
-            case "ReleaseEvent":
-              eventLabel = `Released ${ev.payload?.release?.tag_name || ""}`;
-              break;
-            case "WatchEvent":
-              eventLabel = "Starred";
-              break;
-            case "ForkEvent":
-              eventLabel = "Forked";
-              break;
-          }
-
-          if (eventLabel) {
-            recentEvents.push({
-              type: ev.type,
-              repo: repoName,
-              created_at: ev.created_at,
-              description: eventLabel,
-            });
-          }
-        }
       }
 
-      activity = {
-        pushesThisWeek,
-        pushesThisMonth,
-        reposThisWeek: reposThisWeek.size,
-        recentEvents,
-      };
+      const recentEvents: ActivitySummary["recentEvents"] = [];
+
+      if (commits.length > 0) {
+        // Build display rows from commits (always accurate, never stale)
+        const repoName = `${GITHUB_USERNAME}/hermes-agent-mission-control`;
+        const repoUrl = `https://github.com/${repoName}`;
+
+        for (const commit of commits.slice(0, 12)) {
+          const sha: string = commit.sha || "";
+          const msg: string =
+            (commit.commit?.message || "").split("\n")[0] || "";
+          const date: string = commit.commit?.author?.date || "";
+
+          recentEvents.push({
+            type: "PushEvent",
+            repo: repoName,
+            repoUrl,
+            created_at: date,
+            description: `${sha.slice(0, 7)} · ${msg}`,
+            labelUrl: `${repoUrl}/commit/${sha}`,
+            headSha: sha,
+          });
+        }
+
+        activity = {
+          pushesThisWeek,
+          pushesThisMonth,
+          reposThisWeek: reposThisWeek.size,
+          recentEvents,
+        };
+      } else {
+        // Fallback to events feed if commits API fails
+        for (const ev of events) {
+          const repoName = ev.repo?.name || "";
+          const repoUrl = repoName ? `https://github.com/${repoName}` : "";
+
+          if (recentEvents.length < 12) {
+            const branch =
+              typeof ev.payload?.ref === "string"
+                ? ev.payload.ref.replace(/^refs\/heads\//, "")
+                : "";
+            const headSha: string | undefined =
+              ev.type === "PushEvent" &&
+              typeof ev.payload?.head === "string"
+                ? ev.payload.head
+                : undefined;
+            const prNum = ev.payload?.pull_request?.number;
+            const prTitle: string =
+              ev.payload?.pull_request?.title || "";
+            const prHtmlUrl: string | undefined =
+              typeof ev.payload?.pull_request?.html_url === "string"
+                ? ev.payload.pull_request.html_url
+                : undefined;
+            const prHeadSha: string | undefined =
+              typeof ev.payload?.pull_request?.head?.sha === "string"
+                ? ev.payload.pull_request.head.sha
+                : undefined;
+            const issueNum = ev.payload?.issue?.number;
+            const issueHtmlUrl: string | undefined =
+              typeof ev.payload?.issue?.html_url === "string"
+                ? ev.payload.issue.html_url
+                : undefined;
+            const releaseTag: string | undefined =
+              typeof ev.payload?.release?.tag_name === "string"
+                ? ev.payload.release.tag_name
+                : undefined;
+            const releaseHtmlUrl: string | undefined =
+              typeof ev.payload?.release?.html_url === "string"
+                ? ev.payload.release.html_url
+                : undefined;
+            const releaseTarget: string | undefined =
+              typeof ev.payload?.release?.target_commitish === "string"
+                ? ev.payload.release.target_commitish
+                : undefined;
+            const cap = (s: string) =>
+              s.charAt(0).toUpperCase() + s.slice(1);
+            const short = (s: string) => s.slice(0, 7);
+
+            let eventLabel: string | undefined;
+            let labelUrl: string | undefined;
+            switch (ev.type) {
+              case "PushEvent":
+                eventLabel = `Pushed${branch ? ` ${branch}` : ""}${headSha ? ` · ${short(headSha)}` : ""}`;
+                labelUrl =
+                  headSha && repoName
+                    ? `${repoUrl}/commit/${headSha}`
+                    : undefined;
+                break;
+              case "CreateEvent":
+                if (
+                  ev.payload?.ref_type === "branch" &&
+                  branch &&
+                  repoName
+                ) {
+                  eventLabel = `Created branch ${branch}`;
+                  labelUrl = `${repoUrl}/tree/${branch}`;
+                } else if (
+                  ev.payload?.ref_type === "tag" &&
+                  branch &&
+                  repoName
+                ) {
+                  eventLabel = `Created tag ${branch}`;
+                  labelUrl = `${repoUrl}/releases/tag/${branch}`;
+                } else if (ev.payload?.ref_type === "repository") {
+                  eventLabel = `Created repository ${repoName.split("/").pop() || ""}`;
+                  labelUrl = repoUrl || undefined;
+                }
+                break;
+              case "PullRequestEvent":
+                eventLabel = `${cap(ev.payload?.action || "updated")} PR${prNum ? ` #${prNum}` : ""}${prHeadSha ? ` · ${short(prHeadSha)}` : ""}${prTitle ? ` · ${prTitle}` : ""}`;
+                labelUrl =
+                  prHtmlUrl ||
+                  (prNum && repoName ? `${repoUrl}/pull/${prNum}` : undefined);
+                break;
+              case "IssuesEvent":
+                eventLabel = `${cap(ev.payload?.action || "updated")} issue${issueNum ? ` #${issueNum}` : ""}`;
+                labelUrl =
+                  issueHtmlUrl ||
+                  (issueNum && repoName
+                    ? `${repoUrl}/issues/${issueNum}`
+                    : undefined);
+                break;
+              case "ReleaseEvent":
+                eventLabel = `Released ${releaseTag || ""}${releaseTarget ? ` · ${short(releaseTarget)}` : ""}`;
+                labelUrl = releaseHtmlUrl;
+                break;
+              case "WatchEvent":
+                eventLabel = "Starred";
+                break;
+              case "ForkEvent":
+                eventLabel = "Forked";
+                break;
+            }
+
+            if (eventLabel) {
+              recentEvents.push({
+                type: ev.type,
+                repo: repoName,
+                repoUrl,
+                created_at: ev.created_at,
+                description: eventLabel,
+                labelUrl,
+                headSha,
+                prNum: prNum || undefined,
+                prUrl: prHtmlUrl,
+                commitUrl:
+                  ev.type === "PushEvent" && headSha && repoName
+                    ? `${repoUrl}/commit/${headSha}`
+                    : undefined,
+              });
+            }
+          }
+        }
+
+        activity = {
+          pushesThisWeek,
+          pushesThisMonth,
+          reposThisWeek: reposThisWeek.size,
+          recentEvents: [...recentEvents].reverse(),
+        };
+      }
     }
 
     return NextResponse.json(
