@@ -107,6 +107,21 @@ interface OmniSpendData {
   days: { date: string; tokens: number }[];
 }
 
+// FreeLLMAPI router usage — fetched from local router /api/analytics.
+interface FreeLLMData {
+  configured: boolean;
+  syncedAt: string | null;
+  totalRequests: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  successRate: number;
+  avgLatencyMs: number;
+  firstRequestAt: string | null;
+  byModel: { model: string; provider: string; requests: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; tokens: number }[];
+  days: { date: string; requests: number; tokens: number }[];
+}
+
 interface HomeData {
   xFollowers: number; xGoal: number; xHandle: string;
   topTweets: Tweet[]; topTweet: Tweet | null; xViewsThisWeek: number;
@@ -135,6 +150,7 @@ interface HomeData {
   };
   spend: SpendData;
   omniSpend?: OmniSpendData | null;
+  freeLLM?: FreeLLMData | null;
 }
 
 const EMPTY: HomeData = {
@@ -160,6 +176,7 @@ const EMPTY: HomeData = {
     sessions: null, toolCalls: null, byModel: [], days: [],
   },
   omniSpend: null,
+  freeLLM: null,
 };
 
 // ── Animated counter ──────────────────────────────────────
@@ -552,6 +569,105 @@ function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
       </div>
       <a href="/api/omniroute/link" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
         Open OmniRoute analytics <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </a>
+    </div>
+  );
+}
+
+// ── FreeLLMAPI per-model share bars (provider from local router) ──
+const FREELLM_TOK_COLORS = { input: "#f59e0b", cache: "#fcd34d", output: "#fbbf24" };
+function FreeLLMShareBars({ byModel, total }: { byModel: FreeLLMData["byModel"]; total: number }) {
+  const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
+  if (!top.length || !total) return null;
+
+  const max = Math.max(...top.map(m => m.tokens), 1);
+
+  return (
+    <div className="mt-4 space-y-1.5">
+      {top.map(m => {
+        const modelTotal = m.inputTokens + m.outputTokens + m.cacheReadTokens;
+        const knownSum = modelTotal;
+        const split = knownSum > 0;
+        const hasCache = m.cacheReadTokens > 0;
+        const widthPct = Math.max(2, Math.round(Math.sqrt(m.tokens / max) * 100));
+        const sharePct = Math.round((m.tokens / total) * 100);
+
+        const parts = [
+          { label: "in", v: m.inputTokens, color: FREELLM_TOK_COLORS.input },
+          { label: "cached", v: m.cacheReadTokens, color: FREELLM_TOK_COLORS.cache },
+          { label: "out", v: m.outputTokens, color: FREELLM_TOK_COLORS.output },
+        ];
+
+        return (
+          <div key={m.model} className="flex items-center gap-2 justify-between"
+            title={split ? `${parts.map(p2 => `${p2.label}: ${fmt(p2.v)}`).join(" · ")}` : undefined}>
+            <span className="text-[10px] text-[var(--hq-text-dim)] truncate w-28 sm:w-48 shrink-0">
+              {m.model}
+              {m.provider && <span className="text-[9.5px] text-[var(--hq-text-ghost)]"> | {m.provider}</span>}
+            </span>
+            <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+              {split ? (
+                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%` }}>
+                  {parts.filter(p2 => p2.v > 0).map(p2 => (
+                    <div key={p2.label} className="h-full" style={{ width: `${(p2.v / modelTotal) * 100}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%`, background: FREELLM_TOK_COLORS.input, opacity: 0.9 }} />
+              )}
+            </div>
+            <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
+              {split ? (
+                <>
+                  <span style={{ color: FREELLM_TOK_COLORS.input }}>in</span> {fmt(m.inputTokens)}{" "}
+                  {hasCache && <><span style={{ color: FREELLM_TOK_COLORS.cache }}>·c</span> {fmt(m.cacheReadTokens)}{" "}</>}
+                  <span style={{ color: FREELLM_TOK_COLORS.output }}>out</span> {fmt(m.outputTokens)}
+                </>
+              ) : `${sharePct}%`}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── FreeLLM spend panel (lightweight mirror of OmniRoutePanel) ──
+function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
+  const series = data.days.map(d => d.tokens);
+  return (
+    <div className="panel flex flex-col p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Cpu className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} />
+        <span className="eyebrow">FreeLLM Compute · 7d</span>
+        {data.syncedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">synced {timeAgo(data.syncedAt)}</span>}
+      </div>
+      <div className="space-y-4">
+        <div>
+          <div className="eyebrow mb-2 !text-[9.5px]">Total tokens · 7d</div>
+          <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
+            {fmt(data.totalTokens)}
+          </div>
+          {series.some(v => v > 0) && <Sparkline data={series} color="#f59e0b" area idSeed="freellm-spend" className="h-9 mt-3" />}
+        </div>
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div>
+            <div className="eyebrow mb-1.5 !text-[9.5px]">Requests</div>
+            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{fmtExact(data.totalRequests)}</div>
+          </div>
+          <div>
+            <div className="eyebrow mb-1.5 !text-[9.5px]">Success rate</div>
+            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{data.successRate.toFixed(1)}%</div>
+          </div>
+        </div>
+        {data.avgLatencyMs > 0 && (
+          <div className="text-[12px] text-[var(--hq-text-dim)]">
+            Avg latency <span className="num text-[var(--hq-text)] font-medium">{data.avgLatencyMs}ms</span>
+          </div>
+        )}
+      </div>
+      <a href="http://localhost:3001" target="_blank" rel="noopener noreferrer" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
+        Open FreeLLM dashboard <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
       </a>
     </div>
   );
@@ -1592,7 +1708,13 @@ export default function Dashboard() {
     setRefreshing(true);
     fetch("/api/home")
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) { setData(d); setTimeout(() => setLoaded(true), 100); } })
+      .then(d => {
+        if (d) {
+          const { freeLLM, ...home } = d;
+          setData(prev => ({ ...prev, ...home }));
+          setTimeout(() => setLoaded(true), 100);
+        }
+      })
       .catch(() => {})
       .finally(() => setTimeout(() => setRefreshing(false), 500));
   };
@@ -1600,6 +1722,19 @@ export default function Dashboard() {
     loadHome();
     const iv = setInterval(loadHome, 30_000);
     return () => clearInterval(iv);
+  }, []);
+
+  // FreeLLMAPI metrics — independent fetch, no polling needed (refreshes with loadHome)
+  useEffect(() => {
+    fetch("/api/freellm")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) {
+          setData(prev => ({ ...prev, freeLLM: d }));
+          setTimeout(() => setLoaded(true), 50);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   if (!mounted) return null;
@@ -1772,6 +1907,29 @@ export default function Dashboard() {
                 />
               </MetricCard>
               <OmniRoutePanel omni={data.omniSpend} />
+            </div>
+          ) : null}
+          {/* FreeLLMAPI token panel — only shown when configured */}
+          {data.freeLLM?.configured ? (
+            <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-5 hq-rise" style={rise(4)}>
+              <MetricCard
+                label="FreeLLM Tokens · 7d"
+                value={data.freeLLM.totalTokens}
+                format={fmt}
+                delta={null} deltaPct={null} deltaLabel={undefined}
+                trend={undefined}
+                goal={undefined} goalFormat={undefined}
+                icon={<Cpu className="w-4 h-4" />} accent="#f59e0b" href="/freellm" loaded={true}
+              >
+                <FreeLLMShareBars byModel={data.freeLLM.byModel} total={data.freeLLM.totalTokens} />
+                <TokenIOSplit
+                  input={data.freeLLM.inputTokens}
+                  output={data.freeLLM.outputTokens}
+                  cache={data.freeLLM.byModel.reduce((s, m) => s + (m.cacheReadTokens ?? 0), 0)}
+                  colors={{ input: "#f59e0b", cache: "#fcd34d", output: "#fbbf24" }}
+                />
+              </MetricCard>
+              <FreeLLMSpendPanel data={data.freeLLM} />
             </div>
           ) : null}
         </div>
