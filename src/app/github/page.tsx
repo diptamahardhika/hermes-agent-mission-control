@@ -351,6 +351,16 @@ export default function GitHubPage() {
                   <span className="text-[12px] text-[var(--hq-text-dim)] flex-1 truncate">
                     {ev.description}
                   </span>
+                  {ev.nCommits && (
+                    <span className="text-[10px] text-[var(--hq-text-ghost)] ml-1">
+                      · {ev.nCommits} commit{s}{ev.nCommits !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {ev.prNum && (
+                    <span className="text-[10px] text-[var(--hq-text-ghost)] ml-1">
+                      PR#{ev.prNum}
+                    </span>
+                  )}
                   <span className="text-[11px] text-[var(--hq-text-ghost)] num shrink-0 w-16 text-right">
                     {timeAgo(ev.created_at)}
                   </span>
