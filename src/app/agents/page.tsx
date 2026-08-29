@@ -152,7 +152,7 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
       {/* Chat button — visible on Cards view */}
       {onChat && (
         <div className="px-5 py-3" style={{ borderTop: "1px solid var(--line)" }}>
-          <button onClick={onChat} className="flex items-center gap-2 w-full rounded-full py-2 text-[12px] text-[var(--text-2)] transition-colors panel-interactive hover:text-[var(--text)]"
+          <button onClick={onChat} className="flex items-center gap-2 w-full rounded-full py-2 text-[12px] text-[var(--text-2)] transition-colors panel-interactive hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             style={{ background: "var(--surface-1)", border: "1px solid var(--line)" }}>
             <span>{agent.emoji}</span> Chat with {agent.name}
           </button>

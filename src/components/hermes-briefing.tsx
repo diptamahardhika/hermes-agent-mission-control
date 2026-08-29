@@ -96,7 +96,7 @@ export function HermesBriefing() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {pending > 0 && (
-            <a href="/hermes" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium num"
+            <a href="/hermes" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium num transition-colors hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--warn)]"
               style={{ color: "var(--warn)", background: "color-mix(in srgb, var(--warn) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--warn) 24%, transparent)" }}>
               {pending} need{pending === 1 ? "s" : ""} you <ArrowUpRight className="w-3 h-3" />
             </a>

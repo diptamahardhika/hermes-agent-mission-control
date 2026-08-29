@@ -349,7 +349,7 @@ function ActivityTicker({ agents }: { agents: Agent[] }) {
     <div className="flex items-center gap-2 bg-neutral-900/60 border border-neutral-800/40 rounded-xl px-4 py-2 max-w-xl mx-auto">
       <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
       <span className="text-[10px] text-neutral-500 font-mono shrink-0">{ev.name}</span>
-      <span className="text-[10px] text-neutral-400 truncate">{ev.action.slice(0, 80)}</span>
+      <span className="text-[10px] text-neutral-400">{ev.action.slice(0, 80)}{ev.action.length > 80 ? "…" : ""}</span>
     </div>
   );
 }
