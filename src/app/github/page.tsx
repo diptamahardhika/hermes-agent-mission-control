@@ -41,8 +41,14 @@ interface ActivitySummary {
   recentEvents: Array<{
     type: string;
     repo: string;
+    repoUrl: string;
     created_at: string;
     description?: string;
+    labelUrl?: string;
+    headSha?: string;
+    prNum?: number;
+    prUrl?: string;
+    commitUrl?: string;
   }>;
 }
 
@@ -338,37 +344,76 @@ export default function GitHubPage() {
           </div>
 
           {data.activity.recentEvents.length > 0 && (
-            <div className="space-y-0.5 max-h-[240px] overflow-y-auto">
-              {data.activity.recentEvents.map((ev, i) => (
-                <a
-                  key={`${ev.type}-${ev.created_at}-${i}`}
-                  href={`https://github.com/${ev.repo}/activity`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-3 py-2 px-2 rounded-md hover:bg-white/[0.03] transition-colors group"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--accent)" }} />
-                  <span className="text-[12px] text-[var(--hq-text-dim)] flex-1 truncate">
-                    {ev.description}
-                  </span>
-                  {ev.nCommits && (
-                    <span className="text-[10px] text-[var(--hq-text-ghost)] ml-1">
-                      · {ev.nCommits} commit{s}{ev.nCommits !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                  {ev.prNum && (
-                    <span className="text-[10px] text-[var(--hq-text-ghost)] ml-1">
-                      PR#{ev.prNum}
-                    </span>
-                  )}
-                  <span className="text-[11px] text-[var(--hq-text-ghost)] num shrink-0 w-16 text-right">
+            <div className="space-y-0.5 max-h-[360px] overflow-y-auto">
+              {data.activity.recentEvents.map((ev, i) => {
+                const rowKey = `${ev.type}-${ev.created_at}-${i}`;
+                const sharedRow = "flex items-center gap-3 py-2 px-2 rounded-md hover:bg-white/[0.03] transition-colors group";
+                const dot = <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--accent)" }} />;
+                const time = (
+                  <span className="text-[11px] text-[var(--hq-text-ghost)] num shrink-0 text-right whitespace-nowrap">
                     {timeAgo(ev.created_at)}
                   </span>
-                  <span className="text-[10.5px] text-[var(--hq-text-ghost)] truncate max-w-[120px] group-hover:text-[var(--hq-text-dim)]">
+                );
+                const repoLink = ev.repoUrl ? (
+                  <a
+                    href={ev.repoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10.5px] text-[var(--hq-text-ghost)] shrink-0 whitespace-nowrap hover:text-[var(--hq-text-dim)]"
+                  >
+                    {ev.repo}
+                  </a>
+                ) : (
+                  <span className="text-[10.5px] text-[var(--hq-text-ghost)] shrink-0 whitespace-nowrap">
                     {ev.repo}
                   </span>
-                </a>
-              ))}
+                );
+                const labelContent = (
+                  <>
+                    {ev.description}
+                    {ev.headSha && !ev.labelUrl && (
+                      <span className="text-[var(--hq-text-faint)] num ml-1.5">· {ev.headSha.slice(0, 7)}</span>
+                    )}
+                  </>
+                );
+                const label = ev.labelUrl ? (
+                  <a
+                    href={ev.labelUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[12px] text-[var(--hq-text-dim)] flex-1 truncate hover:text-[var(--accent)] transition-colors"
+                  >
+                    {labelContent}
+                  </a>
+                ) : (
+                  <span className="text-[12px] text-[var(--hq-text-dim)] flex-1 truncate">
+                    {labelContent}
+                  </span>
+                );
+                return ev.labelUrl ? (
+                  <div key={rowKey} className={sharedRow}>
+                    {dot}
+                    {label}
+                    {time}
+                    {repoLink}
+                  </div>
+                ) : (
+                  <a
+                    key={rowKey}
+                    href={`https://github.com/${ev.repo}/activity`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={sharedRow}
+                  >
+                    {dot}
+                    {label}
+                    {time}
+                    <span className="text-[10.5px] text-[var(--hq-text-ghost)] shrink-0 whitespace-nowrap group-hover:text-[var(--hq-text-dim)]">
+                      {ev.repo}
+                    </span>
+                  </a>
+                );
+              })}
             </div>
           )}
         </div>
