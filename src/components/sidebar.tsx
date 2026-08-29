@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Home,
   Twitter,
@@ -22,6 +22,7 @@ import {
   Notebook,
   PanelLeftClose,
   PanelLeftOpen,
+  Search,
 } from "lucide-react";
 
 import { Logo } from "./logo";
@@ -69,10 +70,24 @@ const mobileTabsRaw = [
   { href: "/github", label: "GitHub", icon: Github },
   { href: "/ideas", label: "Ideas", icon: Lightbulb },
   { href: "/agents", label: "Agents", icon: Bot },
+  {
+    href: "#",
+    label: "Search",
+    icon: Search,
+    action: true,
+  },
 ];
 
 export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (open: boolean) => void }) {
   const pathname = usePathname();
+  const [showSearchHint, setShowSearchHint] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const dismissed = localStorage.getItem("hermy_search_hint_dismissed");
+      setShowSearchHint(!dismissed);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -81,26 +96,86 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
     }
   }, [pathname, setIsOpen]);
 
+  const dismissSearchHint = () => {
+    setShowSearchHint(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("hermy_search_hint_dismissed", "1");
+    }
+  };
+
   return (
     <>
-      {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-b border-[var(--line)] px-4 py-3 flex items-center justify-between">
+      {/* Mobile/tablet header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-b border-[var(--line)] px-4 py-3 flex items-center justify-between">
         <Logo isOpen={isOpen} />
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 text-[var(--text-2)] hover:text-[var(--text)] transition-colors rounded-lg hover:bg-[var(--surface-1)]"
-          aria-label="Toggle menu"
-        >
-          {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <div className="relative">
+            {showSearchHint && (
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[11px] text-[var(--text-2)] shadow-lg">
+                Search &middot; ⌘K
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-2 w-2 rotate-45 bg-[var(--surface-2)] border-r border-b border-[var(--line)]" />
+              </div>
+            )}
+            <button
+              onClick={() => {
+                dismissSearchHint();
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("open-command-palette"));
+                }
+              }}
+              className={`p-2 text-[var(--text-2)] hover:text-[var(--text)] transition-colors rounded-lg hover:bg-[var(--surface-1)] ${showSearchHint ? "animate-pulse" : ""}`}
+              aria-label="Search, or ask Hermes…"
+              title="Search"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+          </div>
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-2 text-[var(--text-2)] hover:text-[var(--text)] transition-colors rounded-lg hover:bg-[var(--surface-1)]"
+            aria-label="Toggle menu"
+          >
+            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
       </div>
 
-      {/* Mobile bottom tab bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-t border-[var(--line)] px-2 py-2 safe-area-pb">
+      {/* Mobile/tablet bottom tab bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-t border-[var(--line)] px-2 py-2 safe-area-pb">
         <nav className="flex justify-around">
           {mobileTabsRaw.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+            if (item.action) {
+              return (
+                <div key="search" className="relative">
+                  {showSearchHint && (
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[11px] text-[var(--text-2)] shadow-lg">
+                      Search &middot; ⌘K
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-2 w-2 rotate-45 bg-[var(--surface-2)] border-r border-b border-[var(--line)]" />
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      dismissSearchHint();
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("open-command-palette"));
+                      }
+                    }}
+                    className={`flex flex-col items-center gap-1 p-2 px-3 rounded-lg transition-all active:scale-95 ${
+                      isActive
+                        ? "text-[var(--text)] bg-[var(--surface-2)]"
+                        : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                    } ${showSearchHint ? "animate-pulse" : ""}`}
+                    aria-label="Search, or ask Hermes…"
+                    title="Search"
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-[10px] font-medium">{item.label}</span>
+                  </button>
+                </div>
+              );
+            }
             return (
               <Link
                 key={item.href}
@@ -119,10 +194,10 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
         </nav>
       </div>
 
-      {/* Mobile overlay */}
+      {/* Mobile/tablet overlay */}
       {isOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black/60 z-40"
+          className="lg:hidden fixed inset-0 bg-black/60 z-40"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -149,9 +224,26 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
           >
             {isOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
           </button>
+          {!isOpen && (
+            <button
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("open-command-palette"));
+                }
+              }}
+              className="mt-4 flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-3)] hover:text-[var(--text)] hover:bg-[var(--surface-1)] transition-all duration-200 ease-out relative group"
+              aria-label="Open command palette"
+              title="Search (⌘K)"
+            >
+              <Search className="w-4 h-4" />
+              <span className="absolute left-14 rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1 text-[11px] text-[var(--text-2)] opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                Search
+              </span>
+            </button>
+          )}
         </div>
 
-        <div className="h-16 md:hidden" />
+        <div className="h-16 lg:hidden" />
 
         <nav className={`flex-1 overflow-y-auto transition-all duration-300 ${isOpen ? "px-3" : "px-0"}`}>
           <div className="space-y-5">

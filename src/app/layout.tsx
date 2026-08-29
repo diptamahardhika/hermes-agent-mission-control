@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ConditionalLayout } from "@/components/conditional-layout";
+import { ToastProvider } from "@/components/ui/toast/toast-context";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
@@ -25,8 +26,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" dir="ltr" className="dark">
-      <body className={`${geist.variable} ${geistMono.variable} ${geist.className} bg-[#0a0a0a] text-white min-h-screen`}>
-        <ConditionalLayout>{children}</ConditionalLayout>
+      <body className={`${geist.variable} ${geistMono.variable} ${geist.className} bg-[var(--bg)] text-[var(--foreground)] min-h-screen`}>
+        <ToastProvider>
+          <ConditionalLayout>{children}</ConditionalLayout>
+        </ToastProvider>
       </body>
     </html>
   );

@@ -15,6 +15,7 @@ import {
   EmptyState,
   Eyebrow,
 } from "@/components/ui/kit";
+import { useToast } from "@/components/ui/toast/toast-context";
 
 // ── Types ─────────────────────────────────────────────────
 interface Req {
@@ -69,6 +70,7 @@ function InboxCard({
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(req.title);
   const [draftPrompt, setDraftPrompt] = useState(req.prompt ?? "");
+  const { success, error } = useToast();
 
   const patch = async (body: Record<string, unknown>) => {
     setBusy(true);
@@ -80,9 +82,11 @@ function InboxCard({
       });
       // optimistic: card fades, parent refetches
       onAction();
+      success(`Request ${body.action}ed`, 3000);
     } catch {
       setBusy(false);
       setEditing(false);
+      error("Failed to update request", 3000);
     }
   };
 
@@ -242,7 +246,10 @@ export function ApprovalInbox({ compact = false }: { compact?: boolean }) {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4">
-        <Eyebrow>Approval inbox</Eyebrow>
+        <div>
+          <Eyebrow>Approval inbox</Eyebrow>
+          <p className="text-[10px] text-[var(--text-4)] mt-0.5">Pre-execute approval</p>
+        </div>
         <Pill tone={count > 0 ? "accent" : "neutral"}>
           {count} pending
         </Pill>

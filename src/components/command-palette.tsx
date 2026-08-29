@@ -24,6 +24,7 @@ import {
   Check,
   type LucideIcon,
 } from "lucide-react";
+import { useToast } from "@/components/ui/toast/toast-context";
 
 interface NavItem {
   label: string;
@@ -50,6 +51,7 @@ type Row =
 
 export function CommandPalette() {
   const router = useRouter();
+  const { info, success, error } = useToast();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -67,6 +69,37 @@ export function CommandPalette() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // ── mobile header search button support ────────────────────
+  useEffect(() => {
+    const openFromMobile = () => setOpen(true);
+    window.addEventListener("open-command-palette", openFromMobile);
+    return () => window.removeEventListener("open-command-palette", openFromMobile);
+  }, []);
+
+  // ── gesture support: swipe down from top edge ──────────────
+  useEffect(() => {
+    if (typeof window === "undefined" || !("ontouchstart" in window)) return;
+    let startY = 0;
+    let startX = 0;
+    const onStart = (e: TouchEvent) => {
+      startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX;
+    };
+    const onMove = (e: TouchEvent) => {
+      const dy = e.touches[0].clientY - startY;
+      const dx = e.touches[0].clientX - startX;
+      if (Math.abs(dy) > Math.abs(dx) && dy > 0 && startY < 40) {
+        setOpen(true);
+      }
+    };
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+    };
   }, []);
 
   // ── reset + focus when opening ────────────────────────────
@@ -124,10 +157,17 @@ export function CommandPalette() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "oneshot", title: q, prompt: q, sideEffecting }),
       });
+      // Show toast based on whether it was side-effecting
+      if (sideEffecting) {
+        success(`Request dispatched to Hermes`, 3000);
+      } else {
+        info(`Request sent: "${q.slice(0, 40)}${q.length > 40 ? '…' : ''}"`);
+      }
     } catch {
       /* non-blocking — dispatch is best-effort */
+      error("Failed to dispatch request", 3000);
     }
-  }, []);
+  }, [success, error, info]);
 
   const run = useCallback(
     async (row: Row | undefined) => {
@@ -183,6 +223,9 @@ export function CommandPalette() {
     | Extract<Row, { kind: "dispatch" }>
     | undefined;
 
+  const listId = "command-palette-results";
+  const activeId = rows.length > 0 ? `command-palette-option-${active}` : undefined;
+
   return (
     <div
       className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 pt-[18vh] motion-safe:animate-[hq-rise_0.18s_ease-out]"
@@ -201,7 +244,7 @@ export function CommandPalette() {
       >
         {/* input */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[var(--line)]">
-          <Search className="w-4 h-4 text-[var(--text-3)] shrink-0" />
+          <Search className="w-4 h-4 text-[var(--text-3)] shrink-0" aria-hidden="true" />
           <input
             ref={inputRef}
             value={query}
@@ -212,12 +255,21 @@ export function CommandPalette() {
             placeholder="Search, or ask Hermes…"
             spellCheck={false}
             autoComplete="off"
+            aria-controls={listId}
+            aria-activedescendant={activeId}
+            aria-autocomplete="list"
             className="num flex-1 bg-transparent border-0 outline-none text-[15px] text-[var(--text)] placeholder-[var(--text-3)]"
           />
         </div>
 
         {/* results */}
-        <div ref={listRef} className="max-h-[52vh] overflow-y-auto py-2">
+        <div
+          ref={listRef}
+          id={listId}
+          role="listbox"
+          aria-label="Search results"
+          className="max-h-[52vh] overflow-y-auto py-2"
+        >
           {navRows.length > 0 && (
             <div className="px-2 pb-1">
               <div className="eyebrow px-3 py-1.5">Navigate</div>
@@ -230,7 +282,8 @@ export function CommandPalette() {
                     active={active === idx}
                     onHover={() => setActive(idx)}
                     onSelect={() => run(r)}
-                    icon={<r.item.icon className="w-4 h-4" />}
+                    icon={<r.item.icon className="w-4 h-4" aria-hidden="true" />}
+                    optionId={`command-palette-option-${idx}`}
                   >
                     <span className="text-[var(--text)]">{r.item.label}</span>
                     <span className="num ml-auto text-[11px] text-[var(--text-4)]">
@@ -253,11 +306,12 @@ export function CommandPalette() {
                     active={active === idx}
                     onHover={() => setActive(idx)}
                     onSelect={() => run(dispatchRow)}
+                    optionId={`command-palette-option-${idx}`}
                     icon={
                       dispatched ? (
-                        <Check className="w-4 h-4" style={{ color: "var(--up)" }} />
+                        <Check className="w-4 h-4" style={{ color: "var(--up)" }} aria-hidden="true" />
                       ) : (
-                        <Sparkles className="w-4 h-4" style={{ color: "var(--accent)" }} />
+                        <Sparkles className="w-4 h-4" style={{ color: "var(--accent)" }} aria-hidden="true" />
                       )
                     }
                   >
@@ -287,12 +341,12 @@ export function CommandPalette() {
         {/* hint bar */}
         <div className="flex items-center gap-4 px-4 py-2.5 border-t border-[var(--line)] text-[11px] num text-[var(--text-3)]">
           <span className="inline-flex items-center gap-1.5">
-            <CornerDownLeft className="w-3 h-3" /> to run
+            <CornerDownLeft className="w-3 h-3" aria-hidden="true" /> to run
           </span>
           <span aria-hidden>·</span>
           <span>esc to close</span>
           <span className="ml-auto inline-flex items-center gap-1.5">
-            <kbd className="rounded px-1.5 py-0.5 bg-[var(--surface-1)] border border-[var(--line)]">
+            <kbd className="rounded px-1.5 py-0.5 bg-[var(--surface-1)] border border-[var(--line)]" aria-hidden="true">
               ↑↓
             </kbd>
             to move
@@ -309,6 +363,7 @@ function PaletteRow({
   onHover,
   onSelect,
   icon,
+  optionId,
   children,
 }: {
   idx: number;
@@ -316,17 +371,21 @@ function PaletteRow({
   onHover: () => void;
   onSelect: () => void;
   icon: React.ReactNode;
+  optionId?: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       data-idx={idx}
+      id={optionId}
       onMouseMove={onHover}
       onClick={onSelect}
       className="relative flex w-full items-center gap-3 rounded-[var(--r-sm)] px-3 py-2 text-left text-[13.5px] transition-colors"
       style={active ? { background: "var(--surface-1)" } : undefined}
       data-active={active ? "true" : undefined}
+      role="option"
+      aria-selected={active}
     >
       {active && (
         <span

@@ -119,7 +119,10 @@ export function AgentProposalsWidget() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4">
-        <Eyebrow>Agent proposals</Eyebrow>
+        <div>
+          <Eyebrow>Agent proposals</Eyebrow>
+          <p className="text-[10px] text-[var(--text-4)] mt-0.5">Review agent work</p>
+        </div>
         <span className="flex items-center gap-2">
           {pending.length > 0 && <Pill tone="warn">{pending.length} waiting</Pill>}
           {handled > 0 && (

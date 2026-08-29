@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/kit";
 import { HermesDispatches } from "@/components/hermes-dispatches";
 import { HermesRuns } from "@/components/hermes-runs";
+import { useToast } from "@/components/ui/toast/toast-context";
 
 // ── Types ─────────────────────────────────────────────────
 type ReqStatus =
@@ -194,6 +195,7 @@ function DispatchBar({ onDone }: { onDone: () => void }) {
   const [side, setSide] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const { success, error, info } = useToast();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flash = (msg: string) => {
@@ -759,6 +761,7 @@ export default function HermesPage() {
   const [cronSync, setCronSync] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const { success } = useToast();
 
   const load = useCallback(async () => {
     const [h, reqs, act, tk, cr] = await Promise.all([
@@ -850,6 +853,15 @@ export default function HermesPage() {
               className="btn-ghost inline-flex items-center justify-center w-9 h-9"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                success("Test success notification!", 2000);
+              }}
+              className="btn-ghost inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-medium text-[var(--up)] ml-2"
+            >
+              Test Toast
             </button>
           </div>
         </div>
