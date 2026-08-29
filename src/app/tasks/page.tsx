@@ -400,9 +400,13 @@ function TaskCard({
         {task.name}
       </p>
       {task.details && (
-        <p className="mb-3 text-[12px] leading-relaxed text-[var(--text-3)] whitespace-pre-line line-clamp-3">
+        <div
+          className="mb-3 max-h-[120px] overflow-y-auto overflow-x-hidden text-[12px] leading-relaxed text-[var(--text-3)] whitespace-pre-line"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           {task.details}
-        </p>
+        </div>
       )}
       {formatting && (
         <p className="mt-2 text-[11px] italic text-[var(--text-3)] animate-pulse">
