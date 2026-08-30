@@ -291,9 +291,7 @@ function IdeasPanel({ boardIdeas, sageDrafts, ytIdeas, buildIdeas }: {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                tab === t.key ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"
-              }`}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${tab === t.key ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"}`}
             >
               {t.label}
               {t.count > 0 && <span className="ml-1 num text-[var(--hq-text-ghost)]">{t.count}</span>}
@@ -1006,9 +1004,7 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
   const Btn = ({ k, label }: { k: "top" | "latest"; label: string }) => (
     <button
       onClick={() => setTab(k)}
-      className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
-        tab === k ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"
-      }`}
+      className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${tab === k ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"}`}
     >
       {label}
     </button>
