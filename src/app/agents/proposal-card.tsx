@@ -161,7 +161,7 @@ function ProposalCard({
               The task context was incomplete — answer below and they&apos;ll continue with your guidance.
             </p>
             {!showReply && (
-              <button onClick={() => setShowReply(true)} className="text-[11px] px-2.5 py-1 rounded-full font-medium" style={{ color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" }}>
+              <button onClick={() => setShowReply(true)} className="text-[11px] px-2.5 py-1 rounded-full font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]" style={{ color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" }}>
                 💬 Answer {proposal.agent}
               </button>
             )}
@@ -180,7 +180,7 @@ function ProposalCard({
                 <button
                   onClick={sendReply}
                   disabled={!replyText.trim() || replying}
-                  className="text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-40"
+                  className="text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                   style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" }}
                 >
                   {replying ? "Sending…" : `Send & unblock ${proposal.agent}`}
@@ -194,7 +194,7 @@ function ProposalCard({
         {overflows && (
           <button
             onClick={() => setExpanded(e => !e)}
-            className="self-start text-[11px] font-medium transition-colors"
+            className="self-start text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             style={{ color: "var(--accent)" }}
           >
             {expanded ? "Show less" : "Read more…"}
@@ -223,16 +223,16 @@ function ProposalCard({
         {proposal.status === "pending" && !replying && (
           <div className="flex flex-col gap-2 mt-1">
             <div className="flex gap-2 flex-wrap">
-              <button onClick={() => onCreateTask(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ background: "color-mix(in srgb, var(--up) 12%, transparent)", color: "var(--up)", border: "1px solid color-mix(in srgb, var(--up) 30%, transparent)" }}>
+              <button onClick={() => onCreateTask(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--up)]" style={{ background: "color-mix(in srgb, var(--up) 12%, transparent)", color: "var(--up)", border: "1px solid color-mix(in srgb, var(--up) 30%, transparent)" }}>
                 ✓ Implement — create task for {proposal.agent}
               </button>
-              <button onClick={() => onComplete(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }}>
+              <button onClick={() => onComplete(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }}>
                 ✓ Mark as completed
               </button>
-              <button onClick={() => setShowReply(s => !s)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }}>
+              <button onClick={() => setShowReply(s => !s)} className="text-[11px] px-2.5 py-1 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]" style={{ color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }}>
                 💬 Reply with guidance
               </button>
-              <button onClick={() => onReject(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "var(--down)", border: "1px solid color-mix(in srgb, var(--down) 30%, transparent)" }}>
+              <button onClick={() => onReject(proposal.taskId)} className="text-[11px] px-2.5 py-1 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--down)]" style={{ color: "var(--down)", border: "1px solid color-mix(in srgb, var(--down) 30%, transparent)" }}>
                 Dismiss
               </button>
             </div>
@@ -252,7 +252,7 @@ function ProposalCard({
                   <button
                     onClick={sendReply}
                     disabled={!replyText.trim() || replying}
-                    className="text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-40"
+                    className="text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" }}
                   >
                     {replying ? "Sending…" : `Send to ${proposal.agent}`}

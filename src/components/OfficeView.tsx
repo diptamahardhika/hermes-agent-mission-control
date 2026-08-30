@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface AgentActivity {
   timestamp: string;
@@ -336,9 +336,29 @@ function ActivityTicker({ agents }: { agents: Agent[] }) {
     .slice(0, 8);
 
   const [idx, setIdx] = useState(0);
+  const [announce, setAnnounce] = useState("");
+  const idxRef = useRef(0);
+  const announced = useRef<Set<string>>(new Set());
+  const eventsRef = useRef(events);
+  useEffect(() => {
+    eventsRef.current = events;
+  });
+
   useEffect(() => {
     if (events.length === 0) return;
-    const t = setInterval(() => setIdx(i => (i + 1) % events.length), 4000);
+    const t = setInterval(() => {
+      const list = eventsRef.current;
+      if (list.length === 0) return;
+      const next = (idxRef.current + 1) % list.length;
+      idxRef.current = next;
+      const target = announced.current.size === 0 ? list[0] : list[next];
+      const key = `${target.name}:${target.action}`;
+      if (!announced.current.has(key)) {
+        announced.current.add(key);
+        setAnnounce(`${target.name}: ${target.action}`);
+      }
+      setIdx(next);
+    }, 4000);
     return () => clearInterval(t);
   }, [events.length]);
 
@@ -346,11 +366,16 @@ function ActivityTicker({ agents }: { agents: Agent[] }) {
   const ev = events[idx];
 
   return (
-    <div className="flex items-center gap-2 bg-neutral-900/60 border border-neutral-800/40 rounded-xl px-4 py-2 max-w-xl mx-auto">
-      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-      <span className="text-[10px] text-neutral-500 font-mono shrink-0">{ev.name}</span>
-      <span className="text-[10px] text-neutral-400">{ev.action.slice(0, 80)}{ev.action.length > 80 ? "…" : ""}</span>
-    </div>
+    <>
+      <div className="flex items-center gap-2 bg-neutral-900/60 border border-neutral-800/40 rounded-xl px-4 py-2 max-w-xl mx-auto" aria-hidden="true">
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+        <span className="text-[10px] text-neutral-500 font-mono shrink-0">{ev.name}</span>
+        <span className="text-[10px] text-neutral-400">{ev.action.slice(0, 80)}{ev.action.length > 80 ? "…" : ""}</span>
+      </div>
+      <div className="sr-only" aria-label="Recent agent activity" aria-live="polite" aria-atomic="true">
+        {announce}
+      </div>
+    </>
   );
 }
 
