@@ -106,7 +106,7 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
   return (
     <>
       {/* Mobile/tablet header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-b border-[var(--line)] px-4 py-3 flex items-center justify-between h-14">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-b border-[var(--line)] px-4 py-3 flex items-center justify-between">
         <Logo isOpen={isOpen} />
         <div className="flex items-center gap-1">
           <div className="relative">
@@ -141,7 +141,7 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
       </div>
 
       {/* Mobile/tablet bottom tab bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-t border-[var(--line)] px-2 py-2 safe-area-pb h-14">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-t border-[var(--line)] px-2 py-2 safe-area-pb">
         <nav className="flex justify-around">
           {mobileTabsRaw.map((item) => {
             const isActive = pathname === item.href;
@@ -243,7 +243,7 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
           )}
         </div>
 
-        <div className="h-14 lg:hidden" />
+        <div className="h-16 lg:hidden" />
 
         <nav className={`flex-1 overflow-y-auto transition-all duration-300 ${isOpen ? "px-3" : "px-0"}`}>
           <div className="space-y-5">
