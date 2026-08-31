@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles, Waypoints } from "lucide-react";
+import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles, Waypoints, RefreshCw } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
@@ -137,6 +137,7 @@ interface HomeData {
   hlBalance: number; hlPosition: HLPosition | null; hlTodayPnl: number; hlAllTimePnl: number;
    hlAssets?: { asset: string; amount: number; usdValue: number; wallet?: string }[];
    hlLastSync?: string | null;
+   lastUpdated?: string | null;
    allTimePnl: number; todayPnl: number;
   processes: Process[];
   hermesKanban: HermesKanban;
@@ -163,9 +164,9 @@ const EMPTY: HomeData = {
   topVideo: null, latestVideo: null, ytSubscribers: 0, ytGoal: 20000,
   polyBalance: 0, polyWinRate: 0, polyTodayPnl: 0, polyAllTimePnl: 0,
    hlBalance: 0, hlPosition: null, hlTodayPnl: 0, hlAllTimePnl: 0, hlAssets: [], hlLastSync: null,
-  allTimePnl: 0, todayPnl: 0, processes: [],
-  hermesKanban: { board: "Hermes 24/7 Assistant", slug: "hermes-24-7-assistant", total: 0, counts: {}, tasks: [] },
-  xViewsTrend: [], snapshots: [],
+   allTimePnl: 0, todayPnl: 0, processes: [],
+   hermesKanban: { board: "Hermes 24/7 Assistant", slug: "hermes-24-7-assistant", total: 0, counts: {}, tasks: [] },
+   xViewsTrend: [], snapshots: [], lastUpdated: null,
   github: { profile: null, pinnedRepos: [], recentRepos: [], activity: null, status: null, contributions: null },
   homelab: {
     connected: false, checkedAt: "",
@@ -1504,24 +1505,10 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
             const days = (data.snapshots || []).filter(s => s.pnl > 0).sort((a,b) => a.d.localeCompare(b.d));
             if (days.length < 2) return null;
             const vals = days.map(s => s.pnl);
-            const min = Math.min(...vals), max = Math.max(...vals);
-            const range = max - min || 1;
-            const W = 100, H = 28;
-            const pts = vals.map((v,i) => `${(i/(vals.length-1))*W},${H - 3 - ((v - min)/range)*(H - 6)}`).join(" ");
             const up = vals[vals.length-1] >= vals[0];
             return (
               <div className="mt-4">
-                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-7" preserveAspectRatio="none" aria-hidden>
-                  <polyline
-                    points={pts}
-                    fill="none"
-                    stroke={up ? "#f0b90b" : "var(--down)"}
-                    strokeWidth="1.5"
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </svg>
+                <Sparkline data={vals} positive={up} color={up ? "#f0b90b" : "var(--down)"} />
                 <div className="flex justify-between mt-1 text-[8.5px] num text-[var(--hq-text-ghost)]">
                   <span>{days[0].d.slice(5)}</span>
                   <span>{days[days.length-1].d.slice(5)}</span>
@@ -1800,10 +1787,16 @@ export default function Dashboard() {
           <div>
             <div className="eyebrow mb-2.5">{greeting()}</div>
             <h1 className="text-[40px] font-semibold tracking-[-0.025em] leading-none text-[var(--hq-text)]">{process.env.NEXT_PUBLIC_OWNER_NAME || "Founder"}</h1>
-            <p className="num text-[var(--hq-text-ghost)] text-[12.5px] mt-3">
+            <p className="num text-[var(--hq-text-ghost)] text-[12.5px] mt-3 flex items-center gap-2">
               {time.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               {"  ·  "}
               {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
+              {data.lastUpdated && <span>· updated {timeAgo(data.lastUpdated)}</span>}
+              <button onClick={loadHome} disabled={refreshing}
+                className="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-white/[0.06] transition-colors"
+                title="Refresh data">
+                <RefreshCw className={`w-3 h-3 text-[var(--hq-text-ghost)] ${refreshing ? "animate-spin" : ""}`} />
+              </button>
             </p>
           </div>
           <div className="flex flex-col items-end gap-4">

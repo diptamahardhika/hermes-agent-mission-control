@@ -889,6 +889,7 @@ let hlBalance = 0;
     tweetIdeas: await prisma.idea.count({ where: { status: { notIn: ["done", "dismissed"] } } }).catch(() => 0),
     videosToFilm: await prisma.youtubeScript.count({ where: { status: { in: ["ready", "to_film", "tofilm", "approved"] } } }).catch(() => 0),
     processes,
+    lastUpdated: new Date().toISOString(),
     insight: "",
     hermesKanban,
   }, { headers: { "Cache-Control": "no-store, no-cache" } });
