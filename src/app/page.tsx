@@ -1814,12 +1814,38 @@ export default function Dashboard() {
                   <span className="num">{data.daysSincePost === 0 ? "Posted today" : `${data.daysSincePost}d since post`}</span>
                 </div>
               )}
-              <div className="flex items-center gap-1.5 rounded-full border border-[var(--hq-hairline)] bg-white/[0.02] px-2.5 py-1">
+              <div className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                style={(() => {
+                  const hlChecked = data.homelab?.checkedAt;
+                  if (!data.homelab?.connected || !hlChecked) {
+                    return { color: "var(--hq-down)", borderColor: "rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.07)" };
+                  }
+                  const age = Date.now() - new Date(hlChecked).getTime();
+                  if (age > 10 * 60 * 1000) {
+                    return { color: "var(--hq-warn)", borderColor: "rgba(251,191,36,0.22)", background: "rgba(251,191,36,0.07)" };
+                  }
+                  return { color: "var(--hq-up)", borderColor: "rgba(52,211,153,0.22)", background: "rgba(52,211,153,0.07)" };
+                })()}>
                 <span className="relative flex w-1.5 h-1.5">
-                  <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--up) 60%, transparent)" }} />
-                  <span className="relative inline-flex w-1.5 h-1.5 rounded-full" style={{ background: "var(--up)" }} />
+                  {data.homelab?.connected && (() => {
+                    const hlChecked = data.homelab.checkedAt;
+                    if (!hlChecked) return null;
+                    const age = Date.now() - new Date(hlChecked).getTime();
+                    if (age <= 10 * 60 * 1000) {
+                      return <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--hq-up) 60%, transparent)" }} />;
+                    }
+                    return null;
+                  })()}
+                  <span className="relative inline-flex w-1.5 h-1.5 rounded-full"
+                    style={{ background: data.homelab?.connected
+                      ? (() => { const hlChecked = data.homelab!.checkedAt; if (!hlChecked) return "var(--hq-down)"; const age = Date.now() - new Date(hlChecked).getTime(); return age > 10 * 60 * 1000 ? "var(--hq-warn)" : "var(--hq-up)"; })()
+                      : "var(--hq-down)" }} />
                 </span>
-                <span className="eyebrow !text-[9.5px] !text-[var(--hq-text-faint)]">Live</span>
+                <span className="eyebrow !text-[9.5px] font-semibold">{
+                  !data.homelab?.connected ? "OFFLINE"
+                  : (() => { const hlChecked = data.homelab.checkedAt; if (!hlChecked) return "STALE"; const age = Date.now() - new Date(hlChecked).getTime(); return age > 10 * 60 * 1000 ? "STALE" : "LIVE"; })()
+                }</span>
+                {data.homelab?.checkedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] font-normal">{timeAgo(data.homelab.checkedAt)}</span>}
               </div>
             </div>
             {score && <ScoreGauge score={score} />}
