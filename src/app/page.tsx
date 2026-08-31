@@ -135,8 +135,9 @@ interface HomeData {
   ytSubscribers: number; ytGoal: number;
   polyBalance: number; polyWinRate: number; polyTodayPnl: number; polyAllTimePnl: number;
   hlBalance: number; hlPosition: HLPosition | null; hlTodayPnl: number; hlAllTimePnl: number;
-  hlAssets?: { asset: string; amount: number; usdValue: number; wallet?: string }[];
-  allTimePnl: number; todayPnl: number;
+   hlAssets?: { asset: string; amount: number; usdValue: number; wallet?: string }[];
+   hlLastSync?: string | null;
+   allTimePnl: number; todayPnl: number;
   processes: Process[];
   hermesKanban: HermesKanban;
   xViewsTrend: number[];
@@ -161,7 +162,7 @@ const EMPTY: HomeData = {
   topIdeas: [],
   topVideo: null, latestVideo: null, ytSubscribers: 0, ytGoal: 20000,
   polyBalance: 0, polyWinRate: 0, polyTodayPnl: 0, polyAllTimePnl: 0,
-  hlBalance: 0, hlPosition: null, hlTodayPnl: 0, hlAllTimePnl: 0, hlAssets: [],
+   hlBalance: 0, hlPosition: null, hlTodayPnl: 0, hlAllTimePnl: 0, hlAssets: [], hlLastSync: null,
   allTimePnl: 0, todayPnl: 0, processes: [],
   hermesKanban: { board: "Hermes 24/7 Assistant", slug: "hermes-24-7-assistant", total: 0, counts: {}, tasks: [] },
   xViewsTrend: [], snapshots: [],
@@ -1464,6 +1465,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
       <div className="flex items-center gap-2 mb-4">
         <span className="text-base leading-none">🪙</span>
         <span className="eyebrow">Binance / Crypto</span>
+        {data.hlLastSync && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">synced {timeAgo(data.hlLastSync)}</span>}
         <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">spot · flexible earn</span>
       </div>
 
