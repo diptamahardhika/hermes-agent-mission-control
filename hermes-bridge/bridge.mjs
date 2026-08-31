@@ -203,14 +203,15 @@ async function healCronDrift(cronListOutput) {
     if (!block.includes("[drift_skip]") || !block.includes("this job is unpinned")) continue;
     const drift = block.match(/model '([^']+)' -> '([^']+)'/);
     if (!drift) { log(`drift_skip on ${id} but no target model in message — leaving for manual fix`); continue; }
-    if (Date.now() - (driftHealedAt.get(id) ?? 0) < 3600_000) continue;
+    // Cooldown: at most one heal attempt per job per hour to avoid thrashing.
+    if (Date.now() - (driftHealedAt.get(id) ?? 0) < 3600_000) continue; // one heal per hour max
     driftHealedAt.set(id, Date.now());
     const model = drift[2];
-    const provider = (await currentInferenceProvider()) ?? (model.includes("/") ? model.split("/")[0] : null);
+    const provider = (await currentInferenceProvider()) ?? (model.includes("/") ? model.split("/")[0] : null); // pin to current live config
     const args = ["cron", "edit", id, "--model", model];
     if (provider) args.push("--provider", provider);
     try {
-      await hermes(args, { timeout: 20000 });
+      await hermes(args, { timeout: 20000 }); // pin exact working config (avoid re-resolving)
       log(`self-healed drift_skip: ${id} pinned to ${provider ?? "(default)"}/${model}`);
       await emit("status", `Self-healed cron drift: ${id} pinned to ${model}`, {
         detail: `Job was skipped by drift_skip guard; pinned provider=${provider ?? "default"} model=${model}.`,
