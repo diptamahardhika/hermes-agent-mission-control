@@ -858,8 +858,8 @@ let hlBalance = 0;
     hlBalance,
     hlTodayPnl,
     hlAllTimePnl,
-    hlPosition: null,
     hlAssets: bnAssets,
+    hlLastSync: binanceLive ? new Date().toISOString() : null,
     allTimePnl: allTimePnl + hlAllTimePnl,
     todayPnl: todayPnl + hlTodayPnl,
     // GitHub
