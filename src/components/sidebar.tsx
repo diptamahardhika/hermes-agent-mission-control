@@ -105,8 +105,8 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
 
   return (
     <>
-      {/* Mobile/tablet header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-b border-[var(--line)] px-4 py-3 flex items-center justify-between">
+      {/* Mobile header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-b border-[var(--line)] px-4 py-3 flex items-center justify-between">
         <Logo isOpen={isOpen} />
         <div className="flex items-center gap-1">
           <div className="relative">
@@ -197,7 +197,7 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
       {/* Mobile/tablet overlay */}
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/60 z-40"
+          className="md:hidden fixed inset-0 bg-black/30 z-20 transition-opacity duration-300"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -205,7 +205,7 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
       {/* Desktop Sidebar */}
       <aside
         className={`
-          fixed md:relative z-50 md:z-10
+           fixed md:relative z-50
           ${isOpen ? "w-64 md:w-[15rem]" : "w-0 md:w-14"} h-full
           bg-[var(--bg)] md:bg-transparent border-r ${isOpen ? "border-[var(--line)]" : "border-none"}
           flex flex-col
