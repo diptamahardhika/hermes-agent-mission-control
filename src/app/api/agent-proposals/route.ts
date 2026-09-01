@@ -35,6 +35,7 @@ const COMMENT_SQL = `
 
 // Only surface tasks that ask for ideas/recommendations — routine daily reports
 // (digests, hygiene scans, completed reviews) are excluded here by title.
+// Also exclude completed implementation tasks (they're just status updates).
 const RUN_SQL = `
   SELECT 'run-' || r.id AS id, r.task_id,
          CASE WHEN r.profile = 'default' THEN 'max' ELSE r.profile END AS author,
@@ -55,15 +56,17 @@ const RUN_SQL = `
       OR lower(t.title) LIKE '%weekly%review%'
       -- Exclude tasks whose title is just "Implement: <something> complete"
       OR (lower(t.title) LIKE 'implement:%' AND lower(t.title) LIKE '%complete%')
-    )
-    AND (
-      lower(t.title) LIKE '%propos%' OR lower(t.title) LIKE '%sugges%'
-      OR lower(t.title) LIKE '%recommend%' OR lower(t.title) LIKE '%improv%'
-      OR lower(t.title) LIKE '%review%' OR lower(t.title) LIKE '%ux%'
-      OR lower(coalesce(t.body,'')) LIKE '%propose%' OR lower(coalesce(t.body,'')) LIKE '%suggest%'
-      OR lower(coalesce(t.body,'')) LIKE '%recommend%' OR lower(coalesce(t.body,'')) LIKE '%improvement%'
-    )
-  ORDER BY created_at DESC;`;
+      -- Exclude pure reading/verification tasks with no actionable output
+      OR lower(t.title) LIKE 'implement: reading%'
+      OR lower(t.title) LIKE 'reading%' AND lower(t.title) LIKE '%complete%'
+      -- Exclude write-only tasks (wrote X, mapped Y, synthesized Z)
+      OR lower(t.title) LIKE '%overview doc%'
+      OR lower(t.title) LIKE '%mapped%' AND lower(t.title) LIKE '%codebase%'
+      -- Exclude completed implementations (title starts with "Added" or "Applied")
+      OR lower(t.title) LIKE 'added %'
+      OR lower(t.title) LIKE 'applied %'
+    );
+`;
 
 const BOARD_NAME = process.env.HERMES_BOARD || "default";
 
@@ -179,8 +182,9 @@ export async function GET(request: Request) {
     // Filter out pure status notifications — reports whose summary says there's
     // nothing to decide (already implemented / no remaining action / just a
     // completion note). These are informational, not calls for approval.
+    // Also filter out completed implementations and research digests.
     const NOT_A_PROPOSAL =
-      /\b(already (implemented|completed|shipped|done)|duplicate of|no remaining work|nothing to (do|decide)|no further action|system healthy|no action (required|needed)|complete\.|review complete)\b/i;
+          /\b(already (implemented|completed|shipped|done)|duplicate of|no remaining work|nothing to (do|decide)|no further action|system healthy|no action (required|needed)|complete\.|review complete|reading (complete|inspection)|verified all|applied patch|implemented all|wrote.*(ai|cyber|security).*(digest|md)|mapped both|audit-only hygiene|added.*status column)\b/i;
     const actionable = proposals.filter((p: any) => {
       if (p.status !== "pending") return true;           // reviewed items stay visible
       if (p.taskStatus === "done" && NOT_A_PROPOSAL.test(p.body || "")) return false;

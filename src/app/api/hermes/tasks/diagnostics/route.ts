@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 
 const execFileP = promisify(execFile);
 const BOARD = process.env.HERMES_BOARD ?? "default";
+const HERMES_BIN = process.env.HERMES_BIN ?? "hermes";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
 
   for (const id of ids) {
     try {
-      const { stdout } = await execFileP("hermes", [
+      const { stdout } = await execFileP(HERMES_BIN, [
         "kanban", "--board", BOARD, "show", id,
       ], { timeout: 10000, maxBuffer: 256 * 1024 });
 

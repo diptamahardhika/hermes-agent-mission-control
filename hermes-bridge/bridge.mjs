@@ -108,30 +108,26 @@ function ensureTempKanbanDb() {
     return null;
   }
 }
-// We check each lock's age: only remove it if it's stale (older than 1 hour),
-// which is well beyond the lifetime of any real init/dispatch transaction.
-const STALE_LOCK_AGE_MS = 3600_000; // 1 hour
+// We check each lock's age: only remove it if it's genuinely stale
+// (older than 5 minutes). A real init/dispatch transaction completes in
+// milliseconds; if a lock persists beyond 5 minutes, nothing is running
+// and it's safe to remove. The previous 10-second threshold caused an
+// infinite clean-loop because Hermes recreates locks within ~12 seconds
+// of deletion, so the lock was always "stale" by the time we checked it.
+const STALE_LOCK_AGE_MS = 300_000; // 5 minutes
 function cleanStaleLocks() {
   for (const lockName of ["kanban.db.init.lock", "kanban.db.dispatch.lock"]) {
     const lockPath = path.join(HERMES_HOME, lockName);
     try {
       if (!fs.existsSync(lockPath)) continue;
-      // Kanban lock files are the main culprit. If hermes kanban fails, Hermes
-      // recreates the lock. Check if it's blocking by testing the CLI. If it
-      // exists and is blocking, remove it regardless of age.
       const { mtimeMs } = fs.statSync(lockPath);
       const age = Date.now() - (mtimeMs || 0);
-      // Always remove kanban init/dispatch locks if older than 10 seconds
-      // (a real init only takes milliseconds). This handles the case where
-      // hermes recreates the lock on every failed attempt.
-      if (age < 10000) continue; // skip locks < 10s old (may be real in-progress)
+      if (age < STALE_LOCK_AGE_MS) continue; // not stale enough
       try {
         fs.unlinkSync(lockPath);
         log(`self-heal: removed stale ${lockName} (age=${Math.round(age / 1000)}s)`);
       } catch (e) {
         // Silently ignore permission errors (e.g., macOS ACL deny-delete on parent dir)
-        // These locks can't be removed and will persist, but they don't block operation
-        // once the initial DB connection is established.
       }
     } catch (e) { /* never fatal — next mirror tick will retry */ }
   }
@@ -550,10 +546,10 @@ async function mirrorHealth() {
     // use a case-insensitive search that doesn't anchor to a single line.
     const lower = out.toLowerCase();
     online = /(online|running|connected)/.test(out);
-    // Look for "gateway" section followed by "running" or "online" anywhere
-    // in the following lines (up to the next section header). The status line
-    // may include a ✓ or ✗ character before the status word.
-    const gatewayMatch = out.match(/gateway service\s*\n[\s\S]*?status:\s*[✓✗]?\s*(running|online)/i);
+    // "gateway service" section header followed by "status:" line with
+    // optional checkmark and running/online. The lines between them may
+    // contain other info (PID, manager, etc.). Match across newlines.
+    const gatewayMatch = out.match(/gateway service\s*\n[\s\S]*?status:\s*[✓✗\s]*(running|online)/i);
     gateway = gatewayMatch ? "running" : (lower.includes("gateway") ? "stopped" : "unknown");
   } catch (e) { detail = e.message.split("\n")[0]; }
   await setStore("hermes-health", { online, gateway, detail, lastSeen: new Date().toISOString() });
@@ -677,40 +673,60 @@ function parseBriefJson(raw) {
 }
 
 async function generateBriefing() {
-  // Weak/fallback models fumble structured output; a single flake used to fail
-  // the whole dispatch. Briefs are idempotent, so retry — worst case we keep
-  // the previous brief (never store garbage over a good one).
-  const attempts = Number(process.env.BRIDGE_BRIEF_ATTEMPTS || 3);
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    if (attempt > 1) await new Promise((r) => setTimeout(r, 2000));
-    let raw = "";
-    try {
-      raw = (await hermes(["-z", briefPrompt()], { timeout: RUN_TIMEOUT_MS })).trim();
-    } catch (e) {
-      log(`brief attempt ${attempt}/${attempts}: cli error`, (e.message || e).toString().split("\n")[0].slice(0, 160));
-      continue;
-    }
-    const { brief, parsed } = parseBriefJson(raw);
-    // A strict/repaired JSON object IS a brief even with zero sections (every
-    // section legitimately empty). Only raw prose with no recoverable JSON
-    // stays invalid — storing that over a good brief is worse than keeping it.
-    const valid = parsed && typeof brief.summary === "string" && brief.summary.trim().length > 0;
-    if (valid) {
-      if (typeof brief.greeting !== "string") delete brief.greeting;
-      // DB clock, not local: the Mac's clock can be briefly wrong after wake and a
-      // skewed generatedAt poisons "x ago" labels and mirrorBrief's dedupe.
-      brief.generatedAt = (await q("SELECT to_char(now() AT TIME ZONE 'GMT', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS t")).rows[0].t;
-      await setStore("hermes-briefing", brief);
-      await emit("status", "Daily brief generated", { level: "up" });
-      if (attempt > 1) log(`brief generated on attempt ${attempt}/${attempts}`);
-      return;
-    }
-    // Keep the full payload for post-mortem — the head alone hid why valid-looking
-    // output failed validation.
-    try { fs.writeFileSync(path.join(os.tmpdir(), "hermes-brief-failed.json"), raw); } catch { /* best effort */ }
-    log(`brief attempt ${attempt}/${attempts}: output not valid JSON; head:`, raw.slice(0, 800));
+  // hermes -z hangs indefinitely in non-interactive mode (confirmed 2026-09).
+  // Route briefings through the kanban system — but MUST use workspace_kind=dir
+  // (the old cron did this automatically). Scratch tasks stay "ready" forever
+  // because no worker picks them up.
+  const BRIEFS_DIR = path.join(os.homedir(), ".hermes", "briefs");
+  const today = new Date().toISOString().slice(0, 10);
+  const briefTitle = `Daily brief ${today}`;
+  const briefBody = briefPrompt();
+  const args = [
+    "kanban", "--board", BOARD, "create", "--json",
+    briefTitle,
+    "--body", briefBody,
+    "--assignee", "default",
+    "--workspace", `dir:${BRIEFS_DIR}`,
+    "--idempotency-key", `daily-brief-${today}`,
+  ];
+  try {
+    await hermes(args, { timeout: 15000 });
+  } catch (e) {
+    log(`brief dispatch failed:`, e.message.split("\n")[0].slice(0, 200));
+    throw new Error(`brief dispatch failed: ${e.message.split("\n")[0]}`);
   }
-  throw new Error(`brief output was not valid JSON after ${attempts} attempts — previous brief kept`);
+
+  // Poll kanban until a "Daily brief" task appears as done (max 20 min).
+  const POLL_INTERVAL = 30_000; // 30s between checks
+  const MAX_WAIT_MS = 20 * 60_000; // 20 minutes
+  const deadline = Date.now() + MAX_WAIT_MS;
+  let briefDone = false;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+    cleanStaleLocks();
+    let hermesEnv = { ...process.env };
+    const kanbanDbPath = ensureTempKanbanDb();
+    if (kanbanDbPath) hermesEnv.HERMES_KANBAN_DB = kanbanDbPath;
+    try {
+      const out = await hermes(["kanban", "--board", BOARD, "list", "--json"], {
+        timeout: 15000,
+        env: hermesEnv,
+      });
+      const parsed = JSON.parse(out || "[]");
+      const tasks = Array.isArray(parsed) ? parsed : parsed.tasks || [];
+      const briefTask = tasks.find((t) => t.title && t.title.includes("Daily brief") && t.status === "done");
+      if (briefTask) {
+        briefDone = true;
+        break;
+      }
+    } catch { /* ignore transient errors */ }
+  }
+  if (!briefDone) {
+    log("brief polling timed out after 20 minutes — previous brief kept");
+    throw new Error("brief timed out waiting for kanban task to complete after 20 minutes");
+  }
+  // brief.json will be picked up by mirrorBrief() on the next mirror tick.
+  await emit("status", "Daily brief dispatched to kanban", { level: "up" });
 }
 
 // Mirror the newest completed "Daily brief" kanban card into the
@@ -719,31 +735,31 @@ async function generateBriefing() {
 // task); HermesTask.result is not reliably populated.
 async function mirrorBrief() {
   const { rows } = await q(
-    `SELECT title FROM "HermesTask"
+    `SELECT title, "updatedAt" AS task_updated_at FROM "HermesTask"
      WHERE title LIKE 'Daily brief%' AND status='done'
      ORDER BY "updatedAt" DESC LIMIT 1`
   );
   if (!rows.length) return;
   const file = path.join(BRIEFS_DIR, "brief.json");
-  let raw = "", mtime = null;
+  let raw = "";
   try {
-    const st = fs.statSync(file);
     raw = fs.readFileSync(file, "utf8");
-    mtime = st.mtime.toISOString();
   } catch { return; }
   const { brief } = parseBriefJson(raw);
   if (typeof brief.summary !== "string") brief.summary = raw.slice(0, 1500);
   if (typeof brief.greeting !== "string") delete brief.greeting;
+  // Skip if summary is empty (empty brief = no content)
+  if (!brief.summary || brief.summary.trim().length < 10) return;
   const prevRow = (await q(
-    `SELECT data, EXTRACT(EPOCH FROM "updatedAt") AS updated_epoch
-     FROM "DataStore" WHERE key='hermes-briefing'`
+    `SELECT data FROM "DataStore" WHERE key='hermes-briefing'`
   )).rows[0] ?? {};
   const prev = prevRow.data ?? {};
-  // Compare against the DB write time (absolute epoch), never the embedded
-  // generatedAt — a locally-skewed generatedAt used to block fresh briefs.
-  if (prevRow.updated_epoch && new Date(mtime).getTime() / 1000 <= Number(prevRow.updated_epoch)) return;
-  if (prev.summary === brief.summary && prev.greeting === brief.greeting && prev.generatedAt === mtime) return;
-  brief.generatedAt = mtime;
+  // Only update if the content actually changed — never overwrite a good brief
+  // with an identical or worse one. Compare summary and greeting.
+  const sameContent = prev.summary === brief.summary && prev.greeting === brief.greeting;
+  if (sameContent) return;
+  // Use current DB time as generatedAt so the dashboard "x ago" label is accurate.
+  brief.generatedAt = (await q("SELECT to_char(now() AT TIME ZONE 'GMT', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS t")).rows[0].t;
   await setStore("hermes-briefing", brief);
   await emit("status", "Daily brief synced from kanban", { level: "up" });
 }
@@ -888,8 +904,11 @@ async function main() {
   await emit("status", "Bridge connected", { level: "up", meta: { host: HOST } });
   await mirrorTick();
   setInterval(() => mirrorTick().catch((e) => log("mirror loop", e.message)), MIRROR_MS);
-  // queue loop
-  const tick = async () => { try { cleanStaleLocks(); await processQueue(); } catch (e) { log("queue loop", e.message); } finally { setTimeout(tick, POLL_MS); } };
+  // queue loop — NOTE: cleanStaleLocks() is NOT called here. It runs in
+  // mirrorTick() every 30s. Calling it here every 5s caused an infinite
+  // clean loop (locks recreated within seconds, threshold of 10s was too
+  // aggressive).
+  const tick = async () => { try { await processQueue(); } catch (e) { log("queue loop", e.message); } finally { setTimeout(tick, POLL_MS); } };
   tick();
 }
 main().catch((e) => { console.error("fatal", e); process.exit(1); });
