@@ -73,6 +73,7 @@ interface Task {
   priority: number | null;
   result: string | null;
   syncedAt: string;
+  diagnosticError?: string | null;
 }
 
 interface Health {
@@ -134,6 +135,18 @@ function columnTone(col: string): "neutral" | "up" | "down" | "warn" | "accent" 
   if (col === "blocked") return "down";
   if (col === "review") return "warn";
   return "neutral";
+}
+
+function isBlocked(t: Task): boolean {
+  return t.status === "blocked";
+}
+
+function hasError(t: Task): boolean {
+  return !!(t.diagnosticError?.trim());
+}
+
+function getError(t: Task): string {
+  return t.diagnosticError ?? "";
 }
 const COLUMN_LABEL: Record<string, string> = {
   triage: "Triage",
@@ -426,10 +439,12 @@ function TaskBoard({
   tasks,
   total,
   lastSync,
+  onRetry,
 }: {
   tasks: Task[];
   total: number;
   lastSync: string | null;
+  onRetry?: () => void;
 }) {
   const [openCols, setOpenCols] = useState<Record<string, boolean>>({});
   const groups: Record<string, Task[]> = {};
@@ -438,6 +453,19 @@ function TaskBoard({
     (groups[col] ||= []).push(t);
   }
   const cols = COLUMN_ORDER.filter((c) => groups[c]?.length);
+
+  const handleRetry = async (taskId: string) => {
+    try {
+      await fetch("/api/hermes/tasks/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: taskId }),
+      });
+      onRetry?.();
+    } catch (err) {
+      console.error("Retry failed:", err);
+    }
+  };
 
   return (
     <>
@@ -480,32 +508,69 @@ function TaskBoard({
                 </div>
                 <div className="flex flex-col gap-2.5">
                   {visible.map((t) => (
-                      <div
-                        key={t.id}
-                        className="panel p-3.5"
-                        style={{
-                          borderLeft: `2px solid color-mix(in srgb, ${
-                            tone === "neutral" ? "var(--text-3)" : `var(--${tone})`
-                          } 55%, transparent)`,
-                        }}
-                      >
-                        <p className="text-[13px] text-[var(--text)] leading-snug line-clamp-2">
-                          {t.title}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2.5">
-                          {t.assignee && (
-                            <span className="num text-[10.5px] text-[var(--text-3)]">
-                              {t.assignee}
-                            </span>
-                          )}
-                          {t.priority != null && t.priority > 0 && (
-                            <span className="num text-[10.5px] text-[var(--text-3)] ml-auto">
-                              P{t.priority}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                  ))}
+                                        <div
+                                          key={t.id}
+                                          className="panel p-3.5"
+                                          style={{
+                                            borderLeft: `2px solid color-mix(in srgb, ${
+                                              tone === "neutral" ? "var(--text-3)" : `var(--${tone})`
+                                            } 55%, transparent)`,
+                                          }}
+                                        >
+                                          <p className="text-[13px] text-[var(--text)] leading-snug line-clamp-2">
+                                            {t.title}
+                                          </p>
+                                          <div className="flex items-center gap-2 mt-2.5">
+                                            {t.assignee && (
+                                              <span className="num text-[10.5px] text-[var(--text-3)]">
+                                                {t.assignee}
+                                              </span>
+                                            )}
+                                            {t.priority != null && t.priority > 0 && (
+                                              <span className="num text-[10.5px] text-[var(--text-3)] ml-auto">
+                                                P{t.priority}
+                                              </span>
+                                            )}
+                                            {isBlocked(t) && (
+                                              <>
+                                                {hasError(t) && (
+                                                  <span
+                                                    className="num text-[10px] text-[var(--text-2)]"
+                                                    style={{ color: "var(--down)" }}
+                                                    title="blocked"
+                                                  >
+                                                    ⚠
+                                                  </span>
+                                                )}
+                                                {!hasError(t) && (
+                                                  <span
+                                                    className="num text-[10px] text-[var(--text-2)]"
+                                                    style={{ color: "var(--down)" }}
+                                                    title="blocked"
+                                                  >
+                                                    ⚠
+                                                  </span>
+                                                )}
+                                                {hasError(t) && (
+                                                  <span
+                                                    className="text-[10px] text-[var(--text-2)] capitalize"
+                                                    style={{ fontSize: "0.7rem", marginLeft: "4px" }}
+                                                  >
+                                                    {getError(t).split("\n")[0]}
+                                                  </span>
+                                                )}
+                                                <button
+                                                  onClick={() => handleRetry(t.id)}
+                                                  className="self-start text-[10px] text-[var(--accent)] hover:text-[var(--text)] transition-colors px-1 ml-1"
+                                                  title="Retry task"
+                                                >
+                                                  ↻
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
                   {overflow > 0 && (
                     <button
                       onClick={() => setOpenCols(prev => ({ ...prev, [col]: !prev[col] }))}
@@ -785,6 +850,23 @@ export default function HermesPage() {
       setTasks(tk.tasks ?? []);
       setTaskTotal(tk.total ?? tk.tasks?.length ?? 0);
       setTaskSync(tk.lastSync ?? null);
+
+      // Fetch diagnostic info for blocked tasks
+      const blockedTasks = (tk.tasks ?? []).filter(t => t.status === "blocked");
+      if (blockedTasks.length > 0) {
+        try {
+          const ids = blockedTasks.map(t => t.id).join(",");
+          const diag = await getJSON<Record<string, string>>("/api/hermes/tasks/diagnostics?ids=" + ids);
+          if (diag) {
+            setTasks(prev => prev.map(t => {
+              if (diag[t.id]) return { ...t, diagnosticError: diag[t.id] };
+              return t;
+            }));
+          }
+        } catch {
+          // ignore diag fetch failures
+        }
+      }
     }
     if (cr) {
       setJobs(cr.jobs ?? []);
@@ -923,7 +1005,7 @@ export default function HermesPage() {
               </div>
             </>
           ) : (
-            <TaskBoard tasks={tasks} total={taskTotal} lastSync={taskSync} />
+            <TaskBoard tasks={tasks} total={taskTotal} lastSync={taskSync} onRetry={load} />
           )}
         </section>
 
