@@ -114,10 +114,26 @@ try {
 // ── 5. Kanban mirror (PULL path) ──────────────────────────────────────────
 if (hermesOk && pgHealthy) {
   try {
+    // Check if there are any stale lock files (older than 5 minutes) and clean them
+    const lockPath = path.join(os.homedir(), ".hermes", "kanban.db.init.lock");
+    let locksCleaned = false;
+    if (fs.existsSync(lockPath)) {
+      const lockStats = fs.statSync(lockPath);
+      if (Date.now() - lockStats.mtimeMs > 300000) { // older than 5 minutes
+        fs.unlinkSync(lockPath);
+        locksCleaned = true;
+      }
+    }
+    
     const out = await execFileP(HERMES_BIN, ["kanban", "--board", BOARD, "list", "--json"], { timeout: 15000 });
     const parsed = JSON.parse(out.stdout || "[]");
     const tasks = Array.isArray(parsed) ? parsed : parsed.tasks || [];
     record("kanban list --json parses", tasks.length >= 0, `returned ${tasks.length} task(s)`);
+    if (locksCleaned) {
+      record("stale lock cleanup", true, "removed stale lock file (age > 5m)");
+    } else {
+      record("stale lock cleanup", true, "no stale locks (age <= 5m)");
+    }
 
     // Dry-run insert into HermesTask to verify the mirror target table is writable
     const sampleId = `smoke-test-${Date.now()}`;

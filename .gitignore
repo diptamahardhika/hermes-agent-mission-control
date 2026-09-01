@@ -61,3 +61,8 @@ infra/postgres/userlist.txt
 # local agent tooling state
 .omc/
 .worktrees/
+
+# Bridge logs
+hermes-bridge/*.log
+watchdog.log
+hermes-bridge/.bridge.pid

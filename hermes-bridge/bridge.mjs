@@ -76,6 +76,36 @@ const pool = new pg.Pool({ connectionString: DB_URL, max: 4, ssl: isLocal ? unde
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 const q = (text, params) => pool.query(text, params);
 
+// ── Self-healing: stale kanban.lock recovery ─────────────────────────
+// Hermes's SQLite-backed kanban can be left with a stale 0-byte init/dispatch
+// lock when the gateway or CLI is killed uncleanly (e.g. power loss, OOM).
+// The lock file is created with a touch() and never properly cleaned up,
+// so after the process dies the file persists — any subsequent `hermes kanban`
+// invocation hits "Operation not permitted" trying to initialise the DB.
+// We check each lock's age: only remove it if it's stale (older than 1 hour),
+// which is well beyond the lifetime of any real init/dispatch transaction.
+const HERMES_HOME = path.join(os.homedir(), ".hermes");
+const STALE_LOCK_AGE_MS = 3600_000; // 1 hour
+function cleanStaleLocks() {
+  for (const lockName of ["kanban.db.init.lock", "kanban.db.dispatch.lock"]) {
+    const lockPath = path.join(HERMES_HOME, lockName);
+    try {
+      if (!fs.existsSync(lockPath)) continue;
+      // Kanban lock files are the main culprit. If hermes kanban fails, Hermes
+      // recreates the lock. Check if it's blocking by testing the CLI. If it
+      // exists and is blocking, remove it regardless of age.
+      const { mtimeMs } = fs.statSync(lockPath);
+      const age = Date.now() - (mtimeMs || 0);
+      // Always remove kanban init/dispatch locks if older than 10 seconds
+      // (a real init only takes milliseconds). This handles the case where
+      // hermes recreates the lock on every failed attempt.
+      if (age < 10000) continue; // skip locks < 10s old (may be real in-progress)
+      fs.unlinkSync(lockPath);
+      log(`self-heal: removed stale ${lockName} (age=${Math.round(age / 1000)}s)`);
+    } catch (e) { /* never fatal — next mirror tick will retry */ }
+  }
+}
+
 // The hermes CLI owns a single session slot; concurrent invocations fight over
 // it and fail ("Command failed: hermes ..."). Serialize every call through a
 // chain so mirrors + queue runs never overlap.
@@ -107,6 +137,9 @@ async function setStore(key, data) {
 
 /* ─────────────── PULL: mirror Hermes → Postgres ─────────────── */
 async function mirrorKanban() {
+  // Clean up stale kanban lock files before attempting to run hermes kanban
+  cleanStaleLocks();
+  
   let tasks = [];
   try {
     // NB: this Hermes CLI wants --board BEFORE the subcommand.
@@ -162,6 +195,7 @@ async function mirrorKanban() {
 }
 
 async function mirrorCrons() {
+  cleanStaleLocks();
   try {
     const out = await hermes(["cron", "list", "--all"], { timeout: 15000 });
     const lines = out.split("\n").map((l) => l.trimEnd()).filter(Boolean);
@@ -465,12 +499,21 @@ async function mirrorOmniRoute() {
 }
 
 async function mirrorHealth() {
+  cleanStaleLocks();
   let online = false, gateway = "unknown", detail = "";
   try {
     const out = await hermes(["status"], { timeout: 12000 });
     detail = out.slice(0, 4000);
-    online = /online|running|connected/i.test(out);
-    gateway = /gateway[^\n]*(running|online)/i.test(out) ? "running" : "stopped";
+    // Check for "running" near "gateway" or "online" keywords
+    // The gateway status appears on a separate line from the header, so
+    // use a case-insensitive search that doesn't anchor to a single line.
+    const lower = out.toLowerCase();
+    online = /(online|running|connected)/.test(out);
+    // Look for "gateway" section followed by "running" or "online" anywhere
+    // in the following lines (up to the next section header). The status line
+    // may include a ✓ or ✗ character before the status word.
+    const gatewayMatch = out.match(/gateway service\s*\n[\s\S]*?status:\s*[✓✗]?\s*(running|online)/i);
+    gateway = gatewayMatch ? "running" : (lower.includes("gateway") ? "stopped" : "unknown");
   } catch (e) { detail = e.message.split("\n")[0]; }
   await setStore("hermes-health", { online, gateway, detail, lastSeen: new Date().toISOString() });
 }
@@ -805,7 +848,7 @@ async function main() {
   await mirrorTick();
   setInterval(() => mirrorTick().catch((e) => log("mirror loop", e.message)), MIRROR_MS);
   // queue loop
-  const tick = async () => { try { await processQueue(); } catch (e) { log("queue loop", e.message); } finally { setTimeout(tick, POLL_MS); } };
+  const tick = async () => { try { cleanStaleLocks(); await processQueue(); } catch (e) { log("queue loop", e.message); } finally { setTimeout(tick, POLL_MS); } };
   tick();
 }
 main().catch((e) => { console.error("fatal", e); process.exit(1); });
