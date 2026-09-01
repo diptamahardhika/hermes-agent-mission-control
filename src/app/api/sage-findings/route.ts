@@ -40,21 +40,18 @@ async function sageFindings(): Promise<Finding[]> {
       const title = String(r.title || "");
       // Prefer the durable digest file (full markdown with source links) over
       // the completion summary, which can get compressed by the dispatcher.
+      // Pick the digest file based on the task's category so AI tasks don't
+      // accidentally surface the cybersecurity digest.
       try {
-        const cyberPath = path.join(DIGEST_DIR, "security-digest.md");
-        const aiPath = path.join(DIGEST_DIR, "ai-digest.md");
-        let digestContent = "";
+        const category = categorize(title);
+        const digestPath = category === "ai"
+          ? path.join(DIGEST_DIR, "ai-digest.md")
+          : path.join(DIGEST_DIR, "security-digest.md");
         try {
-          digestContent = await readFile(cyberPath, "utf8");
-        } catch (e1) {
-          try {
-            digestContent = await readFile(aiPath, "utf8");
-          } catch (e2) {
-            // Neither digest file exists yet — fall back to summary
-          }
-        }
-        if (digestContent.trim().length > summary.length) summary = digestContent.trim();
-      } catch { /* no digest file yet — fall back to summary */ }
+          const digestContent = await readFile(digestPath, "utf8");
+          if (digestContent.trim().length > summary.length) summary = digestContent.trim();
+        } catch { /* no digest file yet — fall back to summary */ }
+      } catch { /* no digest directory yet */ }
       return {
         taskId: String(r.task_id),
         title,
