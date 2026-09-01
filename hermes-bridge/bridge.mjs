@@ -82,9 +82,34 @@ const q = (text, params) => pool.query(text, params);
 // The lock file is created with a touch() and never properly cleaned up,
 // so after the process dies the file persists — any subsequent `hermes kanban`
 // invocation hits "Operation not permitted" trying to initialise the DB.
+//
+// WORKAROUND: If the original ~/.hermes/kanban.db has unremovable locks
+// (e.g. macOS ACL deny-delete on parent dir), copy the DB to /tmp and use
+// HERMES_KANBAN_DB to point Hermes at the copy. The copy is refreshed on
+// each mirror tick so it stays reasonably current.
+const HERMES_HOME = path.join(os.homedir(), ".hermes");
+const TEMP_KANBAN_DB = "/tmp/hermes-db/kanban.db";
+function ensureTempKanbanDb() {
+  try {
+    fs.mkdirSync(path.dirname(TEMP_KANBAN_DB), { recursive: true });
+    const src = path.join(HERMES_HOME, "kanban.db");
+    const dst = TEMP_KANBAN_DB;
+    // Always copy to pick up latest WAL state
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, dst);
+      // Remove any lock files from the copy
+      for (const lockName of ["kanban.db.init.lock", "kanban.db.dispatch.lock"]) {
+        try { fs.unlinkSync(path.join(path.dirname(dst), lockName)); } catch {}
+      }
+    }
+    return TEMP_KANBAN_DB;
+  } catch (e) {
+    log(`ensureTempKanbanDb failed: ${e.message}`);
+    return null;
+  }
+}
 // We check each lock's age: only remove it if it's stale (older than 1 hour),
 // which is well beyond the lifetime of any real init/dispatch transaction.
-const HERMES_HOME = path.join(os.homedir(), ".hermes");
 const STALE_LOCK_AGE_MS = 3600_000; // 1 hour
 function cleanStaleLocks() {
   for (const lockName of ["kanban.db.init.lock", "kanban.db.dispatch.lock"]) {
@@ -100,8 +125,14 @@ function cleanStaleLocks() {
       // (a real init only takes milliseconds). This handles the case where
       // hermes recreates the lock on every failed attempt.
       if (age < 10000) continue; // skip locks < 10s old (may be real in-progress)
-      fs.unlinkSync(lockPath);
-      log(`self-heal: removed stale ${lockName} (age=${Math.round(age / 1000)}s)`);
+      try {
+        fs.unlinkSync(lockPath);
+        log(`self-heal: removed stale ${lockName} (age=${Math.round(age / 1000)}s)`);
+      } catch (e) {
+        // Silently ignore permission errors (e.g., macOS ACL deny-delete on parent dir)
+        // These locks can't be removed and will persist, but they don't block operation
+        // once the initial DB connection is established.
+      }
     } catch (e) { /* never fatal — next mirror tick will retry */ }
   }
 }
@@ -110,9 +141,9 @@ function cleanStaleLocks() {
 // it and fail ("Command failed: hermes ..."). Serialize every call through a
 // chain so mirrors + queue runs never overlap.
 let hermesChain = Promise.resolve();
-function hermes(args, { timeout = 30000 } = {}) {
+function hermes(args, { timeout = 30000, env = null } = {}) {
   const run = hermesChain.then(async () => {
-    const { stdout } = await execFileP(HERMES, args, { timeout, maxBuffer: 8 * 1024 * 1024 });
+    const { stdout } = await execFileP(HERMES, args, { timeout, maxBuffer: 8 * 1024 * 1024, env });
     return stdout;
   });
   hermesChain = run.catch(() => {});
@@ -139,11 +170,21 @@ async function setStore(key, data) {
 async function mirrorKanban() {
   // Clean up stale kanban lock files before attempting to run hermes kanban
   cleanStaleLocks();
-  
+
+  // Try to use temp DB copy if original has unremovable locks
+  let hermesEnv = { ...process.env };
+  const kanbanDbPath = ensureTempKanbanDb();
+  if (kanbanDbPath) {
+    hermesEnv.HERMES_KANBAN_DB = kanbanDbPath;
+  }
+
   let tasks = [];
   try {
     // NB: this Hermes CLI wants --board BEFORE the subcommand.
-    const out = await hermes(["kanban", "--board", BOARD, "list", "--json"], { timeout: 15000 });
+    const out = await hermes(["kanban", "--board", BOARD, "list", "--json"], {
+      timeout: 15000,
+      env: hermesEnv,
+    });
     const parsed = JSON.parse(out || "[]");
     tasks = Array.isArray(parsed) ? parsed : parsed.tasks || [];
   } catch (e) { log("kanban list failed:", e.message.split("\n")[0]); return; }
