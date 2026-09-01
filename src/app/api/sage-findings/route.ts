@@ -44,13 +44,21 @@ async function sageFindings(): Promise<Finding[]> {
       // accidentally surface the cybersecurity digest.
       try {
         const category = categorize(title);
-        const digestPath = category === "ai"
-          ? path.join(DIGEST_DIR, "ai-digest.md")
-          : path.join(DIGEST_DIR, "security-digest.md");
+        // Derive the date from the task's completion timestamp and look up the
+        // dated digest file so historical findings show their own content.
+        // Fall back to the global (undated) file for entries before this fix.
+        const completedAtSec = Number(r.ended_at) || Math.floor(Date.now() / 1000);
+        const d = new Date(completedAtSec * 1000);
+        const dateStr = d.toISOString().slice(0, 10); // YYYY-MM-DD
+        const datedPath = path.join(DIGEST_DIR, `${category === "ai" ? "ai" : "security"}-digest-${dateStr}.md`);
         try {
-          const digestContent = await readFile(digestPath, "utf8");
+          const digestContent = await readFile(datedPath, "utf8");
           if (digestContent.trim().length > summary.length) summary = digestContent.trim();
-        } catch { /* no digest file yet — fall back to summary */ }
+        } catch {
+          // No dated digest file — keep the DB summary as-is.
+          // (The global undated file gets overwritten daily and would show
+          // today's content for stale entries, so we don't fall back to it.)
+        }
       } catch { /* no digest directory yet */ }
       return {
         taskId: String(r.task_id),
