@@ -78,7 +78,18 @@ export async function GET() {
   // Fall back to static data if Prisma Idea table is empty (no migrations run yet)
   if (!ideas.length) {
     ideas = ideasJson.map((i) => ({
-      ...i,
+      id: i.id,
+      title: i.title,
+      description: i.description ?? null,
+      status: i.status ?? null,
+      model: i.model ?? null,
+      type: i.type ?? null,
+      category: i.category ?? null,
+      source: i.source ?? null,
+      estimatedTime: i.estimatedTime ?? null,
+      agent: i.agent ?? null,
+      rejectionReason: null,
+      timestamp: new Date(),
       _source: "static-data",
     }));
   }

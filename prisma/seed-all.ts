@@ -72,11 +72,11 @@ async function seedAgentStateFromKanban() {
     const result = await execSqlite(
       `SELECT COUNT(*) as total, MAX(completed_at) as last_completed, status FROM tasks WHERE assignee='${id}' GROUP BY status ORDER BY completed_at DESC LIMIT 1`
     )
-    const totalRow = await execSqlite(`SELECT COUNT(*) as total FROM tasks WHERE assignee='${id}'`)
-    const doneRow = await execSqlite(`SELECT COUNT(*) as done FROM tasks WHERE assignee='${id}' AND status='done'`)
+    const totalRow = await execSqlite(`SELECT COUNT(*) as total FROM tasks WHERE assignee='${id}'`) as { total?: string; done?: string; last_completed?: string }
+    const doneRow = await execSqlite(`SELECT COUNT(*) as done FROM tasks WHERE assignee='${id}' AND status='done'`) as { total?: string; done?: string; last_completed?: string }
 
-    const total = parseInt((totalRow.value?.total ?? totalRow.total ?? '0') as string)
-    const done = parseInt((doneRow.value?.done ?? doneRow.done ?? '0') as string)
+    const total = parseInt((totalRow.total ?? '0') as string)
+    const done = parseInt((doneRow.done ?? '0') as string)
     const lastCompleted = totalRow.last_completed ? new Date(totalRow.last_completed as string) : new Date()
 
     await prisma.agentState.upsert({
@@ -111,10 +111,10 @@ async function seedAgentStateFromKanban() {
   }
 }
 
-function execSqlite(query: string): Promise<{ value?: string; total?: string; done?: string; last_completed?: string }> {
+function execSqlite(query: string): Promise<{ total?: string; done?: string; last_completed?: string }> {
   return new Promise((resolve, reject) => {
     const { execFile } = require('child_process')
-    execFile('sqlite3', ['-readonly', '~/.hermes/kanban.db', query], { timeout: 5000 }, (err, stdout, stderr) => {
+    execFile('sqlite3', ['-readonly', '~/.hermes/kanban.db', query], { timeout: 5000 }, (err: Error | null, stdout: string, stderr: string) => {
       if (err) return reject(err)
       try {
         const lines = stdout.trim().split('\n').filter(Boolean)
