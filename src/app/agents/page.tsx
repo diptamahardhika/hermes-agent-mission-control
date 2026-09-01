@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import { SortAsc, SortDesc } from "lucide-react";
 import OfficeView from "@/components/OfficeView";
 import { ProposalCard } from "./proposal-card";
 
@@ -309,6 +310,8 @@ export default function AgentsPage() {
   const [proposals, setProposals] = useState<AgentProposal[]>([]);
   const [proposalsCollapsed, setProposalsCollapsed] = useState(false);
   const [proposalsLoading, setProposalsLoading] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "agent">("newest");
+  const [filter, setFilter] = useState<"all" | "pending">("all");
 
   const loadAgents = useCallback(async () => {
     try {
@@ -324,12 +327,12 @@ export default function AgentsPage() {
   const loadProposals = useCallback(async () => {
     setProposalsLoading(true);
     try {
-      const res = await fetch("/api/agent-proposals");
+      const res = await fetch(`/api/agent-proposals?sortBy=${sortBy}&filter=${filter}`);
       const data = await res.json();
       setProposals(Array.isArray(data) ? data : []);
     } catch {}
     setProposalsLoading(false);
-  }, []);
+  }, [sortBy, filter]);
 
   useEffect(() => {
     loadAgents();
@@ -340,7 +343,7 @@ export default function AgentsPage() {
   useEffect(() => {
     loadProposals();
     const interval = setInterval(loadProposals, 20000);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); };
   }, [loadProposals]);
 
   async function handleReject(taskId: string) {
@@ -513,9 +516,59 @@ export default function AgentsPage() {
               <p className="text-[12px] text-[var(--text-3)]">
                 Ideas and UI/UX proposals from your agents — review, approve, dismiss, or turn into a task.
               </p>
+              {/* Sort/filter controls */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex rounded-full p-0.5 gap-0.5" style={{ border: "1px solid var(--line)" }}>
+                  <button
+                    onClick={() => setSortBy("newest")}
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                      sortBy === "newest" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                    }`}
+                    title="Sort by newest first"
+                  >
+                    <SortDesc className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => setSortBy("oldest")}
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                      sortBy === "oldest" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                    }`}
+                    title="Sort by oldest first"
+                  >
+                    <SortAsc className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => setSortBy("agent")}
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                      sortBy === "agent" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                    }`}
+                    title="Sort by agent"
+                  >
+                    A-Z
+                  </button>
+                </div>
+                <div className="flex rounded-full p-0.5 gap-0.5 ml-auto" style={{ border: "1px solid var(--line)" }}>
+                  <button
+                    onClick={() => setFilter("all")}
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                      filter === "all" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setFilter("pending")}
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                      filter === "pending" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                    }`}
+                  >
+                    Pending
+                  </button>
+                </div>
+              </div>
               {/* Pending first, then handled ones */}
               <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
-                {[...proposals].sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1)).map((p) => (
+                {proposals.map((p) => (
                   <ProposalCard
                     key={p.taskId}
                     proposal={p}

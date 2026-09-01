@@ -8,7 +8,7 @@
    ─────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Inbox, ArrowUpRight } from "lucide-react";
+import { Check, Inbox, ArrowUpRight, SortAsc, SortDesc } from "lucide-react";
 import { Panel, Pill, EmptyState, Eyebrow } from "@/components/ui/kit";
 import { ProposalCard } from "@/app/agents/proposal-card";
 
@@ -28,24 +28,29 @@ interface Proposal {
   followUpResult?: string | null;
 }
 
+type SortMode = "newest" | "oldest" | "agent";
+type FilterMode = "all" | "pending";
+
 export function AgentProposalsWidget() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [sortBy, setSortBy] = useState<SortMode>("newest");
+  const [filter, setFilter] = useState<FilterMode>("all");
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/agent-proposals");
+      const r = await fetch(`/api/agent-proposals?sortBy=${sortBy}&filter=${filter}`);
       const data = await r.json();
       setProposals(Array.isArray(data) ? data : []);
     } catch { /* keep last state */ }
     setLoaded(true);
-  }, []);
+  }, [sortBy, filter]);
 
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
       try {
-        const r = await fetch("/api/agent-proposals");
+        const r = await fetch(`/api/agent-proposals?sortBy=${sortBy}&filter=${filter}`);
         const data = await r.json();
         if (!cancelled) setProposals(Array.isArray(data) ? data : []);
       } catch { /* keep last state */ }
@@ -54,13 +59,11 @@ export function AgentProposalsWidget() {
     tick();
     const iv = setInterval(tick, 20000);
     return () => { cancelled = true; clearInterval(iv); };
-  }, []);
+  }, [sortBy, filter]);
 
   const pending = proposals.filter((p) => p.status === "pending");
   const handled = proposals.length - pending.length;
-  const visible = [...proposals]
-    .sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1))
-    .slice(0, 2);
+  const visible = [...proposals].slice(0, 2);
 
   const reject = async (taskId: string) => {
     await fetch("/api/agent-proposals", {
@@ -129,6 +132,70 @@ export function AgentProposalsWidget() {
             <span className="num text-[10.5px] text-[var(--text-3)]">{handled} handled</span>
           )}
         </span>
+      </div>
+
+      {/* Controls row */}
+      <div className="flex items-center gap-2 mb-3">
+        {/* Sort toggle */}
+        <div className="flex rounded-full p-0.5 gap-0.5" style={{ border: "1px solid var(--line)" }}>
+          <button
+            onClick={() => setSortBy("newest")}
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+              sortBy === "newest"
+                ? "bg-white/[0.08] text-[var(--text)]"
+                : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+            }`}
+            title="Sort by newest first"
+          >
+            <SortDesc className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => setSortBy("oldest")}
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+              sortBy === "oldest"
+                ? "bg-white/[0.08] text-[var(--text)]"
+                : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+            }`}
+            title="Sort by oldest first"
+          >
+            <SortAsc className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => setSortBy("agent")}
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+              sortBy === "agent"
+                ? "bg-white/[0.08] text-[var(--text)]"
+                : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+            }`}
+            title="Sort by agent"
+          >
+            A-Z
+          </button>
+        </div>
+
+        {/* Filter toggle */}
+        <div className="flex rounded-full p-0.5 gap-0.5 ml-auto" style={{ border: "1px solid var(--line)" }}>
+          <button
+            onClick={() => setFilter("all")}
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+              filter === "all"
+                ? "bg-white/[0.08] text-[var(--text)]"
+                : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setFilter("pending")}
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+              filter === "pending"
+                ? "bg-white/[0.08] text-[var(--text)]"
+                : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+            }`}
+          >
+            Pending
+          </button>
+        </div>
       </div>
 
       {loaded && proposals.length === 0 ? (

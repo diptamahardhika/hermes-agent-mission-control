@@ -33,9 +33,8 @@ const COMMENT_SQL = `
     AND length(c.body) > 100
   ORDER BY c.created_at DESC;`;
 
-// Agents report results in task_runs.summary (not task_comments). Surface a
-// run as a proposal when the task asked for ideas/recommendations (reviews,
-// UX proposals, audits) — routine reports stay off the proposal board.
+// Only surface tasks that ask for ideas/recommendations — routine daily reports
+// (digests, hygiene scans, completed reviews) are excluded here by title.
 const RUN_SQL = `
   SELECT 'run-' || r.id AS id, r.task_id,
          CASE WHEN r.profile = 'default' THEN 'max' ELSE r.profile END AS author,
@@ -47,6 +46,16 @@ const RUN_SQL = `
   WHERE r.status = 'done'
     AND length(coalesce(r.summary,'')) > 100
     AND r.id = (SELECT MAX(r2.id) FROM task_runs r2 WHERE r2.task_id = r.task_id)
+    AND NOT (
+      -- Exclude pure daily reports/digests that are just informational
+      lower(t.title) LIKE '%digest%'
+      OR lower(t.title) LIKE '%daily brief%'
+      OR lower(t.title) LIKE '%hygiene scan%'
+      OR lower(t.title) LIKE '%performance check%'
+      OR lower(t.title) LIKE '%weekly%review%'
+      -- Exclude tasks whose title is just "Implement: <something> complete"
+      OR (lower(t.title) LIKE 'implement:%' AND lower(t.title) LIKE '%complete%')
+    )
     AND (
       lower(t.title) LIKE '%propos%' OR lower(t.title) LIKE '%sugges%'
       OR lower(t.title) LIKE '%recommend%' OR lower(t.title) LIKE '%improv%'
@@ -91,11 +100,21 @@ function toProposal(row: any, persisted?: any, followUp?: { status: string; resu
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const sortBy = searchParams.get("sortBy") || "newest"; // newest | oldest | status
+    const filter = searchParams.get("filter") || "all"; // all | pending
+
     const [persisted, commentRows, runRows] = await Promise.all([
       prisma.agentProposal.findMany(),
-      shJson(COMMENT_SQL),
+      shJson(`
+        SELECT c.id, c.task_id, c.author, c.body, c.created_at, t.title AS task_title, t.status AS task_status
+        FROM task_comments c
+        JOIN tasks t ON t.id = c.task_id
+        WHERE c.author IN ('nova','sage','knox','max','pixel')
+          AND length(c.body) > 100
+        ORDER BY c.created_at DESC;`),
       shJson(RUN_SQL),
     ]);
 
@@ -108,13 +127,13 @@ export async function GET() {
     }
     const rows = [...byTask.values()];
 
-    const stateByTask = new Map(persisted.map((p) => [p.taskId, p]));
+    const stateByTask = new Map(persisted.map((p: any) => [p.taskId, p]));
 
     // Self-heal: proposals turned into tasks get their follow-up kanban id
     // backfilled from the bridge's AgentRequest result (task JSON from
     // `hermes kanban create --json`).
     const unlinked = persisted.filter(
-      (p) => p.status === "turned-into-task" && !p.followUpTaskId
+      (p: any) => p.status === "turned-into-task" && !p.followUpTaskId
     );
     if (unlinked.length) {
       for (const p of unlinked.slice(0, 10)) {
@@ -139,8 +158,8 @@ export async function GET() {
 
     // Live status of follow-up tasks created from proposals (single sqlite query)
     const followUpIds = persisted
-      .map((p) => p.followUpTaskId)   // includes ids just backfilled above
-      .filter((id): id is string => Boolean(id));
+      .map((p: any) => p.followUpTaskId)   // includes ids just backfilled above
+      .filter((id: string): id is string => Boolean(id));
     const followUpMap = new Map<string, { status: string; result: string | null; blockKind?: string | null }>();
     if (followUpIds.length) {
       const list = followUpIds.map((id) => `'${id.replace(/'/g, "")}'`).join(",");
@@ -157,21 +176,40 @@ export async function GET() {
       return toProposal(row, p, p?.followUpTaskId ? followUpMap.get(p.followUpTaskId) : null);
     });
 
-    // Not everything an agent reports is a proposal. Filter out pure status
-    // notifications — reports whose summary says there's nothing to decide
-    // (duplicate work / already implemented / no remaining action). These are
-    // completion notes, not calls for the user's approval.
+    // Filter out pure status notifications — reports whose summary says there's
+    // nothing to decide (already implemented / no remaining action / just a
+    // completion note). These are informational, not calls for approval.
     const NOT_A_PROPOSAL =
-      /\b(already (implemented|completed|shipped|done)|duplicate of|no remaining work|nothing to (do|decide)|no further action)\b/i;
+      /\b(already (implemented|completed|shipped|done)|duplicate of|no remaining work|nothing to (do|decide)|no further action|system healthy|no action (required|needed)|complete\.|review complete)\b/i;
     const actionable = proposals.filter((p: any) => {
       if (p.status !== "pending") return true;           // reviewed items stay visible
       if (p.taskStatus === "done" && NOT_A_PROPOSAL.test(p.body || "")) return false;
       return true;
     });
 
-    actionable.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // Sort: pending first always, then by requested sort key
+    const sorted = actionable.sort((a: any, b: any) => {
+      // Pending always comes first
+      if (a.status !== b.status) {
+        return a.status === "pending" ? -1 : 1;
+      }
+      // Then by sort criterion
+      if (sortBy === "oldest") {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      if (sortBy === "agent") {
+        return a.agent.localeCompare(b.agent) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      // Default: newest first
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
-    return NextResponse.json(actionable, {
+    // Filter by status if requested
+    const filtered = filter === "pending"
+      ? sorted.filter((p: any) => p.status === "pending")
+      : sorted;
+
+    return NextResponse.json(filtered, {
       headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
     });
   } catch (error) {
