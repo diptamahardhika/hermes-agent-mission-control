@@ -197,14 +197,18 @@ export async function GET(request: Request) {
     const sorted = actionable.sort((a: any, b: any) => {
       // Pending always comes first
       if (a.status !== b.status) {
-        return a.status === "pending" ? -1 : 1;
+        // Pending always comes first; if only one is pending, that decides it.
+        // If neither is pending (rejected vs completed, etc.) fall through to
+        // the date sort so date order wins across status boundaries.
+        if (a.status === "pending") return -1;
+        if (b.status === "pending") return 1;
       }
       // Then by sort criterion
       if (sortBy === "oldest") {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       }
       if (sortBy === "agent") {
-        return a.agent.localeCompare(b.agent) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return a.title.localeCompare(b.title) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
       // Default: newest first
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();

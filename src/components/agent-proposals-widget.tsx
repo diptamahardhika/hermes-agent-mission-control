@@ -167,7 +167,7 @@ export function AgentProposalsWidget() {
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
-            title="Sort by agent"
+            title="Sort by title (A-Z)"
           >
             A-Z
           </button>

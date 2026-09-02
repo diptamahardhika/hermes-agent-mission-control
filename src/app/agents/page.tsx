@@ -561,7 +561,7 @@ export default function AgentsPage() {
                     className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
                       sortBy === "agent" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                     }`}
-                    title="Sort by agent"
+                    title="Sort by title (A-Z)"
                   >
                     A-Z
                   </button>
