@@ -2,9 +2,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { NextResponse } from "next/server";
-
-// OpenRouter's public model catalog needs no API key.
-const MODELS_URL = "https://openrouter.ai/api/v1/models";
+import { fetchAllModels } from "@/lib/free-model-sources";
 
 // AI news feeds — plain RSS/Atom, no keys.
 const NEWS_FEEDS: { url: string; source: string }[] = [
@@ -55,11 +53,15 @@ export type ModelCard = {
   id: string;
   name: string;
   provider: string;
+  source: string;                    // NEW: "openrouter" | "gemini" | "groq" | "github" | "cerebras" | "llm7" | "kilo" | "zai" | "ovh" | "deepseek" | "siliconflow" | "sambanova" | "nebius" | "nscale" | "ai21" | "xai" | ...
   contextLength: number | null;
   free: boolean;
+  freeTier: "permanent-zero" | "quota" | "trial" | "no-card" | "unknown";  // NEW
+  freeTierDetail?: string;           // NEW: human-readable detail
   createdAt: number | null;
   inputs: string[];
   tags: string[];
+  url?: string;                      // NEW: canonical link for this model
 };
 
 export type NewsItem = {
@@ -85,17 +87,6 @@ function decodeEntities(s: string): string {
 function tag(block: string, name: string): string {
   const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, "i"));
   return m ? decodeEntities(m[1]).trim() : "";
-}
-
-async function fetchModels(): Promise<ModelCard[]> {
-  try {
-    const res = await fetch(MODELS_URL, { next: { revalidate: 3600 } });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return Array.isArray(json?.data) ? json.data.map(toCard) : [];
-  } catch {
-    return [];
-  }
 }
 
 function parseFeed(xml: string, source: string): NewsItem[] {
@@ -147,20 +138,30 @@ function deriveTags(m: ORModel): string[] {
 }
 
 function toCard(m: ORModel): ModelCard {
+  const isFree = m.pricing?.prompt === "0" && m.pricing?.completion === "0";
   return {
     id: m.id,
     name: m.name,
     provider: m.id.split("/")[0] || "unknown",
+    source: "openrouter",
     contextLength: m.context_length ?? null,
-    free: m.pricing?.prompt === "0" && m.pricing?.completion === "0",
+    free: isFree,
+    freeTier: isFree ? "permanent-zero" : "unknown",
+    freeTierDetail: isFree ? "$0 on OpenRouter" : undefined,
     createdAt: m.created ? m.created * 1000 : null,
     inputs: m.architecture?.input_modalities || ["text"],
     tags: deriveTags(m),
+    url: `https://openrouter.ai/${m.id}`,
   };
 }
 
 export async function GET() {
-  const [models, news] = await Promise.all([fetchModels(), Promise.all([fetchNews(), fetchHN()]).then(([a, b]) => [...a, ...b].sort((x, y) => (y.publishedAt || 0) - (x.publishedAt || 0)).slice(0, 14))]);
+  const [models, news] = await Promise.all([
+    fetchAllModels(),
+    Promise.all([fetchNews(), fetchHN()]).then(([a, b]) =>
+      [...a, ...b].sort((x, y) => (y.publishedAt || 0) - (x.publishedAt || 0)).slice(0, 14)
+    ),
+  ]);
 
   if (!models.length && !news.length) {
     return NextResponse.json({ newModels: [], freeModels: [], totalFree: 0, news: [], fetchedAt: null });
@@ -168,20 +169,36 @@ export async function GET() {
 
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const newModels = models
-    .filter(m => m.createdAt && m.createdAt > thirtyDaysAgo)
+    .filter((m) => m.createdAt && m.createdAt > thirtyDaysAgo)
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     .slice(0, 8);
 
+  // Sort freeModels by tier priority first (permanent-zero > quota > trial > no-card > unknown),
+  // then by recency so the most valuable + newest free models appear first.
+  const TIER_ORDER: Record<ModelCard["freeTier"], number> = {
+    "permanent-zero": 5,
+    "quota": 4,
+    "trial": 2,
+    "no-card": 1,
+    "unknown": 0,
+  };
   const freeModels = models
-    .filter(m => m.free)
-    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-    .slice(0, 10);
+    .filter((m) => m.free)
+    .sort((a, b) => {
+      const tierDiff = TIER_ORDER[b.freeTier] - TIER_ORDER[a.freeTier];
+      if (tierDiff !== 0) return tierDiff;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    })
+    .slice(0, 30);
 
-  return NextResponse.json({
-    newModels,
-    freeModels,
-    totalFree: models.filter(m => m.free).length,
-    news,
-    fetchedAt: new Date().toISOString(),
-  }, { headers: { "Cache-Control": "no-store, no-cache" } });
+  return NextResponse.json(
+    {
+      newModels,
+      freeModels,
+      totalFree: models.filter((m) => m.free).length,
+      news,
+      fetchedAt: new Date().toISOString(),
+    },
+    { headers: { "Cache-Control": "no-store, no-cache" } }
+  );
 }
