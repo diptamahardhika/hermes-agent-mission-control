@@ -72,6 +72,47 @@ Post findings as a comment on the PR via GitHub API.`;
   return taskId;
 }
 
+// ── Enqueue Pixel merge-review task ───────────────────────────────────────────
+async function enqueuePixelMergeReview(
+  repo: string,
+  prNumber: number,
+  commitSha: string,
+  prTitle: string
+): Promise<string> {
+  const taskId = `pixel-merge-${repo}-${prNumber}-${Date.now()}`;
+  const body = `Security review for recent merge in ${repo}.
+Commit: ${commitSha}
+PR: #${prNumber}
+Title: ${prTitle}
+
+Check for:
+- [ ] Security regressions introduced
+- [ ] Hardcoded secrets in new code
+- [ ] Dependency changes with known CVEs
+- [ ] Insecure patterns (eval, exec, innerHTML, etc.)
+- [ ] Unused dependencies added
+- [ ] Run graphify update . after scan`;
+
+  await execFileP(HERMES_BIN, [
+    "kanban",
+    "--board",
+    "default",
+    "create",
+    "--json",
+    "--idempotency-key",
+    `pixel-merge-review-${repo}-${prNumber}`,
+    "--assignee",
+    "pixel",
+    taskId,
+    "--body",
+    body,
+    "--workspace",
+    `worktree:${homedir()}/${repo.split("/")[1]}`,
+  ]);
+
+  return taskId;
+}
+
 // ── POST handler ──────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
   const raw = await req.text();
@@ -108,14 +149,14 @@ export async function POST(req: Request) {
     const title = pr.title || "Untitled PR";
     const actionType = payload.action || "unknown";
 
-    // Only review on open or synchronize (not close/merge/reopen)
+    // Review on open or synchronize
     if (actionType === "opened" || actionType === "synchronize") {
       console.log(`[webhook] PR #${prNumber} ${actionType} in ${repoName}`);
-      
+
       try {
         const taskId = await enqueuePixelReview(repoName, prNumber, branch, sha, title);
         console.log(`[webhook] Pixel review task enqueued: ${taskId}`);
-        
+
         return NextResponse.json({
           ok: true,
           message: `Pixel security review enqueued for PR #${prNumber}`,
@@ -126,6 +167,29 @@ export async function POST(req: Request) {
         console.error("[webhook] Failed to enqueue task:", err);
         return NextResponse.json(
           { error: "Failed to enqueue review task", detail: String(err) },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Review on merge (closed + merged) — post-merge security scan
+    if (actionType === "closed" && pr.merged) {
+      console.log(`[webhook] PR #${prNumber} merged in ${repoName}`);
+
+      try {
+        const taskId = await enqueuePixelMergeReview(repoName, prNumber, sha, title);
+        console.log(`[webhook] Pixel merge-review task enqueued: ${taskId}`);
+
+        return NextResponse.json({
+          ok: true,
+          message: `Pixel merge review enqueued for PR #${prNumber}`,
+          taskId,
+          prUrl: pr.html_url,
+        });
+      } catch (err) {
+        console.error("[webhook] Failed to enqueue merge-review task:", err);
+        return NextResponse.json(
+          { error: "Failed to enqueue merge review task", detail: String(err) },
           { status: 500 }
         );
       }
