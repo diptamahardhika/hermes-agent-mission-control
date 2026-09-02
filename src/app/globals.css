@@ -49,6 +49,13 @@
   100% { box-shadow: 0 0 0 0 rgba(56,189,248,0); }
 }
 
+/* Pulse ring for online (available) agents — emerald standby indicator */
+@keyframes online-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(52,211,153,0.35); }
+  70%  { box-shadow: 0 0 0 5px rgba(52,211,153,0); }
+  100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); }
+}
+
 :root {
   --background: #0a0b0d;
   --foreground: #e7e8ea;

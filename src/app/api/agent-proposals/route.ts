@@ -176,7 +176,9 @@ export async function GET(request: Request) {
 
     const proposals = rows.map((row: any) => {
       const p = stateByTask.get(row.task_id);
-      return toProposal(row, p, p?.followUpTaskId ? followUpMap.get(p.followUpTaskId) : null);
+      const result = toProposal(row, p, p?.followUpTaskId ? followUpMap.get(p.followUpTaskId) : null);
+      // Normalize id to taskId so POST lookups work regardless of source
+      return { ...result, id: row.task_id };
     });
 
     // Filter out pure status notifications — reports whose summary says there's
@@ -286,14 +288,25 @@ export async function POST(request: Request) {
     if (!proposal) {
       const isRunId = proposalId.startsWith("run-");
       const runNum = isRunId ? proposalId.slice(4).replace(/[^0-9]/g, "") : "";
-      // Try, in order: run by run-id, comment by task_id, run by task_id.
-      // (The UI may send any of: proposal id "run-<n>", or the source task id.)
+      const safeTaskId = proposalId.replace(/'/g, "");
+
+      // Build targeted queries for the fallback lookup
+      const runByIdSql = RUN_SQL.replace(
+        "WHERE r.status = 'done'",
+        `WHERE r.status = 'done' AND r.id = ${runNum}`
+      );
+      const commentByTaskSql = COMMENT_SQL.replace(
+        "WHERE c.author IN",
+        `WHERE c.task_id = '${safeTaskId}' AND c.author IN`
+      );
+      const runByTaskSql = RUN_SQL.replace(
+        "WHERE r.status = 'done'",
+        `WHERE r.status = 'done' AND r.task_id = '${safeTaskId}'`
+      );
+
       const attempts = isRunId
-        ? [RUN_SQL.replace("ORDER BY created_at DESC;", ` AND r.id = '${runNum}';`)]
-        : [
-            COMMENT_SQL.replace("ORDER BY c.created_at DESC;", `AND c.task_id = '${proposalId.replace(/'/g, "")}';`),
-            RUN_SQL.replace("ORDER BY created_at DESC;", ` AND r.task_id = '${proposalId.replace(/'/g, "")}';`),
-          ];
+        ? [runByIdSql]
+        : [commentByTaskSql, runByTaskSql];
       let rows: any[] = [];
       for (const sql of attempts) {
         rows = await shJson(sql);
@@ -303,9 +316,18 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "proposal not found" }, { status: 404 });
       }
       const row = rows[0];
-      proposal = await prisma.agentProposal.create({
-        data: {
-          id: String(row.id),
+      // Use taskId as the primary key — it's already unique.
+      proposal = await prisma.agentProposal.upsert({
+        where: { taskId: row.task_id },
+        update: {
+          body: row.body,
+          agent: row.author,
+          title: `${row.author}: ${firstLine(row.body).slice(0, 70)}`,
+          status: "pending",
+          reviewedAt: null,
+        },
+        create: {
+          id: row.task_id,
           taskId: row.task_id,
           agent: row.author,
           title: `${row.author}: ${firstLine(row.body).slice(0, 70)}`,

@@ -23,7 +23,7 @@ interface Agent {
   tasksCompleted: number;
   totalCost: number;
   recentActivity: AgentActivity[];
-  proposals?: AgentProposal[];
+  blockedTasks?: { count: number; firstTitle?: string };
 }
 
 interface AgentProposal {
@@ -315,9 +315,28 @@ export default function AgentsPage() {
 
   const loadAgents = useCallback(async () => {
     try {
-      const res = await fetch("/api/agents");
-      const data = await res.json();
-      setAgents(Array.isArray(data) ? data : []);
+      const [agentsRes, tasksRes] = await Promise.all([
+        fetch("/api/agents"),
+        fetch("/api/hermes/tasks"),
+      ]);
+      const agentsData = await agentsRes.json();
+      const tasksData = await tasksRes.json();
+      const blockedMap: Record<string, { count: number; firstTitle?: string }> = {};
+      if (Array.isArray(tasksData?.tasks)) {
+        for (const t of tasksData.tasks as any[]) {
+          if (t.status === "blocked" && t.assignee) {
+            blockedMap[t.assignee] ||= { count: 0 };
+            blockedMap[t.assignee].count!++;
+            if (!blockedMap[t.assignee].firstTitle) blockedMap[t.assignee].firstTitle = t.title;
+          }
+        }
+      }
+      setAgents(
+        (Array.isArray(agentsData) ? agentsData : []).map((a: any) => ({
+          ...a,
+          blockedTasks: blockedMap[a.id] || undefined,
+        }))
+      );
     } catch (e) {
       setLoadError("Failed to load agents. Check your connection and try again.");
     }
@@ -611,6 +630,38 @@ export default function AgentsPage() {
       {view === "office" && (
         <>
           <OfficeView agents={agents} />
+          {/* Unblock strip — only shown when any agent has blocked tasks */}
+          {(() => {
+            const totalBlocked = agents.reduce((s, a) => s + (a.blockedTasks?.count || 0), 0);
+            if (totalBlocked === 0) return null;
+            return (
+              <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/5">
+                <span className="text-[12px] text-red-300">
+                  ⚠ {totalBlocked} blocked task{totalBlocked > 1 ? "s" : ""} across {agents.filter(a => a.blockedTasks?.count).length} agent{agents.filter(a => a.blockedTasks?.count).length > 1 ? "s" : ""}
+                </span>
+                <button
+                  onClick={async () => {
+                    const ids = agents.flatMap(a =>
+                      Array.from({ length: a.blockedTasks?.count || 0 }, (_, i) => a.id)
+                    );
+                    await Promise.all(
+                      [...new Set(ids)].map(id =>
+                        fetch("/api/hermes/tasks/unblock", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ agentId: id }),
+                        })
+                      )
+                    );
+                    loadAgents();
+                  }}
+                  className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium text-red-300 border border-red-500/30 hover:bg-red-500/15 transition-colors panel-interactive"
+                >
+                  Unblock all
+                </button>
+              </div>
+            );
+          })()}
           {/* Chat quick-launch strip — Max first since he's the main agent at hermy-hq */}
           <div className="flex flex-wrap gap-2 pt-2">
             {agents.find(a => a.id === "max") && (

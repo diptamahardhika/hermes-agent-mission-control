@@ -19,6 +19,7 @@ interface Agent {
   tasksCompleted: number;
   totalCost: number;
   recentActivity: AgentActivity[];
+  blockedTasks?: { count: number; firstTitle?: string };
 }
 
 // ── Desk layout ───────────────────────────────────────────
@@ -234,6 +235,8 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
   const statusKey = STATUS[rawStatus] ? rawStatus : "idle";
   const colors = STATUS[statusKey];
   const isWorking = rawStatus === "working";
+  const isOnline = rawStatus === "online" || rawStatus === "active";
+  const isIdle = rawStatus === "idle" || rawStatus === "completed";
   const isOffline = rawStatus === "offline" || !agent;
   const spriteSize = isMax ? 56 : 44;
   const walk = WALK[agent?.id as keyof typeof WALK] ?? WALK.sage;
@@ -256,7 +259,11 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
           ${colors.bg} ${colors.glow}
           ${isOffline ? "opacity-40" : ""}
           hover:scale-105 hover:z-10`}
-        style={isWorking ? { animation: "status-ring 1.5s infinite" } : undefined}
+        style={isWorking
+          ? { animation: "status-ring 1.5s infinite" }
+          : isOnline
+            ? { animation: "online-ring 2.5s infinite" }
+            : undefined}
       >
         {/* Desk surface */}
         <div className={`absolute bottom-3 left-3 right-3 h-1/3 rounded-lg
@@ -281,20 +288,22 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
           </div>
 
           {/* Horizontal wander wrapper */}
-          {/* NB: only WORKING agents animate like they're busy. Idle agents sit
-              at their desk (gentle breathing bob) — wandering around + popping
-              activity bubbles made them look mid-task when they weren't. */}
+          {/* NB: only WORKING agents animate like they're busy. IDLE agents wander
+              horizontally at their desk (agent-wander). ONLINE agents breathe
+              gently (agent-bob) — showing they're connected but waiting. */}
           <div
             style={
               isWorking
                 ? { animation: `agent-type 0.55s ease-in-out infinite` }
-                : undefined
+                : isIdle
+                  ? { animation: `agent-wander ${walk.wanderDur} ${walk.wanderDelay} infinite` }
+                  : undefined
             }
           >
-            {/* Vertical bob wrapper */}
+            {/* Vertical bob wrapper — ONLINE agents only (gentle breathing while waiting) */}
             <div
               style={
-                !isWorking && !isOffline
+                isOnline
                   ? { animation: `agent-bob 3.2s ${walk.wanderDelay} infinite ease-in-out` }
                   : undefined
               }
@@ -305,7 +314,7 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
 
           {/* Name + status dot */}
           <div className="flex items-center gap-1 mt-1">
-            <div className={`w-1.5 h-1.5 rounded-full ${colors.dot} ${isWorking ? "animate-pulse" : ""}`} />
+            <div className={`w-1.5 h-1.5 rounded-full ${colors.dot} ${isWorking || isOnline ? "animate-pulse" : ""}`} />
             <span className={`text-[10px] font-bold tracking-wider uppercase ${isOffline ? "text-neutral-600" : "text-white/80"}`}>
               {agent?.name ?? "Empty"}
             </span>
@@ -318,6 +327,23 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
             <span className="text-[9px] font-bold text-white">{agent.tasksCompleted > 99 ? "99+" : agent.tasksCompleted}</span>
           </div>
         )}
+
+        {/* Blocked-tasks badge */}
+        {(() => {
+          const bt = agent?.blockedTasks;
+          if (!bt || bt.count <= 0) return null;
+          return (
+            <div
+              className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-mono font-bold pointer-events-none"
+              style={{ background: "rgba(239,68,68,0.15)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5" }}
+              title={bt.firstTitle ?? "Blocked tasks"}
+              aria-label={`${bt.count} blocked tasks`}
+            >
+              <span>⚠</span>
+              <span>{bt.count}</span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Label */}
@@ -439,11 +465,12 @@ export default function OfficeView({ agents }: { agents: Agent[] }) {
       {/* Legend */}
       <div className="border-t border-neutral-800/60 px-6 py-3 flex items-center gap-6 flex-wrap">
         {[
-          { status: "working", label: "Working" },
-          { status: "idle",    label: "Idle" },
-          { status: "offline", label: "Offline" },
-          { status: "error",   label: "Error" },
-        ].map(({ status, label }) => (
+           { status: "working", label: "Working" },
+           { status: "online",  label: "Online" },
+           { status: "idle",    label: "Idle" },
+           { status: "offline", label: "Offline" },
+           { status: "error",   label: "Error" },
+         ].map(({ status, label }) => (
           <div key={status} className="flex items-center gap-1.5">
             <div className={`w-2 h-2 rounded-full ${STATUS[status]?.dot ?? "bg-neutral-600"}`} />
             <span className="text-[10px] text-neutral-500 uppercase tracking-wider">{label}</span>

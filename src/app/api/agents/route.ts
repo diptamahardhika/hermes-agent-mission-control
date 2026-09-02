@@ -152,40 +152,108 @@ async function hermesKanbanActivity(): Promise<{
   return { activity, doneCounts };
 }
 
-// ── Hermes interactive sessions (local state.db) → Max ─────
-// A row in session_turn_leases with expires_at in the future means a turn is
-// generating RIGHT NOW.
-async function hermesSessionLive(): Promise<Live> {
-  const db = `${homedir()}/.hermes/state.db`;
+// ── Hermes interactive sessions (local state.db) → per-profile ──
+// Each profile has its own state.db — query all of them for active leases.
+async function hermesSessionLiveMap(): Promise<Record<string, Live>> {
   const nowSql = "strftime('%s','now')";
+  const profiles = ["", "knox", "sage", "nova", "pixel"];
+  const map: Record<string, Live> = {};
 
-  const leaseOut = await sh("sqlite3", [
-    "-readonly", db,
-    `SELECT l.conversation_id, s.title, s.last_activity_at
-     FROM session_turn_leases l LEFT JOIN sessions s ON s.id = l.conversation_id
-     WHERE l.expires_at > ${nowSql} ORDER BY s.last_activity_at DESC LIMIT 1;`,
-  ]);
+  // Check active turn leases in each profile's database
+  for (const profile of profiles) {
+    const db = profile
+      ? `${homedir()}/.hermes/profiles/${profile}/state.db`
+      : `${homedir()}/.hermes/state.db`;
 
-  if (leaseOut && leaseOut.trim()) {
-    const [, title] = leaseOut.trim().split("|");
-    return {
-      status: "working",
-      currentTask: title && title !== "" ? title.slice(0, 80) : "Working on a task",
-      lastActive: new Date().toISOString(),
-    };
+    const leaseOut = await sh("sqlite3", [
+      "-readonly", db,
+      `SELECT l.conversation_id, s.title, s.last_activity_at
+       FROM session_turn_leases l LEFT JOIN sessions s ON s.id = l.conversation_id
+       WHERE l.expires_at > ${nowSql}
+       ORDER BY s.last_activity_at DESC LIMIT 1;`,
+    ]);
+
+    if (leaseOut && leaseOut.trim()) {
+      const parts = leaseOut.trim().split("|");
+      const [, title] = parts;
+      const agentId = profile === "" ? "max" : profile;
+      if (!(KANBAN_PROFILES as readonly string[]).includes(agentId) || map[agentId]) continue;
+      map[agentId] = {
+        status: "working",
+        currentTask: title && title !== "" ? title.slice(0, 80) : "Working on a task",
+        lastActive: new Date().toISOString(),
+      };
+    }
   }
 
-  return { status: "idle" };
+  // Detect active Hermes CLI processes — check recent activity for working/online
+  const psOut = await sh("sh", [
+    "-c",
+    "ps aux | grep 'hermes_cli.main' | grep -v grep",
+  ]);
+  if (psOut && psOut.trim()) {
+    for (const line of psOut.trim().split("\n")) {
+      const profileMatch = line.match(/--profile\s+(\S+)/);
+      if (!profileMatch) continue;
+      const profile = profileMatch[1];
+      const agentId = profile === "default" ? "max" : profile;
+      if (!(KANBAN_PROFILES as readonly string[]).includes(agentId)) continue;
+
+      // Already has an active turn lease — skip
+      if (map[agentId]) continue;
+
+      // Check recent session activity in the profile's database
+      const db = profile
+        ? `${homedir()}/.hermes/profiles/${profile}/state.db`
+        : `${homedir()}/.hermes/state.db`;
+      const activityOut = await sh("sqlite3", [
+        "-readonly", db,
+        `SELECT last_activity_at FROM sessions
+         WHERE profile_name = '${agentId}'
+         ORDER BY last_activity_at DESC LIMIT 1;`,
+      ]);
+      let lastActivity = Number(activityOut?.trim());
+
+      // Fallback: most recent session if no profile_name match
+      if (!lastActivity) {
+        const recentOut = await sh("sqlite3", [
+          "-readonly", db,
+          `SELECT last_activity_at FROM sessions ORDER BY last_activity_at DESC LIMIT 1;`,
+        ]);
+        lastActivity = Number(recentOut?.trim());
+      }
+
+      if (lastActivity) {
+        const now = Date.now() / 1000;
+        // Show "working" if active within 2 minutes, otherwise "online"
+        if (now - lastActivity <= 120) {
+          map[agentId] = {
+            status: "working",
+            currentTask: "Active session",
+            lastActive: new Date().toISOString(),
+          };
+        } else {
+          map[agentId] = {
+            status: "online",
+            lastActive: new Date().toISOString(),
+          };
+        }
+      }
+    }
+  }
+
+  return map;
 }
 
 
 export async function GET() {
   try {
-    const [states, sessionLive, kanbanLive, kanbanActivity] = await Promise.all([
+    const [states, sessionLiveMap, kanbanLive, kanbanActivity, healthRow] = await Promise.all([
       prisma.agentState.findMany(),
-      hermesSessionLive(),
+      hermesSessionLiveMap(),
       hermesKanbanLive(),
       hermesKanbanActivity(),
+      prisma.dataStore.findUnique({ where: { key: "hermes-health" } }),
     ]);
     const stateMap: Record<string, any> = {};
     for (const s of states) {
@@ -195,17 +263,33 @@ export async function GET() {
     // Real runtime → cast mapping: all five agents are Hermes kanban profiles.
     // max: interactive Hermes sessions (you talking to Hermes) OR his kanban tasks;
     // sage/knox/nova/pixel: their kanban profile tasks (running = Working).
+    // Bridge health: when the hermes-bridge is connected, all five kanban-profile
+    // agents (max/sage/knox/nova/pixel) are reachable even when they have no
+    // running kanban task. Without this, the agents page shows them as static
+    // idle dots while the bridge is actually up — a visual gap between the
+    // in-app browser's agent list and hermy-hq's /agents view.
+    // DataStore.data is JsonValue — cast to any since we control the shape written
+    // by bridge.mjs mirrorHealth() (always { online, gateway, detail, lastSeen }).
+    const healthData = (healthRow?.data as any) ?? {};
+    const bridgeHealthy = healthData.online === true && healthData.gateway === "running";
     const liveMap: Record<string, Live> = {
-      // NB: spread kanbanLive FIRST — the max: line must win, otherwise a
-      // queued (ready) kanban task's "idle" overwrites the live session's
-      // "working" (interactive turn beats a queued task).
+      // NB: spread kanbanLive FIRST — the sessionLiveMap must win for any agent
+      // that has an active interactive turn (interactive beats queued kanban).
       ...kanbanLive,
-      max: kanbanLive.max?.status === "working" ? kanbanLive.max : sessionLive,
+      ...sessionLiveMap,
     };
+
+    // When the bridge is healthy but an agent has no running kanban task, mark it
+    // online (pulsing) so the agents page reflects the real connected state instead
+    // of a static idle dot.
+    function bridgeFallback(live: Live | undefined): Live | undefined {
+      if (!bridgeHealthy || live) return live; // kanbanLive already has a verdict
+      return { status: "online" };
+    }
 
     const agents = DEFAULT_AGENTS.map((agent) => {
       const s = stateMap[agent.id] || {};
-      const live = liveMap[agent.id];
+      const live = bridgeFallback(liveMap[agent.id]);
       const status = live?.status ?? s.status ?? agent.status;
       const currentTask = live?.currentTask ?? (s.currentTask || undefined);
       const lastActive =
