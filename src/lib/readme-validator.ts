@@ -5,7 +5,7 @@ interface ExampleResult {
   file: string;
   line: number;
   code: string;
-  status: "PASS" | "FAIL";
+  status: "PASS" | "FAIL" | "WARN";
   error?: string;
 }
 
@@ -124,8 +124,9 @@ function validateExample(example: {file: string; line: number; code: string}, re
     }
     
     // Execute with timeout and limited output
-    execSync(command, {
-      args,
+    // Use sh -c for proper argument handling
+    const cmdString = `${command} ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`;
+    execSync(cmdString, {
       cwd: workingDir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -151,8 +152,8 @@ function validateExample(example: {file: string; line: number; code: string}, re
 
 // ── Main README validator function ────────────────────────────────────────────
 export function validateReadmeExamples(repoPath: string): ReadmeValidationResult {
-  let readmePath: string;
-  
+  let readmePath = "";
+
   // Look for README.md in various locations
   const possiblePaths = [
     join(repoPath, 'README.md'),
