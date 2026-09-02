@@ -675,9 +675,18 @@ function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
 
 // ── AI model news panel ────────────────────────────────────
 interface ModelCard {
-  id: string; name: string; provider: string;
-  contextLength: number | null; free: boolean;
-  createdAt: number | null; inputs: string[]; tags: string[];
+  id: string;
+  name: string;
+  provider: string;
+  source: string;
+  contextLength: number | null;
+  free: boolean;
+  freeTier: "permanent-zero" | "quota" | "trial" | "no-card" | "unknown";
+  freeTierDetail?: string;
+  createdAt: number | null;
+  inputs: string[];
+  tags: string[];
+  url?: string;
 }
 interface AINewsData { newModels: ModelCard[]; freeModels: ModelCard[]; totalFree: number; news: { title: string; url: string; source: string; publishedAt: number | null }[]; fetchedAt: string | null }
 
@@ -706,22 +715,60 @@ function AIModelNewsPanel() {
     </span>
   );
 
-  const Row = ({ m }: { m: ModelCard }) => (
-    <a
-      href={`https://openrouter.ai/${m.id}`}
-      target="_blank" rel="noopener noreferrer"
-      className="flex items-center gap-1.5 py-1.5 border-b border-[var(--hq-hairline)] last:border-0 group"
-    >
-      <span className="text-[11px] text-[var(--hq-text-dim)] truncate flex-1 group-hover:text-[var(--hq-text)] transition-colors">{m.name}</span>
-      <span className="shrink-0 flex gap-1">
-        {m.tags.slice(0, 3).map(t => <Tag key={t} t={t} />)}
-      </span>
-      {m.free && (
-        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full text-[#34d399] bg-[#34d399]/10">free</span>
-      )}
-      <span className="num shrink-0 text-[10px] text-[var(--hq-text-ghost)]">{ctx(m.contextLength)}</span>
-    </a>
-  );
+  const TIER_LABEL: Record<ModelCard["freeTier"], string> = {
+    "permanent-zero": "FREE",
+    quota: "QUOTA",
+    trial: "TRIAL",
+    "no-card": "NO CARD",
+    unknown: "FREE",
+  };
+  const TIER_COLOR: Record<ModelCard["freeTier"], { text: string; bg: string }> = {
+    "permanent-zero": { text: "#34d399", bg: "#34d399" },
+    quota: { text: "#f0b132", bg: "#f0b132" },
+    trial: { text: "#fb7185", bg: "#fb7185" },
+    "no-card": { text: "#38bdf8", bg: "#38bdf8" },
+    unknown: { text: "#888", bg: "#888" },
+  };
+
+  const Row = ({ m }: { m: ModelCard }) => {
+    const tier = m.freeTier;
+    const tierColor = TIER_COLOR[tier];
+    const tierLabel = TIER_LABEL[tier];
+    const linkUrl = m.url || `https://openrouter.ai/${m.id}`;
+
+    return (
+      <a
+        href={linkUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1.5 py-1.5 border-b border-[var(--hq-hairline)] last:border-0 group"
+      >
+        <span className="text-[11px] text-[var(--hq-text-dim)] truncate flex-1 group-hover:text-[var(--hq-text)] transition-colors">{m.name}</span>
+        <span className="shrink-0 flex gap-1">
+          {m.tags.slice(0, 3).map((t) => <Tag key={t} t={t} />)}
+          {m.source && (
+            <span
+              className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+              style={{ color: "var(--hq-text-dim)", background: "var(--hq-card)", border: "1px solid var(--hq-border)" }}
+              title={m.source}
+            >
+              {m.source}
+            </span>
+          )}
+        </span>
+        {m.free && (
+          <span
+            className="shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full"
+            style={{ color: tierColor.text, background: `${tierColor.bg}1a`, border: `1px solid ${tierColor.bg}33` }}
+            title={m.freeTierDetail || tier}
+          >
+            {tierLabel}
+          </span>
+        )}
+        <span className="num shrink-0 text-[10px] text-[var(--hq-text-ghost)]">{ctx(m.contextLength)}</span>
+      </a>
+    );
+  };
 
   return (
     <div className="panel flex flex-col p-6">
@@ -762,9 +809,11 @@ function AIModelNewsPanel() {
               <div className="eyebrow mb-1 !text-[11px]">
                 FREE MODELS{news.totalFree != null && <span className="num text-[var(--hq-text-ghost)] font-normal"> · {news.totalFree} live</span>}
               </div>
+            <div className="flex-1 overflow-y-auto max-h-[340px] pr-1 scrollbar-none" style={{ scrollbarWidth: "none" }}>
               {news.freeModels.length
                 ? news.freeModels.map(m => <Row key={m.id} m={m} />)
                 : <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">No free models listed.</div>}
+            </div>
             </div>
           </div>
           {/* Right: AI news headlines */}
@@ -786,9 +835,18 @@ function AIModelNewsPanel() {
           </div>
         </div>
       )}
-      <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors">
-        Full catalog on OpenRouter <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-      </a>
+      <div className="mt-auto pt-4 flex flex-wrap items-center gap-2 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors">
+        <span className="text-[var(--hq-text-ghost)]">References:</span>
+        <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--hq-text)] transition-colors">OpenRouter</a>
+        <span className="text-[var(--hq-text-ghost)]">·</span>
+        <a href="https://freellm.net" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--hq-text)] transition-colors">freellm.net</a>
+        <span className="text-[var(--hq-text-ghost)]">·</span>
+        <a href="https://freellms.org" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--hq-text)] transition-colors">freellms.org</a>
+        <span className="text-[var(--hq-text-ghost)]">·</span>
+        <a href="https://freetoken.link/get-key" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--hq-text)] transition-colors">freetoken.link</a>
+        <span className="text-[var(--hq-text-ghost)]">·</span>
+        <a href="https://github.com/open-free-llm-api/awesome-freellm-apis" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--hq-text)] transition-colors">GitHub</a>
+      </div>
     </div>
   );
 }
