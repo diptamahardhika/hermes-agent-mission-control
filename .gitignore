@@ -66,3 +66,8 @@ infra/postgres/userlist.txt
 hermes-bridge/*.log
 watchdog.log
 hermes-bridge/.bridge.pid
+
+# graphify runtime artifacts
+graphify-out/.graphify_*
+graphify-out/2026-*
+graphify-out/cache/semantic/
