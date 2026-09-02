@@ -18,7 +18,16 @@
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
-When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+**ALL AGENTS — Max, Sage, Knox, Nova, Pixel — must use graphify first when working on code in this project.** Before grepping files or reading source directly:
+
+```bash
+graphify query "<question>"     # broad context
+graphify path "A" "B"           # shortest path between concepts
+graphify explain "<symbol>"     # node + its neighbors
+graphify update .               # after any code change (AST-only, free)
+```
+
+If `graphify-out/graph.json` doesn't exist yet, build it: `/graphify .`
 
 Rules:
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
