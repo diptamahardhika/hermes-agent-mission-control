@@ -72,3 +72,4 @@ graphify-out/.graphify_*
 graphify-out/2026-*
 graphify-out/cache/semantic/
 graphify-out/cache/ast/
+graphify-out/cache/last_query_stamp
