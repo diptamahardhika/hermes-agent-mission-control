@@ -133,6 +133,38 @@ function cleanStaleLocks() {
   }
 }
 
+// ── Self-healing: dispatch stuck kanban tasks when gateway is down ──────────
+// When the gateway crashes or restarts, its embedded dispatcher stops running.
+// Kanban tasks created during that window sit in `ready` indefinitely because
+// no dispatcher is polling to claim them. This function detects that condition
+// and manually triggers a dispatch pass to unstick them.
+const STUCK_KANBAN_MINUTES = 10;
+async function healStuckKanban() {
+  try {
+    // Check gateway status
+    const statusOut = await hermes(["status"], { timeout: 10000 });
+    const gatewayDown = !/Gateway Service\s*\n[\s\S]*?Status:\s*[✓\s]*running/i.test(statusOut);
+    if (gatewayDown) {
+      // Gateway is down — try to dispatch any stuck ready tasks
+      const ageThreshold = Date.now() - STUCK_KANBAN_MINUTES * 60 * 1000;
+      const out = await hermes(["kanban", "--board", BOARD, "list", "--json"], { timeout: 15000 });
+      const tasks = JSON.parse(out || "[]");
+      const stuck = tasks.filter((t) => t.status === "ready" && t.created_at && t.created_at * 1000 < ageThreshold);
+      if (stuck.length > 0) {
+        log(`self-heal: gateway down, ${stuck.length} stuck task(s) — dispatching`);
+        try {
+          await hermes(["kanban", "--board", BOARD, "dispatch", "--json"], { timeout: 30000 });
+        } catch (e) {
+          log(`self-heal: dispatch failed: ${e.message.split("\n")[0]}`);
+        }
+      }
+    }
+  } catch (e) {
+    // Non-fatal — next mirror tick will retry
+    log(`healStuckKanban check failed: ${e.message.split("\n")[0]}`);
+  }
+}
+
 // The hermes CLI owns a single session slot; concurrent invocations fight over
 // it and fail ("Command failed: hermes ..."). Serialize every call through a
 // chain so mirrors + queue runs never overlap.
@@ -897,6 +929,7 @@ async function mirrorTick() {
   try { await mirrorOmniRoute(); } catch (e) { log("mirrorOmniRoute err", e.message); }
   try { await mirrorBrief(); } catch (e) { log("mirrorBrief err", e.message); }
   try { await mirrorHomelab(); } catch (e) { log("mirrorHomelab err", e.message); }
+  try { await healStuckKanban(); } catch (e) { log("healStuckKanban err", e.message); }
 }
 
 async function main() {
