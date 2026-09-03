@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { ConditionalLayout } from "@/components/conditional-layout";
 import { ToastProvider } from "@/components/ui/toast/toast-context";
@@ -19,16 +20,19 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const sidebarOpen = cookieStore.get("hermy_sidebar_open")?.value !== "false";
+
   return (
     <html lang="en" dir="ltr" className="dark">
       <body className={`${geist.variable} ${geistMono.variable} ${geist.className} bg-[var(--bg)] text-[var(--foreground)] min-h-screen`}>
         <ToastProvider>
-          <ConditionalLayout>{children}</ConditionalLayout>
+          <ConditionalLayout sidebarOpen={sidebarOpen}>{children}</ConditionalLayout>
         </ToastProvider>
       </body>
     </html>

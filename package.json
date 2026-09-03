@@ -14,7 +14,7 @@
     "db:seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^1.6.0",
+    "@auth/prisma-adapter": "^2.11.3",
     "@prisma/client": "^6.19.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/formidable": "^3.4.6",
@@ -24,8 +24,8 @@
     "googleapis": "^171.4.0",
     "grammy": "^1.44.0",
     "lucide-react": "^0.564.0",
-    "next": "16.1.6",
-    "next-auth": "^4.24.13",
+    "next": "16.3.4",
+    "next-auth": "^4.24.15",
     "pg": "^8.19.0",
     "prisma": "^6.19.2",
     "react": "19.2.3",
@@ -42,7 +42,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
     "typescript": "^5"
@@ -56,5 +56,9 @@
     "prisma@6.19.2": true,
     "sharp@0.34.5": true,
     "unrs-resolver@1.11.1": true
+  },
+  "overrides": {
+    "brace-expansion": "^1.1.18",
+    "@babel/core": "^7.29.7"
   }
 }

@@ -1,29 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from '@/components/sidebar';
 import { CommandPalette } from '@/components/command-palette';
 
-export function ConditionalLayout({ children }: { children: React.ReactNode }) {
+export function ConditionalLayout({ children, sidebarOpen }: { children: React.ReactNode; sidebarOpen: boolean }) {
   const pathname = usePathname();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(sidebarOpen);
   const isStandalone = pathname === '/login';
 
-  // Persistence logic: Load from localStorage on mount
+  // Persist to cookie + localStorage on change
   useEffect(() => {
-    const savedState = localStorage.getItem('hermy_sidebar_open');
-    if (savedState !== null) {
-      setIsSidebarOpen(savedState === 'true');
-    } else if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setIsSidebarOpen(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("hermy_sidebar_open", String(isSidebarOpen));
+      document.cookie = `hermy_sidebar_open=${isSidebarOpen ? "true" : "false"}; path=/; max-age=${60*60*24*365}; SameSite=Lax`;
+    }
+  }, [isSidebarOpen]);
+
+  // Mobile: auto-close on mount (doesn't persist — responsive, not a preference)
+  useLayoutEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      requestAnimationFrame(() => setIsSidebarOpen(false));
     }
   }, []);
-
-  // Persistence logic: Save to localStorage on change
-  useEffect(() => {
-    localStorage.setItem('hermy_sidebar_open', String(isSidebarOpen));
-  }, [isSidebarOpen]);
 
   if (isStandalone) {
     return <>{children}</>;
