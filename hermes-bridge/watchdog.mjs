@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 /**
- * Bridge watchdog — restarts the Hermes bridge if it's not running.
- * Intended to run via cron every 5 minutes.
+ * Bridge watchdog — reports status of the Hermes bridge.
+ *
+ * With launchd (ai.hermyhq.bridge) managing the bridge process, this script
+ * acts as a read-only health reporter for the Hermes cron watchdog job.
+ * It only attempts manual intervention if launchd is not managing the service.
  */
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
 const BRIDGE_DIR = path.resolve(import.meta.dirname, '..');
-const BRIDGE_SCRIPT = path.join(BRIDGE_DIR, 'bridge.mjs');
 const PID_FILE = path.join(BRIDGE_DIR, '.bridge.pid');
 const LOG_FILE = path.join(BRIDGE_DIR, 'watchdog.log');
+
+const LAUNCHD_LABEL = 'ai.hermyhq.bridge';
 
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}`;
@@ -18,21 +22,27 @@ function log(msg) {
   fs.appendFileSync(LOG_FILE, line + '\n');
 }
 
-function isBridgeRunning() {
+/**
+ * Check whether launchd is managing the bridge service.
+ * Returns { managed: true,  running: bool } or { managed: false, running: bool }.
+ */
+function checkLaunchd() {
   try {
-    if (fs.existsSync(PID_FILE)) {
-      const pid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
-      try {
-        process.kill(pid, 0); // signal 0 = check existence without sending
-        return true;
-      } catch {
-        return false;
-      }
-    }
+    const output = execSync(
+      `launchctl list | grep '${LAUNCHD_LABEL}'`,
+      { encoding: 'utf8' }
+    );
+    // launchctl list outputs: PID  Label  (empty PID means service exists but not running)
+    const pid = output.trim().split(/\s+/)[0];
+    const running = pid && pid !== '' && pid !== '0';
+    return { managed: true, running };
   } catch {
-    return false;
+    return { managed: false, running: false };
   }
-  // Fallback: grep for the process
+}
+
+/** Fallback: check via pgrep (for non-launchd installs). */
+function isBridgeRunningFallback() {
   try {
     const output = execSync('pgrep -f "node.*bridge.mjs"', { encoding: 'utf8' });
     return output.trim().length > 0;
@@ -41,48 +51,26 @@ function isBridgeRunning() {
   }
 }
 
-function startBridge() {
-  log('Starting bridge...');
-  try {
-    execSync(`node ${BRIDGE_SCRIPT} >> ${LOG_FILE} 2>&1 &`, { shell: true, detached: true });
-    // Give it a moment to start and write its PID
-    setTimeout(() => {
-      try {
-        const output = execSync('pgrep -f "node.*bridge.mjs"', { encoding: 'utf8' }).trim();
-        if (output) {
-          fs.writeFileSync(PID_FILE, output);
-          log(`Bridge started with PID ${output}`);
-        }
-      } catch (e) {
-        log('Failed to get bridge PID after start');
-      }
-    }, 2000);
-  } catch (e) {
-    log(`Failed to start bridge: ${e.message}`);
-  }
-}
-
-function stopBridge() {
-  log('Stopping bridge...');
-  try {
-    const output = execSync('pkill -f "node.*bridge.mjs"', { encoding: 'utf8' });
-    log(`Killed: ${output.trim()}`);
-  } catch {
-    // Not running
-  }
-  if (fs.existsSync(PID_FILE)) {
-    fs.unlinkSync(PID_FILE);
-  }
-}
-
 function main() {
   log('Watchdog tick');
-  if (!isBridgeRunning()) {
-    log('Bridge not running — restarting');
-    stopBridge();
-    startBridge();
+  const ld = checkLaunchd();
+
+  if (ld.managed) {
+    if (ld.running) {
+      log('Bridge is running (launchd)');
+    } else {
+      log('Bridge service registered but NOT running — launchd will restart it');
+      // Write empty pidfile so downstream tools know launchd owns it
+      try { fs.unlinkSync(PID_FILE); } catch {}
+    }
   } else {
-    log('Bridge is running');
+    // Not managed by launchd — fall back to manual check
+    const procRunning = isBridgeRunningFallback();
+    if (procRunning) {
+      log('Bridge is running (manual)');
+    } else {
+      log('Bridge NOT running and not managed by launchd — manual restart recommended');
+    }
   }
 }
 
