@@ -53,6 +53,10 @@ next-env.d.ts
 /services/client-pulse-bot/dist/
 kanban.db
 data/*.db*
+data/*.sqlite*
+
+# local dev utilities (not part of the project)
+restart.sh
 
 # local prisma dev database
 prisma/dev.db
