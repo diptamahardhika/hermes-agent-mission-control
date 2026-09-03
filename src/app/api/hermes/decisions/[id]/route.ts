@@ -181,22 +181,24 @@ async function approveDecision(
   const kind = decision.kind || "confirm";
   const title = `Approve: ${decision.title}`;
   
-  // Build prompt based on decision type
-  let prompt = `Decision approved by user: ${decision.body}`;
-  
-  // If actionTarget has an ID, reference it
-  const target = decision.actionTarget as { type?: string; id?: string } | null;
-  if (target?.id) {
-    prompt += `\n\nRelated entity: ${target.type}#${target.id}`;
-  }
+  // Build structured prompt data for the bridge
+  const promptData = {
+    decisionId: decision.id,
+    decisionKey: decision.key,
+    decisionTitle: decision.title,
+    decisionBody: decision.body,
+    decisionKind: decision.kind,
+    actionTarget: decision.actionTarget,
+    approvedAt: new Date().toISOString()
+  };
 
-  // Create agent request
+  // Create agent request with JSON prompt
   const request = await prisma.agentRequest.create({
     data: {
       origin: "web",
       kind: `decision.${kind}`,
       title,
-      prompt,
+      prompt: JSON.stringify(promptData),
       sideEffecting: kind !== "confirm",
       status: kind === "confirm" ? "approved" : "awaiting_approval",
       decidedAt: new Date()

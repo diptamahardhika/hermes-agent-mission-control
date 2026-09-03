@@ -870,6 +870,52 @@ async function runRequest(r) {
     } else if (r.kind === "briefing.generate") {
       await generateBriefing();
       result = "brief updated";
+    } else if (r.kind.startsWith("decision.")) {
+      const op = r.kind.split(".")[1]; // archive | confirm | pin | resolve
+      let decisionData = {};
+      try {
+        decisionData = r.prompt ? JSON.parse(r.prompt) : {};
+      } catch (e) {
+        // Fallback: prompt might be plain text
+        decisionData = { rawPrompt: r.prompt };
+      }
+      
+      if (op === "archive") {
+        // Create a kanban task to archive the referenced items
+        const target = decisionData.actionTarget;
+        const context = target ? ` (related: ${target.type}#${target.id})` : "";
+        const archiveTitle = `Archive${context}: ${decisionData.decisionTitle || r.title}`;
+        const archivePrompt = decisionData.body || `Archive the following as requested: ${r.prompt}`;
+        
+        const args = ["kanban", "--board", BOARD, "create", "--json", archiveTitle, "--body", archivePrompt];
+        result = (await hermes(args, { timeout: 20000 })).trim();
+        await mirrorKanban();
+      } else if (op === "confirm") {
+        // Simple confirmation - just log it
+        result = `decision confirmed: ${r.title}`;
+      } else if (op === "pin") {
+        // Pin configuration - store in DataStore
+        const pinData = JSON.parse(r.prompt || "{}");
+        const storeKey = `decision:pin:${pinData.key || decisionData.key}`;
+        await setStore(storeKey, {
+          ...pinData,
+          pinnedAt: new Date().toISOString(),
+          decisionId: decisionData.decisionId
+        });
+        result = `configuration pinned: ${storeKey}`;
+      } else if (op === "resolve") {
+        // Resolve - mark related task as done
+        const target = decisionData.actionTarget;
+        if (target?.type === "task" && target?.id) {
+          const args = ["kanban", "--board", BOARD, "done", target.id];
+          result = (await hermes(args, { timeout: 20000 })).trim();
+          await mirrorKanban();
+        } else {
+          result = `decision resolved (no task target)`;
+        }
+      } else {
+        throw new Error(`unknown decision op ${op}`);
+      }
     } else {
       throw new Error(`unknown kind ${r.kind}`);
     }
