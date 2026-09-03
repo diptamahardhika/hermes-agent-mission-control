@@ -719,7 +719,9 @@ async function generateBriefing() {
     "--body", briefBody,
     "--assignee", "default",
     "--workspace", `dir:${BRIEFS_DIR}`,
-    "--idempotency-key", `daily-brief-${today}`,
+    // Removed --idempotency-key so each manual "Generate" click creates a fresh
+    // task instead of reusing today's morning brief. The daily cron uses its own
+    // schedule; manual clicks should always produce a new brief.
   ];
   try {
     await hermes(args, { timeout: 15000 });
