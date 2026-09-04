@@ -796,6 +796,59 @@ async function mirrorBrief() {
   brief.generatedAt = (await q("SELECT to_char(now() AT TIME ZONE 'GMT', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS t")).rows[0].t;
   await setStore("hermes-briefing", brief);
   await emit("status", "Daily brief synced from kanban", { level: "up" });
+  
+  // Bridge: Convert "Needs your decision" items to structured Decisions
+  await bridgeDecisionsFromBrief(brief);
+}
+
+/**
+ * Bridge: Convert briefing decision items to structured Decisions
+ * This connects the Chief of Staff briefing to the approval inbox.
+ */
+async function bridgeDecisionsFromBrief(brief) {
+  const decisionSection = brief.sections?.find(s => s.label?.toLowerCase().includes("decision"));
+  if (!decisionSection || !Array.isArray(decisionSection.items) || decisionSection.items.length === 0) return;
+  
+  const createdCount = [];
+  for (const item of decisionSection.items) {
+    if (typeof item !== "string") continue;
+    
+    // Generate deterministic key from item text
+    const key = item.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);
+    
+    // Skip if decision already exists (idempotent)
+    const existing = await q("SELECT id FROM \"Decision\" WHERE key = $1", [key]);
+    if (existing.rows.length > 0) continue;
+    
+    // Infer kind from keywords
+    let kind = "confirm";
+    if (/archive|cleanup|remove|delete/i.test(item)) kind = "archive";
+    else if (/pin|config|setting|drift/i.test(item)) kind = "pin";
+    else if (/resolve|fix|complete|finish/i.test(item)) kind = "resolve";
+    
+    // Determine actions based on kind
+    const actions = kind === "confirm" ? ["approve", "dismiss"] : ["approve", "dismiss", "open"];
+    
+    // Create decision
+    try {
+      await q(
+        `INSERT INTO "Decision" (id, key, title, body, kind, status, actions, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6, now(), now())`,
+        [randomUUID(), key, item.slice(0, 100), item, JSON.stringify(actions)]
+      );
+      createdCount.push(key);
+      log(`bridged decision: ${key} (kind=${kind})`);
+    } catch (e) {
+      log(`failed to bridge decision ${key}:`, e.message);
+    }
+  }
+  
+  if (createdCount.length > 0) {
+    await emit("status", `Briefing: bridged ${createdCount.length} decision(s) to inbox`, {
+      level: "up",
+      meta: { decisions: createdCount }
+    });
+  }
 }
 
 /* ─────────────── Homelab Monitor (optional: mirror homelab-monitor state) ─────────────── */
