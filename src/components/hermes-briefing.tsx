@@ -195,6 +195,9 @@ export function HermesBriefing() {
   const [genFailed, setGenFailed] = useState(false);
   const [genSuccess, setGenSuccess] = useState(false);
   const [decisionLayer, setDecisionLayer] = useState<"legacy" | "structured">("legacy");
+  // Decision filtering state
+  const [filterKind, setFilterKind] = useState<string | null>(null);
+  const [showDecisionsOnly, setShowDecisionsOnly] = useState(false);
   const genAt = useRef<string | null>(null);
   // Map of item key -> expanded state, only one hook for all items
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
@@ -304,7 +307,70 @@ export function HermesBriefing() {
           <p className="text-[14px] leading-relaxed text-[var(--text-2)] max-w-[75ch]">{data!.summary}</p>
 
           {(data!.sections ?? []).length > 0 && (
-            <div className="mt-6 grid sm:grid-cols-2 gap-x-8 gap-y-6">
+            <>
+              {/* Decision filter bar (only shown when decisions exist) */}
+              {(data!.sections ?? []).some(s =>
+                s.items.some(item => typeof item === "object" && item !== null)
+              ) && decisionLayer !== "legacy" && (
+                <div className="mt-6 flex items-center gap-2 flex-wrap">
+                  <span className="eyebrow !text-[9.5px]">Filter</span>
+                  <button
+                    onClick={() => setFilterKind(null)}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                      filterKind === null
+                        ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                        : "bg-[var(--surface-1)] text-[var(--text-3)] hover:text-[var(--text)]"
+                    }`}
+                  >
+                    All
+                    {filterKind === null && <span className="ml-0.5">×</span>}
+                  </button>
+                  {(["archive", "pin", "resolve", "confirm"] as const).map(kind => {
+                    const count = (data!.sections ?? []).reduce(
+                      (acc, s) => acc + s.items.filter(item =>
+                        typeof item === "object" && item !== null && (item as any).kind === kind
+                      ).length,
+                      0
+                    );
+                    if (count === 0) return null;
+                    const colorMap = { archive: "var(--warn)", pin: "var(--accent)", resolve: "var(--up)", confirm: "var(--down)" };
+                    const isActive = filterKind === kind;
+                    return (
+                      <button
+                        key={kind}
+                        onClick={() => setFilterKind(isActive ? null : kind)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors"
+                        style={{
+                          background: isActive ? `color-mix(in srgb, ${colorMap[kind]} 20%, transparent)` : "var(--surface-1)",
+                          color: isActive ? colorMap[kind] : "var(--text-3)",
+                          border: isActive ? `1px solid ${colorMap[kind]}` : "1px solid var(--line)",
+                        }}
+                      >
+                        {kind.charAt(0).toUpperCase() + kind.slice(1)}
+                        <span className="ml-0.5">{count}</span>
+                        {isActive && <span className="ml-1">×</span>}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setShowDecisionsOnly(prev => !prev)}
+                    className={`ml-auto text-[11px] transition-colors ${
+                      showDecisionsOnly ? "text-[var(--accent)] font-medium" : "text-[var(--text-3)] hover:text-[var(--text)]"
+                    }`}
+                  >
+                    {showDecisionsOnly ? "Show all" : "Decisions only"}
+                  </button>
+                  {(filterKind || showDecisionsOnly) && (
+                    <button
+                      onClick={() => { setFilterKind(null); setShowDecisionsOnly(false); }}
+                      className="text-[10px] text-[var(--text-4)] hover:text-[var(--text)] transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="mt-6 grid sm:grid-cols-2 gap-x-8 gap-y-6">
               {data!.sections!.map((s, i) => (
                 <div key={i}>
                   <div className="flex items-center gap-2 mb-2">
@@ -362,6 +428,7 @@ export function HermesBriefing() {
                 </div>
               ))}
             </div>
+            </>
           )}
         </>
       )}

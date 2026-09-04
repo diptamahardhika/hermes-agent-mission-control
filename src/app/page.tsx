@@ -5,8 +5,9 @@ import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, S
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
+import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget";
 import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
-import { Skeleton } from "@/components/ui/kit";
+import { Skeleton, Panel } from "@/components/ui/kit";
 
 // ── Types ─────────────────────────────────────────────────
 interface HLPosition {
@@ -1733,6 +1734,7 @@ function SageFindingsPanel() {
 
 export default function Dashboard() {
   const [data, setData] = useState<HomeData>(EMPTY);
+  const [decisions, setDecisions] = useState<{ decisions: any[]; pendingCount: number; total: number } | null>(null);
   const [time, setTime] = useState(new Date());
   const [loaded, setLoaded] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -1774,6 +1776,19 @@ export default function Dashboard() {
       .then(d => {
         if (d) {
           setData(prev => ({ ...prev, freeLLM: d }));
+          setTimeout(() => setLoaded(true), 50);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Decisions fetch — independent fetch, no polling needed (refreshes with loadHome)
+  useEffect(() => {
+    fetch("/api/hermes/decisions")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) {
+          setDecisions(d);
           setTimeout(() => setLoaded(true), 50);
         }
       })
@@ -2008,6 +2023,19 @@ export default function Dashboard() {
             </div>
           ) : null}
         </div>
+
+        {/* Decision Dashboard Widget */}
+        <Panel className="mt-8 hq-rise" style={rise(6)}>
+          <DecisionDashboardWidget
+            pendingCount={decisions?.pendingCount || 0}
+            recentDecisions={decisions?.decisions?.slice(0, 5) || []}
+            loading={!decisions}
+            onAction={(action, decisionId) => {
+              console.log("Dashboard decision action:", action, decisionId);
+              window.location.href = `/admin/decisions?highlight=${decisionId}`;
+            }}
+          />
+        </Panel>
 
         {/* ── Brief + Approval inbox (side-by-side on wide) ─ */}
         <div className="mt-5 grid grid-cols-1 xl:grid-cols-3 gap-5 items-stretch">

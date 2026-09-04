@@ -23,6 +23,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  ClipboardCheck,
 } from "lucide-react";
 
 import { Logo } from "./logo";
@@ -34,6 +35,7 @@ const navGroups = [
       { href: "/", label: "Dashboard", icon: Home },
       { href: "/hermes", label: "Hermes", icon: Cpu },
       { href: "/tasks", label: "Tasks", icon: ClipboardList },
+      { href: "/admin/decisions", label: "Decisions", icon: ClipboardCheck },
     ],
   },
   {

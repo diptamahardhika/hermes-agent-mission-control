@@ -1,16 +1,16 @@
 # Graph Report - hermes-agent-mission-control  (2026-09-04)
 
 ## Corpus Check
-- 171 files · ~149,970 words
+- 176 files · ~153,526 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1468 nodes · 1987 edges · 132 communities (85 shown, 39 thin omitted)
+- 1488 nodes · 2039 edges · 133 communities (85 shown, 39 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 6 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `9de382ee`
+- Built from commit: `4449955e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -31,7 +31,7 @@
 - tauri.conf.json
 - memory-wiki/page.tsx
 - home/route.ts
-- agent-proposals-widget.tsx
+- Panel
 - outlier-scanner.js
 - articles/page.tsx
 - kit.tsx
@@ -40,7 +40,7 @@
 - github-review.ts
 - agents/route.ts
 - tasks/page.tsx
-- src components outlierfeed
+- OutlierFeed.tsx
 - seed.ts
 - homelab/page.tsx
 - LongFormPage
@@ -48,7 +48,7 @@
 - api/ideas/route.ts
 - findings/route.ts
 - api/tasks/route.ts
-- fmt
+- timeAgo
 - YouTubePage
 - smoke-test.mjs
 - homelab/route.ts
@@ -65,14 +65,14 @@
 - pr-opened/route.ts
 - freellm/route.ts
 - trends/route.ts
-- timeAgo
+- SageFindingsPanel
 - src components sparkline
 - articles/route.ts
 - scrape-metrics/route.ts
 - generate-visual/route.ts
 - request/route.ts
 - Dashboard
-- hermes-dispatches.tsx
+- generate-visuals/route.ts
 - readme-validator.ts
 - agent-bus/route.ts
 - revise/route.ts
@@ -90,11 +90,10 @@
 - scripts/route.ts
 - seed-datastore.ts
 - vercel.json
-- generate-visuals/route.ts
+- decision-dashboard-widget.tsx
 - README.md
 - garden/route.ts
 - format/route.ts
-- watchlist-radar/route.ts
 - src app api x analytics route
 - src app api x content feedback rout
 - src app api x content viral score r
@@ -108,8 +107,8 @@
 - unblock/route.ts
 - longform/tweak/route.ts
 - Phase 2.2 Implementation Summary
-- trends/update/route.ts
-- mark-posted/route.ts
+- hermes/cost/route.ts
+- calendar/route.ts
 - top-tweets/route.ts
 - Phase 2.1 Implementation Summary
 - youtube-scrape/route.ts
@@ -123,7 +122,7 @@
 - update-env.sh
 - next.config.ts
 - postcss.config.mjs
-- ScoreGauge
+- outliers/route.ts
 - app
 - hermes-briefing.tsx
 - 02-performance.sql
@@ -135,21 +134,22 @@
 - hermes-agent-mission-control
 - decisions/route.ts
 - test-phase2.sh
-- map-chat/route.ts
 - x-stats/route.ts
-- watchlist-radar/update/route.ts
 - orchestrator_append.md
+- client-pulse/route.ts
+- generate-qt/route.ts
+- mark-posted/route.ts
 
 ## God Nodes (most connected - your core abstractions)
 1. `prisma` - 51 edges
 2. `EmptyState()` - 16 edges
 3. `compilerOptions` - 16 edges
-4. `runRequest()` - 13 edges
-5. `mirrorTick()` - 13 edges
-6. `🐘 Hermy HQ Self-Hosted PostgreSQL Migration Guide` - 13 edges
-7. `log()` - 12 edges
-8. `YouTubePage()` - 12 edges
-9. `Panel()` - 12 edges
+4. `Panel()` - 14 edges
+5. `log()` - 13 edges
+6. `runRequest()` - 13 edges
+7. `mirrorTick()` - 13 edges
+8. `🐘 Hermy HQ Self-Hosted PostgreSQL Migration Guide` - 13 edges
+9. `YouTubePage()` - 12 edges
 10. `Pill()` - 12 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -167,7 +167,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (132 total, 39 thin omitted)
+## Communities (133 total, 39 thin omitted)
 
 ### Community 0 - "devDependencies"
 Cohesion: 0.04
@@ -175,11 +175,11 @@ Nodes (48): eslint, eslint-config-next, allowScripts, better-sqlite3@12.11.1, es
 
 ### Community 1 - "bridge.mjs"
 Cohesion: 0.13
-Nodes (43): briefPrompt(), cachedInfCfg, cleanStaleLocks(), currentInferenceProvider(), __dirname, driftHealedAt, emit(), ensureTempKanbanDb() (+35 more)
+Nodes (44): bridgeDecisionsFromBrief(), briefPrompt(), cachedInfCfg, cleanStaleLocks(), currentInferenceProvider(), __dirname, driftHealedAt, emit() (+36 more)
 
 ### Community 2 - "app/page.tsx"
 Cohesion: 0.05
-Nodes (32): AINewsData, BoardIdea, BuildIdea, CATEGORY_COLOR, CATEGORY_LABEL, Draft, FREELLM_TOK_COLORS, FreeLLMData (+24 more)
+Nodes (34): AINewsData, BoardIdea, BuildIdea, CATEGORY_COLOR, CATEGORY_LABEL, Draft, FREELLM_TOK_COLORS, FreeLLMData (+26 more)
 
 ### Community 3 - "x-content/page.tsx"
 Cohesion: 0.07
@@ -190,8 +190,8 @@ Cohesion: 0.05
 Nodes (39): @auth/prisma-adapter, better-sqlite3, drizzle-orm, formidable, googleapis, grammy, lucide-react, next (+31 more)
 
 ### Community 5 - "prisma.ts"
-Cohesion: 0.06
-Nodes (10): dynamic, AnalysisWithClient, asStringArray(), GET(), DaySnap, dynamic, dynamic, dynamic (+2 more)
+Cohesion: 0.07
+Nodes (9): isAuthorized(), POST(), dynamic, dynamic, dynamic, revalidate, dynamic, globalForPrisma (+1 more)
 
 ### Community 6 - "agents/page.tsx"
 Cohesion: 0.06
@@ -233,7 +233,7 @@ Nodes (19): ConfidenceDot(), confidenceMeta(), confidenceValue(), Draft, draftFr
 Cohesion: 0.13
 Nodes (12): BN_CACHE, BoardIdeaRoute, dynamic, extractMetrics(), formatHermesKanban(), GET(), GH_CACHE, HERMES_KANBAN_DEMO_TASKS (+4 more)
 
-### Community 16 - "agent-proposals-widget.tsx"
+### Community 16 - "Panel"
 Cohesion: 0.18
 Nodes (9): AgentProposalsWidget(), FilterMode, Proposal, SortMode, InboxCard(), Req, timeAgo(), Eyebrow() (+1 more)
 
@@ -246,8 +246,8 @@ Cohesion: 0.11
 Nodes (11): Article, CalendarTabProps, ChatMessage, ComposeTabProps, LibraryTabProps, SavedTitle, STATUS_COLUMNS, Tab (+3 more)
 
 ### Community 19 - "kit.tsx"
-Cohesion: 0.15
-Nodes (13): EMPTY_FORM, GardenBlob, Plant, LongformScript, TONE, Idea, LongformTab, OutlierFeed (+5 more)
+Cohesion: 0.16
+Nodes (12): EMPTY_FORM, GardenBlob, Plant, LongformScript, TONE, Idea, LongformTab, OutlierFeed (+4 more)
 
 ### Community 20 - "ideas/page.tsx"
 Cohesion: 0.13
@@ -269,7 +269,7 @@ Nodes (13): Activity, ACTIVITY_PROFILE_MAP, DEFAULT_AGENTS, dynamic, execFileP, 
 Cohesion: 0.20
 Nodes (15): columns, STATUS_COLORS, statusColor(), Task, TaskCard(), TaskDraft, TaskEditor(), TasksPage() (+7 more)
 
-### Community 25 - "src components outlierfeed"
+### Community 25 - "OutlierFeed.tsx"
 Cohesion: 0.19
 Nodes (14): analyzeTitlePatterns(), formatNumber(), MinScore, NICHE_COLORS, NicheCount, OutlierData, OutlierFeed(), scoreBadgeColor() (+6 more)
 
@@ -301,9 +301,9 @@ Nodes (10): ensureFindingsDir(), FINDINGS_DIR, GET(), getReviewHistory(), listFi
 Cohesion: 0.35
 Nodes (11): DELETE(), GET(), parseFrontmatter(), PATCH(), POST(), safeFileName(), serializeFrontmatter(), TaskData (+3 more)
 
-### Community 33 - "fmt"
-Cohesion: 0.21
-Nodes (12): fmt(), fmtExact(), FreeLLMShareBars(), FreeLLMSpendPanel(), modelProvider(), ModelShareBars(), OmniRoutePanel(), OmniShareBars() (+4 more)
+### Community 33 - "timeAgo"
+Cohesion: 0.16
+Nodes (17): CryptoPortfolioCard(), fmt(), fmtExact(), FreeLLMShareBars(), FreeLLMSpendPanel(), HomelabHomeCard(), modelProvider(), ModelShareBars() (+9 more)
 
 ### Community 34 - "YouTubePage"
 Cohesion: 0.24
@@ -346,8 +346,8 @@ Cohesion: 0.36
 Nodes (7): bestViews(), draftToApi(), dynamic, GET(), mergeMetrics(), PATCH(), POST()
 
 ### Community 44 - "client-pulse/page.tsx"
-Cohesion: 0.32
-Nodes (7): categoryLabel, categoryTone, ClientPulsePage(), dateLabel(), PulseClient, PulseData, scoreColor()
+Cohesion: 0.16
+Nodes (14): categoryLabel, categoryTone, ClientPulsePage(), dateLabel(), PulseClient, PulseData, scoreColor(), ago() (+6 more)
 
 ### Community 45 - "seed-all.ts"
 Cohesion: 0.43
@@ -369,10 +369,6 @@ Nodes (6): authFetch(), dynamic, FREELLM_BASE, GET(), getSessionToken(), revalid
 Cohesion: 0.33
 Nodes (6): dynamic, GET(), readTrendData(), revalidate, Trend, TrendsResponse
 
-### Community 50 - "timeAgo"
-Cohesion: 0.29
-Nodes (7): CryptoPortfolioCard(), HomelabHomeCard(), renderWithLinks(), SageFindingsPanel(), timeAgo(), YouTubeCard(), YouTubeVideoTabs()
-
 ### Community 51 - "src components sparkline"
 Cohesion: 0.38
 Nodes (5): Sparkline(), SparklineProps, MetricCard(), MetricCardProps, useCountUp()
@@ -388,10 +384,6 @@ Nodes (5): ACCENT_COLORS, esc(), POST(), stripBullet(), wrapText()
 ### Community 56 - "Dashboard"
 Cohesion: 0.40
 Nodes (6): Dashboard(), EMPTY, greeting(), sampleSeries(), snapDelta(), withDevPreview()
-
-### Community 57 - "hermes-dispatches.tsx"
-Cohesion: 0.33
-Nodes (6): ago(), HermesDispatches(), LABEL, Req, TONE, SectionHeader()
 
 ### Community 58 - "readme-validator.ts"
 Cohesion: 0.47
@@ -436,6 +428,10 @@ Nodes (3): main(), prisma, upsert()
 ### Community 74 - "vercel.json"
 Cohesion: 0.50
 Nodes (3): iad1, crons, regions
+
+### Community 75 - "decision-dashboard-widget.tsx"
+Cohesion: 0.23
+Nodes (13): DecisionFilters, DecisionDashboardWidget(), DecisionDashboardWidgetProps, timeAgo(), DecisionDetailModal(), BadgeDef, KIND_BADGE, STATUS_BADGE (+5 more)
 
 ### Community 76 - "README.md"
 Cohesion: 0.06
@@ -509,25 +505,29 @@ Nodes (5): Anti-patterns to catch myself on:, Concrete rules:, The Approval Gate
 Cohesion: 0.50
 Nodes (3): hermes-agent-mission-control, Operator mandates, Ops facts
 
+### Community 132 - "client-pulse/route.ts"
+Cohesion: 0.67
+Nodes (3): AnalysisWithClient, asStringArray(), GET()
+
 ## Knowledge Gaps
-- **608 isolated node(s):** `eslintConfig`, `__dirname`, `HOST`, `POLL_MS`, `MIRROR_MS` (+603 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 798 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **611 isolated node(s):** `eslintConfig`, `__dirname`, `HOST`, `POLL_MS`, `MIRROR_MS` (+606 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 802 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **39 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `prisma` connect `prisma.ts` to `x-stats/route.ts`, `watchlist-radar/update/route.ts`, `home/route.ts`, `agents/route.ts`, `api/ideas/route.ts`, `homelab/route.ts`, `agent-proposals/route.ts`, `x-content/route.ts`, `trends/route.ts`, `articles/route.ts`, `scrape-metrics/route.ts`, `generate-visual/route.ts`, `request/route.ts`, `agent-bus/route.ts`, `saved-titles/route.ts`, `crons/route.ts`, `longform/route.ts`, `score/route.ts`, `x-content/tweak/route.ts`, `visual/route.ts`, `scripts/route.ts`, `generate-visuals/route.ts`, `garden/route.ts`, `watchlist-radar/route.ts`, `src app api x analytics route`, `src app api x content feedback rout`, `src app api youtube ideas generate `, `src app api youtube ideas route`, `trends/update/route.ts`, `mark-posted/route.ts`, `decisions/[id]/route.ts`, `decisions/route.ts`, `map-chat/route.ts`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
+- **Why does `prisma` connect `prisma.ts` to `x-stats/route.ts`, `client-pulse/route.ts`, `generate-qt/route.ts`, `mark-posted/route.ts`, `home/route.ts`, `agents/route.ts`, `api/ideas/route.ts`, `homelab/route.ts`, `agent-proposals/route.ts`, `x-content/route.ts`, `trends/route.ts`, `articles/route.ts`, `scrape-metrics/route.ts`, `generate-visual/route.ts`, `request/route.ts`, `generate-visuals/route.ts`, `agent-bus/route.ts`, `saved-titles/route.ts`, `crons/route.ts`, `longform/route.ts`, `score/route.ts`, `x-content/tweak/route.ts`, `visual/route.ts`, `scripts/route.ts`, `garden/route.ts`, `briefing/route.ts`, `src app api x analytics route`, `src app api x content feedback rout`, `src app api youtube ideas generate `, `src app api youtube ideas route`, `hermes/cost/route.ts`, `calendar/route.ts`, `outliers/route.ts`, `decisions/[id]/route.ts`, `decisions/route.ts`?**
+  _High betweenness centrality (0.012) - this node is a cross-community bridge._
+- **Why does `Panel()` connect `Panel` to `app/page.tsx`, `hermes/page.tsx`, `src components hermes runs`, `decision-dashboard-widget.tsx`, `client-pulse/page.tsx`, `memory-wiki/page.tsx`, `kit.tsx`, `ideas/page.tsx`, `content-os/page.tsx`, `hermes-briefing.tsx`?**
+  _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **Why does `Skeleton()` connect `kit.tsx` to `app/page.tsx`, `hermes/page.tsx`, `client-pulse/page.tsx`, `memory-wiki/page.tsx`, `articles/page.tsx`, `ideas/page.tsx`, `content-os/page.tsx`?**
-  _High betweenness centrality (0.009) - this node is a cross-community bridge._
-- **Why does `EmptyState()` connect `kit.tsx` to `x-content/page.tsx`, `hermes/page.tsx`, `src components hermes runs`, `client-pulse/page.tsx`, `memory-wiki/page.tsx`, `agent-proposals-widget.tsx`, `ideas/page.tsx`, `content-os/page.tsx`, `hermes-dispatches.tsx`?**
-  _High betweenness centrality (0.008) - this node is a cross-community bridge._
+  _High betweenness centrality (0.006) - this node is a cross-community bridge._
 - **What connects `eslintConfig`, `__dirname`, `HOST` to the rest of the system?**
-  _608 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _611 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `devDependencies` be split into smaller, more focused modules?**
   _Cohesion score 0.04081632653061224 - nodes in this community are weakly interconnected._
 - **Should `bridge.mjs` be split into smaller, more focused modules?**
-  _Cohesion score 0.12790697674418605 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.12727272727272726 - nodes in this community are weakly interconnected._
 - **Should `app/page.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.047619047619047616 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.046511627906976744 - nodes in this community are weakly interconnected._
