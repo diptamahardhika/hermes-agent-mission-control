@@ -234,9 +234,18 @@ textarea, input {
   --r-md: 12px;
   --r-lg: 16px;
 
-  /* motion */
-  --ease:       cubic-bezier(0.16, 1, 0.3, 1);   /* strong ease-out */
-  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  /* motion — Emil Kowalski refined curves */
+  --ease:        cubic-bezier(0.16, 1, 0.3, 1);     /* strong ease-out (legacy) */
+  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);    /* Emil's strong ease-out */
+  --ease-inout:  cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);   /* Emil's symmetric */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);    /* iOS-like drawer */
+
+  /* duration rules — UI animations under 300ms */
+  --dur-fast:    100ms;   /* button press feedback */
+  --dur-normal:  150ms;   /* tooltips, small popovers */
+  --dur-ui:      200ms;   /* dropdowns, selects */
+  --dur-overlay: 300ms;   /* modals, drawers */
 
   /* legacy aliases — keep older components rendering during migration */
   --hq-bg: var(--bg);
@@ -336,6 +345,65 @@ textarea, input {
   transform: translateY(-1px) scale(0.995);
 }
 
+/* ── Emil Kowalski: button press feedback (100-160ms) ────────── */
+.decision-btn:active {
+  transform: scale(0.97);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+/* ── Emil Kowalski: touch device hover gating ─────────────────── */
+@media (hover: hover) and (pointer: fine) {
+  .decision-row:hover {
+    border-color: var(--line-strong);
+    background: var(--surface-2);
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 20px -8px rgba(0, 0, 0, 0.5);
+  }
+  
+  .decision-action:hover {
+    background: var(--surface-1);
+    transform: none;
+  }
+}
+
+/* ── Emil Kowalski: staggered list item entrance ──────────────── */
+@keyframes hq-rise-decision {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.decision-item {
+  opacity: 0;
+  animation: hq-rise-decision var(--dur-ui) var(--ease-out) forwards;
+}
+
+/* ── Emil Kowalski: card enter animation ───────────────────────── */
+@keyframes hq-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.hq-panel-enter {
+  animation: hq-panel-enter var(--dur-overlay) var(--ease-out) forwards;
+}
+
+/* ── Emil Kowalski: refined status badge ──────────────────────── */
+.decision-badge {
+  background: color-mix(in srgb, var(--badge-color, var(--text-3)) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-color, var(--text-3)) 32%, transparent);
+  transition: background var(--dur-normal) var(--ease-out), border-color var(--dur-normal) var(--ease-out);
+}
+
 /* overlays (menus / modals) — the ONLY place a real shadow lives */
 .elevated {
   background: var(--surface-2);
@@ -402,5 +470,9 @@ textarea, input {
   .panel-interactive:active,
   .btn-primary:active,
   .btn-ghost:active { transform: none; }
+  .decision-item,
+  .hq-panel-enter { animation: none; opacity: 1; transform: none; }
+  .decision-btn:active,
+  .decision-row:active { transform: none; }
   .animate-pulse { animation: none !important; opacity: 1 !important; }
 }

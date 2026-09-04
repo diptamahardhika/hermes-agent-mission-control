@@ -796,6 +796,59 @@ async function mirrorBrief() {
   brief.generatedAt = (await q("SELECT to_char(now() AT TIME ZONE 'GMT', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS t")).rows[0].t;
   await setStore("hermes-briefing", brief);
   await emit("status", "Daily brief synced from kanban", { level: "up" });
+  
+  // Bridge: Convert "Needs your decision" items to structured Decisions
+  await bridgeDecisionsFromBrief(brief);
+}
+
+/**
+ * Bridge: Convert briefing decision items to structured Decisions
+ * This connects the Chief of Staff briefing to the approval inbox.
+ */
+async function bridgeDecisionsFromBrief(brief) {
+  const decisionSection = brief.sections?.find(s => s.label?.toLowerCase().includes("decision"));
+  if (!decisionSection || !Array.isArray(decisionSection.items) || decisionSection.items.length === 0) return;
+  
+  const createdCount = [];
+  for (const item of decisionSection.items) {
+    if (typeof item !== "string") continue;
+    
+    // Generate deterministic key from item text
+    const key = item.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);
+    
+    // Skip if decision already exists (idempotent)
+    const existing = await q("SELECT id FROM \"Decision\" WHERE key = $1", [key]);
+    if (existing.rows.length > 0) continue;
+    
+    // Infer kind from keywords
+    let kind = "confirm";
+    if (/archive|cleanup|remove|delete/i.test(item)) kind = "archive";
+    else if (/pin|config|setting|drift/i.test(item)) kind = "pin";
+    else if (/resolve|fix|complete|finish/i.test(item)) kind = "resolve";
+    
+    // Determine actions based on kind
+    const actions = kind === "confirm" ? ["approve", "dismiss"] : ["approve", "dismiss", "open"];
+    
+    // Create decision
+    try {
+      await q(
+        `INSERT INTO "Decision" (id, key, title, body, kind, status, actions, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6, now(), now())`,
+        [randomUUID(), key, item.slice(0, 100), item, JSON.stringify(actions)]
+      );
+      createdCount.push(key);
+      log(`bridged decision: ${key} (kind=${kind})`);
+    } catch (e) {
+      log(`failed to bridge decision ${key}:`, e.message);
+    }
+  }
+  
+  if (createdCount.length > 0) {
+    await emit("status", `Briefing: bridged ${createdCount.length} decision(s) to inbox`, {
+      level: "up",
+      meta: { decisions: createdCount }
+    });
+  }
 }
 
 /* ─────────────── Homelab Monitor (optional: mirror homelab-monitor state) ─────────────── */
@@ -870,6 +923,54 @@ async function runRequest(r) {
     } else if (r.kind === "briefing.generate") {
       await generateBriefing();
       result = "brief updated";
+    } else if (r.kind.startsWith("decision.")) {
+      const op = r.kind.split(".")[1]; // archive | confirm | pin | resolve
+      let decisionData = {};
+      try {
+        decisionData = r.prompt ? JSON.parse(r.prompt) : {};
+      } catch (e) {
+        // Fallback: prompt might be plain text
+        decisionData = { rawPrompt: r.prompt };
+      }
+      
+      if (op === "archive") {
+        // Create a kanban task to archive the referenced items
+        const target = decisionData.actionTarget;
+        const context = target ? ` (related: ${target.type}#${target.id})` : "";
+        const archiveTitle = `Archive${context}: ${decisionData.decisionTitle || r.title}`;
+        const archivePrompt = decisionData.body || `Archive the following as requested: ${r.prompt}`;
+        
+        // Assign to "default" agent so workers pick it up immediately
+        const assignee = decisionData.assignee || "default";
+        const args = ["kanban", "--board", BOARD, "create", "--json", archiveTitle, "--body", archivePrompt, "--assignee", assignee];
+        result = (await hermes(args, { timeout: 20000 })).trim();
+        await mirrorKanban();
+      } else if (op === "confirm") {
+        // Simple confirmation - just log it
+        result = `decision confirmed: ${r.title}`;
+      } else if (op === "pin") {
+        // Pin configuration - store in DataStore
+        const pinData = JSON.parse(r.prompt || "{}");
+        const storeKey = `decision:pin:${pinData.key || decisionData.key}`;
+        await setStore(storeKey, {
+          ...pinData,
+          pinnedAt: new Date().toISOString(),
+          decisionId: decisionData.decisionId
+        });
+        result = `configuration pinned: ${storeKey}`;
+      } else if (op === "resolve") {
+        // Resolve - mark related task as done
+        const target = decisionData.actionTarget;
+        if (target?.type === "task" && target?.id) {
+          const args = ["kanban", "--board", BOARD, "done", target.id];
+          result = (await hermes(args, { timeout: 20000 })).trim();
+          await mirrorKanban();
+        } else {
+          result = `decision resolved (no task target)`;
+        }
+      } else {
+        throw new Error(`unknown decision op ${op}`);
+      }
     } else {
       throw new Error(`unknown kind ${r.kind}`);
     }
