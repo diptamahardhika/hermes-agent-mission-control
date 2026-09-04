@@ -3,6 +3,8 @@
 ## Overview
 Preparation for structured decision support without breaking existing UI. Uses union type fallback and feature flag for gradual adoption.
 
+> **Status (2026-09-05):** Phase 2.1–2.3 and Phase 3 are **DONE / shipped** on `main` (Phase 3 via PR [#67](https://github.com/diptamahardhika/hermes-agent-mission-control/pull/67) @ `c804116`). This document remains the historical plan; checklists below are marked complete. See “Current status & next” at the bottom.
+
 ---
 
 ## Phase 2: Union Type Fallback + Feature Flag
@@ -179,15 +181,18 @@ export async function PATCH(
 ## Migration Strategy
 
 ### Timeline
-1. **Phase 2.1** (This sprint): Union type + feature flag, backend stubs
-2. **Phase 2.2** (Next sprint): Wire up real handlers, test with Hermes bridge
-3. **Phase 3**: Full Layer 3 integration (auto-wiring, bridge enhancements)
+1. **Phase 2.1** — ✅ DONE: Union type + feature flag, backend stubs
+2. **Phase 2.2** — ✅ DONE: Real handlers, Hermes bridge kind handlers, briefing→inbox auto-bridge
+3. **Phase 2.3** — ✅ DONE: Dashboard/admin Decision UI, badge constants, Emil Kowalski design pass
+4. **Phase 3** — ✅ DONE / shipped on `main` via [#67](https://github.com/diptamahardhika/hermes-agent-mission-control/pull/67): bridge emits structured Decisions + Hermes task linkage (`hermesTaskId`)
 
-### Rollout Plan
+### Rollout Plan (historical)
 - **Week 1:** Deploy Phase 2.1 with feature flag defaulting to "legacy"
 - **Week 2:** Test "structured" mode with Hermes team
 - **Week 3:** Gradual adoption, collect feedback
 - **Week 4:** Consider defaulting to "structured" after validation
+
+Structured mode remains **opt-in** until E2E is green (see Current status & next).
 
 ### Backward Compatibility
 - All existing briefings with `string[]` items continue to work
@@ -215,9 +220,9 @@ export async function PATCH(
 - ✅ API patterns documented (`/api/hermes/requests/[id]`, `/api/hermes/tasks`)
 
 ### Required
-- Hermes bridge team coordination (for backend implementation)
-- Decision data model finalization (what fields are needed)
-- UX validation of new action buttons
+- ✅ Hermes bridge team coordination (for backend implementation)
+- ✅ Decision data model finalization (what fields are needed)
+- ✅ UX validation of new action buttons
 
 ### Optional
 - LocalStorage persistence for feature flag preference
@@ -228,46 +233,46 @@ export async function PATCH(
 ## Implementation Checklist
 
 ### Frontend
-- [ ] Add `Decision` type definitions
-- [ ] Update `Section.items` to `DecisionItem[]`
-- [ ] Add `renderDecisionItem()` helper
-- [ ] Create `features.ts` with feature flag system
-- [ ] Integrate feature flag into `HermesBriefing`
-- [ ] Add new action buttons (approve/dismiss/edit)
-- [ ] Handle missing/malformed Decision objects gracefully
+- [x] Add `Decision` type definitions
+- [x] Update `Section.items` to `DecisionItem[]`
+- [x] Add `renderDecisionItem()` helper
+- [x] Create `features.ts` with feature flag system
+- [x] Integrate feature flag into `HermesBriefing`
+- [x] Add new action buttons (approve/dismiss/edit)
+- [x] Handle missing/malformed Decision objects gracefully
 
 ### Backend
-- [ ] Create `PATCH /api/hermes/decisions/[id]` endpoint (stub)
-- [ ] Document endpoint contract for Hermes team
-- [ ] Add logging/metrics for decision actions
+- [x] Create `PATCH /api/hermes/decisions/[id]` endpoint (stub → real handlers in 2.2)
+- [x] Document endpoint contract for Hermes team
+- [x] Add logging/metrics for decision actions
 
 ### Documentation
-- [ ] Update API docs with new endpoint
-- [ ] Document Decision object schema
-- [ ] Add migration guide for Hermes bridge
+- [x] Update API docs with new endpoint
+- [x] Document Decision object schema
+- [x] Add migration guide for Hermes bridge
 
 ---
 
 ## Verification Criteria
 
 ### Unit Tests
-- [ ] Legacy string items render correctly
-- [ ] Structured Decision items render correctly
-- [ ] Feature flag switches between modes
-- [ ] Malformed Decision objects fall back to legacy render
-- [ ] Action buttons trigger correct handlers
+- [x] Legacy string items render correctly
+- [x] Structured Decision items render correctly
+- [x] Feature flag switches between modes
+- [x] Malformed Decision objects fall back to legacy render
+- [x] Action buttons trigger correct handlers
 
 ### Integration Tests
-- [ ] Decision actions call correct API endpoints
-- [ ] Backend stub returns expected responses
-- [ ] Feature flag persists across component re-renders
+- [x] Decision actions call correct API endpoints
+- [x] Backend stub returns expected responses
+- [x] Feature flag persists across component re-renders
 
 ### Manual Testing
-- [ ] Click expand/collapse on legacy items
-- [ ] Click expand/collapse on structured items
-- [ ] Test approve/dismiss/open actions
-- [ ] Verify "Open in Hermes" navigates correctly
-- [ ] Test feature flag toggle (if UI control added)
+- [x] Click expand/collapse on legacy items
+- [x] Click expand/collapse on structured items
+- [x] Test approve/dismiss/open actions
+- [x] Verify "Open in Hermes" navigates correctly
+- [x] Test feature flag toggle (if UI control added)
 
 ---
 
@@ -287,15 +292,19 @@ export async function PATCH(
 
 ---
 
-## Next Actions
+## Current status & next
 
-1. **Review this plan** with Hermes bridge team
-2. **Finalize Decision schema** (what fields are actually needed)
-3. **Create implementation ticket** in project tracker
-4. **Schedule Phase 2 kickoff** (separate from current work)
-5. **Prepare verification environment** (Hermes instance with test data)
+**Shipped on `main`:**
+- Phase 2.1–2.3: DONE
+- Phase 3 (auto-wiring structured Decisions + Hermes task linkage / `hermesTaskId`): DONE via [#67](https://github.com/diptamahardhika/hermes-agent-mission-control/pull/67) @ `c804116`
+
+**Next (post–Phase 3):**
+1. Prove E2E briefing → Decision → Hermes/kanban
+2. Fix intermittent SQLite `kanban.db` lock on `/api/agents`
+3. Smoke test; keep structured mode opt-in until E2E is green
+4. Then Phase 4 theme = close decision outcomes into AgentRequest / kanban / briefing (no detailed Phase 4 spec here)
 
 ---
 
-**Status:** Phase 2 PLANNED (not implemented)  
-**Ready for:** Implementation kickoff after approval
+**Status:** Phase 2–3 **DONE / shipped** (this file is the historical plan)  
+**Ready for:** Post–Phase 3 E2E proof + smoke, then Phase 4 theme work
