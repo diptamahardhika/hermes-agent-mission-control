@@ -32,10 +32,17 @@ export function DecisionDashboardWidget({
   onAction,
 }: DecisionDashboardWidgetProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
+
+  // Trigger staggered entrance after mount
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   if (loading) {
     return (
@@ -71,7 +78,7 @@ export function DecisionDashboardWidget({
   }
 
   return (
-    <Panel className="p-6 h-full flex flex-col">
+    <Panel className={`p-6 h-full flex flex-col ${mounted ? "hq-panel-enter" : ""}`}>
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <div
@@ -80,14 +87,13 @@ export function DecisionDashboardWidget({
           />
           <Eyebrow>Decisions</Eyebrow>
         </div>
-        {pendingCount > 0 && (
+{pendingCount > 0 && (
           <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium num"
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium num decision-badge"
             style={{
               color: "var(--warn)",
-              background: "color-mix(in srgb, var(--warn) 12%, transparent)",
-              border: "1px solid color-mix(in srgb, var(--warn) 24%, transparent)",
-            }}
+              "--badge-color": "var(--warn)",
+            } as React.CSSProperties}
           >
             {pendingCount} pending
           </span>
@@ -95,7 +101,7 @@ export function DecisionDashboardWidget({
       </div>
 
       <div className="flex-1 space-y-2 overflow-y-auto">
-        {recentDecisions.map((decision) => {
+        {recentDecisions.map((decision, i) => {
           const kindInfo = KIND_BADGE[decision.kind] || KIND_BADGE.confirm;
           const statusInfo = STATUS_BADGE[decision.status] || STATUS_BADGE.pending;
           const isExpanded = expandedId === decision.id;
@@ -103,12 +109,15 @@ export function DecisionDashboardWidget({
           return (
             <div
               key={decision.id}
-              className="border border-[var(--line)] rounded-lg overflow-hidden transition-colors"
+              className={`border border-[var(--line)] rounded-lg overflow-hidden decision-item`}
+              style={{
+                animationDelay: mounted ? `${Math.min(i, 12) * 50}ms` : "0ms",
+              }}
             >
               <button
                 type="button"
                 onClick={() => toggleExpand(decision.id)}
-                className="w-full flex items-center gap-2.5 py-2.5 px-3 text-left hover:bg-[var(--surface-1)] transition-colors"
+                className="w-full flex items-center gap-2.5 py-2.5 px-3 text-left decision-row transition-[background,border-color,transform] duration-150 ease-out"
               >
                 <span
                   className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -118,8 +127,11 @@ export function DecisionDashboardWidget({
                   {decision.title}
                 </p>
                 <span
-                  className="text-[10px] font-medium shrink-0"
-                  style={{ color: kindInfo.color, background: `color-mix(in srgb, ${kindInfo.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${kindInfo.color} 24%, transparent)` }}
+                  className="text-[10px] font-medium shrink-0 decision-badge"
+                  style={{
+                    color: kindInfo.color,
+                    "--badge-color": kindInfo.color,
+                  } as React.CSSProperties}
                 >
                   {kindInfo.label}
                 </span>
@@ -159,7 +171,7 @@ export function DecisionDashboardWidget({
                       <button
                         type="button"
                         onClick={() => onAction("approve", decision.id)}
-                        className="text-[11px] text-[var(--up)] hover:text-[var(--text)] transition-colors font-medium"
+                        className="text-[11px] text-[var(--up)] hover:text-[var(--text)] transition-colors duration-150 ease-out decision-btn font-medium"
                       >
                         Approve
                       </button>
@@ -168,7 +180,7 @@ export function DecisionDashboardWidget({
                       <button
                         type="button"
                         onClick={() => onAction("dismiss", decision.id)}
-                        className="text-[11px] text-[var(--text-3)] hover:text-[var(--down)] transition-colors"
+                        className="text-[11px] text-[var(--text-3)] hover:text-[var(--down)] transition-colors duration-150 ease-out decision-btn"
                       >
                         Dismiss
                       </button>
@@ -177,7 +189,7 @@ export function DecisionDashboardWidget({
                       <button
                         type="button"
                         onClick={() => onAction("open", decision.id)}
-                        className="text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors"
+                        className="text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors duration-150 ease-out decision-btn"
                       >
                         Open
                       </button>
@@ -185,7 +197,7 @@ export function DecisionDashboardWidget({
                     <button
                       type="button"
                       onClick={() => onAction("view", decision.id)}
-                      className="ml-auto text-[11px] text-[var(--text-3)] hover:text-[var(--text)] transition-colors"
+                      className="ml-auto text-[11px] text-[var(--text-3)] hover:text-[var(--text)] transition-colors duration-150 ease-out decision-btn"
                     >
                       View all
                     </button>
@@ -201,7 +213,7 @@ export function DecisionDashboardWidget({
         <div className="mt-3 pt-3 border-t border-[var(--line)]">
           <a
             href="/admin/decisions"
-            className="inline-flex items-center gap-1 text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors"
+            className="inline-flex items-center gap-1 text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors duration-150 ease-out"
           >
             View all decisions <ArrowUpRight className="w-3 h-3" />
           </a>
