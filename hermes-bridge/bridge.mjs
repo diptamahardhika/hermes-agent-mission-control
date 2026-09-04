@@ -940,7 +940,9 @@ async function runRequest(r) {
         const archiveTitle = `Archive${context}: ${decisionData.decisionTitle || r.title}`;
         const archivePrompt = decisionData.body || `Archive the following as requested: ${r.prompt}`;
         
-        const args = ["kanban", "--board", BOARD, "create", "--json", archiveTitle, "--body", archivePrompt];
+        // Assign to "default" agent so workers pick it up immediately
+        const assignee = decisionData.assignee || "default";
+        const args = ["kanban", "--board", BOARD, "create", "--json", archiveTitle, "--body", archivePrompt, "--assignee", assignee];
         result = (await hermes(args, { timeout: 20000 })).trim();
         await mirrorKanban();
       } else if (op === "confirm") {
