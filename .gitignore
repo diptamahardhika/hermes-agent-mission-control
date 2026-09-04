@@ -82,3 +82,7 @@ graphify-out/graph.json
 graphify-out/graph.html
 graphify-out/manifest.json
 graphify-out/cost.json
+
+# Agent skills (installed dependencies)
+.agents/
+.claude/

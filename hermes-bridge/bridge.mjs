@@ -178,6 +178,32 @@ function hermes(args, { timeout = 30000, env = null } = {}) {
   return run;
 }
 
+function parseTaskResult(result) {
+  try {
+    const json = JSON.parse(result);
+    // Hermes CLI kanban create --json returns task info; be lenient with format
+    if (json && (json.id || json.taskId)) {
+      return { id: json.id || json.taskId, title: json.title || json.name || json.id, data: json };
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function linkDecisionToHermesTask(decisionKey, hermesTaskId) {
+  try {
+    await q(
+      `UPDATE "Decision" SET hermesTaskId = $1, updatedAt = now()
+       WHERE key = $2`,
+      [hermesTaskId, decisionKey]
+    );
+    log(`linked decision ${decisionKey} → Hermes task ${hermesTaskId}`);
+  } catch (e) {
+    log(`failed to link decision ${decisionKey} to Hermes task ${hermesTaskId}:`, e.message);
+  }
+}
+
 async function emit(kind, title, { detail = null, agent = "hermes", level = "info", meta = null } = {}) {
   await q(
     `INSERT INTO "AgentEvent" (id, kind, title, detail, agent, level, meta, "createdAt")
@@ -804,13 +830,28 @@ async function mirrorBrief() {
 /**
  * Bridge: Convert briefing decision items to structured Decisions
  * This connects the Chief of Staff briefing to the approval inbox.
+ *
+ * Phase 3: Auto-wiring — when briefing contains structured Decision objects,
+ * the bridge emits them directly to Hermes as agent requests instead of
+ * just storing them as DB records. This closes the loop:
+ * Hermes → briefing → Decision → Hermes task.
  */
 async function bridgeDecisionsFromBrief(brief) {
   const decisionSection = brief.sections?.find(s => s.label?.toLowerCase().includes("decision"));
   if (!decisionSection || !Array.isArray(decisionSection.items) || decisionSection.items.length === 0) return;
   
   const createdCount = [];
+  const bridgedStructured = [];
+  
   for (const item of decisionSection.items) {
+    // Handle structured Decision objects from the briefing (Phase 3 auto-wiring)
+    if (typeof item === "object" && item !== null && item.kind) {
+      await bridgeStructuredDecision(item, decisionSection.label);
+      bridgedStructured.push(item.title || item.key);
+      continue;
+    }
+    
+    // Handle legacy string items (Phase 2.x)
     if (typeof item !== "string") continue;
     
     // Generate deterministic key from item text
@@ -848,6 +889,70 @@ async function bridgeDecisionsFromBrief(brief) {
       level: "up",
       meta: { decisions: createdCount }
     });
+  }
+  
+  if (bridgedStructured.length > 0) {
+    await emit("status", `Briefing: auto-wired ${bridgedStructured.length} structured decision(s) to Hermes`, {
+      level: "up",
+      meta: { decisions: bridgedStructured }
+    });
+  }
+}
+
+/**
+ * Phase 3: Auto-wire a structured Decision object from the briefing
+ * directly to Hermes workflow — create an agent request immediately
+ * instead of waiting for manual approval in the web UI.
+ */
+async function bridgeStructuredDecision(decision, sectionLabel) {
+  const { title, body, kind = "confirm", key, actionTarget, actions } = decision;
+  
+  // Generate deterministic key if not provided
+  const decisionKey = key || (title || body).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);
+  
+  // Skip if decision already exists (idempotent)
+  const existing = await q("SELECT id FROM \"Decision\" WHERE key = $1", [decisionKey]);
+  if (existing.rows.length > 0) {
+    log(`structured decision already exists: ${decisionKey}`);
+    return;
+  }
+  
+  // Determine actions based on kind if not provided
+  const decisionActions = actions || (kind === "confirm" ? ["approve", "dismiss"] : ["approve", "dismiss", "open"]);
+  
+  // Create decision record with pending status
+  try {
+    await q(
+      `INSERT INTO "Decision" (id, key, title, body, kind, status, actions, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, now(), now())`,
+      [randomUUID(), decisionKey, title?.slice(0, 200) || "Untitled", body || "", kind, JSON.stringify(decisionActions)]
+    );
+    log(`bridged structured decision: ${decisionKey} (kind=${kind}, from ${sectionLabel})`);
+  } catch (e) {
+    log(`failed to bridge structured decision ${decisionKey}:`, e.message);
+    return;
+  }
+  
+  // Create agent request to Hermes immediately (auto-wiring)
+  try {
+    const promptData = {
+      decisionKey,
+      decisionTitle: title,
+      decisionBody: body,
+      decisionKind: kind,
+      actionTarget,
+      source: "briefing-auto-wire",
+      approvedAt: new Date().toISOString()
+    };
+    
+    await q(
+      `INSERT INTO "AgentRequest" (id, origin, kind, title, prompt, sideEffecting, status, decidedAt)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, now())`,
+      [randomUUID(), "web", `decision.${kind}`, title || decisionKey, JSON.stringify(promptData), kind !== "confirm", kind === "confirm" ? "approved" : "queued"]
+    );
+    log(`auto-wired decision ${decisionKey} → Hermes agent request`);
+  } catch (e) {
+    log(`failed to auto-wire decision ${decisionKey} to Hermes:`, e.message);
   }
 }
 
@@ -933,6 +1038,9 @@ async function runRequest(r) {
         decisionData = { rawPrompt: r.prompt };
       }
       
+      // Extract decision key for linking
+      const decisionKey = decisionData.decisionKey;
+      
       if (op === "archive") {
         // Create a kanban task to archive the referenced items
         const target = decisionData.actionTarget;
@@ -944,6 +1052,13 @@ async function runRequest(r) {
         const assignee = decisionData.assignee || "default";
         const args = ["kanban", "--board", BOARD, "create", "--json", archiveTitle, "--body", archivePrompt, "--assignee", assignee];
         result = (await hermes(args, { timeout: 20000 })).trim();
+        
+        // Extract task ID from result and link to Decision (Phase 3)
+        const taskResult = parseTaskResult(result);
+        if (taskResult?.id && decisionKey) {
+          await linkDecisionToHermesTask(decisionKey, taskResult.id);
+        }
+        
         await mirrorKanban();
       } else if (op === "confirm") {
         // Simple confirmation - just log it
@@ -964,6 +1079,12 @@ async function runRequest(r) {
         if (target?.type === "task" && target?.id) {
           const args = ["kanban", "--board", BOARD, "done", target.id];
           result = (await hermes(args, { timeout: 20000 })).trim();
+          
+          // Link decision to Hermes task (Phase 3)
+          if (decisionKey) {
+            await linkDecisionToHermesTask(decisionKey, target.id);
+          }
+          
           await mirrorKanban();
         } else {
           result = `decision resolved (no task target)`;
