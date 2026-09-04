@@ -179,16 +179,24 @@ $ npx tsc --noEmit
 
 ## Next Steps
 
-### Phase 2.2 (Not Started)
+### Phase 2.2 — ✅ DONE / shipped
 - Wire up real action handlers in backend
 - Implement archive/pin/resolve logic
 - Add database models for Decision tracking
 - Hermes bridge integration for auto-routing
 
-### Phase 3 (Not Started)
-- Full auto-wiring to tasks/requests
-- Bridge enhancements for structured decisions
-- Performance optimizations
+### Phase 2.3 — ✅ DONE / shipped
+- Dashboard / admin Decision UI + design pass
+
+### Phase 3 — ✅ DONE / shipped on `main` via [#67](https://github.com/diptamahardhika/hermes-agent-mission-control/pull/67) @ `c804116`
+- Full auto-wiring to tasks/requests (`hermesTaskId`)
+- Bridge emits structured Decisions
+
+### Next (post–Phase 3)
+1. Prove E2E briefing → Decision → Hermes/kanban
+2. Fix intermittent SQLite `kanban.db` lock on `/api/agents`
+3. Smoke test; keep structured mode opt-in until E2E is green
+4. Then Phase 4 theme = close decision outcomes into AgentRequest / kanban / briefing
 
 ---
 
@@ -218,3 +226,4 @@ $ npx tsc --noEmit
 
 **Implementation Date:** 2026-09-03  
 **Status:** Phase 2.1 Complete ✅
+**Follow-on:** Phase 2.2–2.3 + Phase 3 ✅ shipped on `main` (docs refreshed 2026-09-05)

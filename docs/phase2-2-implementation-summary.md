@@ -1,7 +1,8 @@
 # Phase 2.2 Implementation Summary
 
 **Date:** 2026-09-03  
-**Status:** ✅ COMPLETE
+**Status:** ✅ COMPLETE (Phase 2.2)
+**Follow-on:** Phase 2.3 + Phase 3 ✅ shipped on `main` (docs refreshed 2026-09-05)
 
 ---
 
@@ -227,23 +228,31 @@ $ npx prisma db push
 
 ## Next Steps
 
-### Phase 2.3 (Optional)
-- Add Decision UI components to dashboard
-- Create admin interface for decision management
-- Add decision filtering in frontend
+### Phase 2.3 — ✅ DONE / shipped
+- Dashboard Decision Widget, Admin Decision page, Detail Modal
+- Centralized badge constants (`src/lib/decisions.ts`)
+- Emil Kowalski design engineering pass on Decisions panel
 
-### Phase 3 (Future)
+### Phase 3 — ✅ DONE / shipped on `main` via [#67](https://github.com/diptamahardhika/hermes-agent-mission-control/pull/67) @ `c804116`
 - Auto-wiring: Bridge emits structured Decisions
-- Hermes task creation from decisions
-- Full integration with kanban board
+- Hermes task linkage (`hermesTaskId`)
+- Integration with kanban / AgentRequest flows
+
+### Next (post–Phase 3)
+1. Prove E2E briefing → Decision → Hermes/kanban
+2. Fix intermittent SQLite `kanban.db` lock on `/api/agents`
+3. Smoke test; keep structured mode opt-in until E2E is green
+4. Then Phase 4 theme = close decision outcomes into AgentRequest / kanban / briefing (no detailed Phase 4 spec here)
 
 ### Production Readiness
 - [x] Database migrated
 - [x] API endpoints tested
 - [x] TypeScript clean
-- [ ] Add to CI/CD pipeline
-- [ ] Monitor in staging
-- [ ] Deploy to production
+- [x] Phase 2.3 UI shipped
+- [x] Phase 3 auto-wiring shipped on `main`
+- [ ] E2E briefing→Decision→Hermes/kanban proven
+- [ ] `/api/agents` kanban.db lock smoke-clean
+- [ ] Structured mode default only after E2E green
 
 ---
 
@@ -271,10 +280,11 @@ Phase 2.2 is **COMPLETE** and **TESTED**. The Decision layer now has:
 - Activity tracking
 - Integration with Hermes workflows
 
-**Status:** Ready for Phase 2.3 or production deployment.
+**Status:** Phase 2.2 complete; Phase 2.3 and Phase 3 have since shipped on `main` (see Next Steps).
 
 ---
 
 **Implementation Date:** 2026-09-03  
 **Commit:** ed9f6ea  
-**Branch:** feat/decision-layer
+**Branch:** feat/decision-layer (historical)
+**Later:** Phase 3 on `main` via #67 @ `c804116`

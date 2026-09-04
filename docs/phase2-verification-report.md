@@ -2,7 +2,8 @@
 
 **Date:** 2026-09-03  
 **Status:** ✅ PASSED - All critical tests pass  
-**Ready for:** Manual browser testing → Production deployment
+**Ready for:** (historical) Manual browser testing → Production deployment
+**Follow-on:** Phase 2.2–2.3 + Phase 3 ✅ shipped on `main` (docs refreshed 2026-09-05)
 
 ---
 
@@ -261,10 +262,10 @@ getDecisionLayerFromBriefing(briefing) // Extracts from briefing data
 - Could confuse developers if not documented
 - Mitigation: Clear comments in features.ts
 
-⚠️ **Stub implementation**
-- PATCH endpoint logs but doesn't execute actions
-- Phase 2.2 needed for real routing logic
-- Mitigation: Clearly marked as stub with TODOs
+✅ **Stub → real handlers (Phase 2.2+)**
+- PATCH endpoint originally logged only (Phase 2.1)
+- Phase 2.2 wired real routing; Phase 3 auto-wiring shipped
+- Historical note: mitigated as planned
 
 ---
 
@@ -297,29 +298,37 @@ getDecisionLayerFromBriefing(briefing) // Extracts from briefing data
 - [ ] Monitor error logs for 24 hours
 
 ### Post-Deployment
-- [ ] Watch for Decision-related errors
-- [ ] Collect feedback from Hermes team
-- [ ] Prepare Phase 2.2 implementation plan
+- [x] Watch for Decision-related errors
+- [x] Collect feedback from Hermes team
+- [x] Prepare Phase 2.2 implementation plan (Phase 2.2–3 since shipped)
 
 ---
 
 ## Next Steps
 
-### Immediate (Optional)
-1. **Deploy Phase 2.1** - Safe, no breaking changes
-2. **Monitor** - Watch for any unexpected behavior
-3. **Document** - Add usage examples for Hermes bridge team
+### Immediate — ✅ DONE
+1. **Deploy Phase 2.1** - Shipped (legacy default, no breaking changes)
+2. **Monitor** - Phase 2.2–2.3 and Phase 3 followed on `main`
+3. **Document** - Decision Layer docs refreshed 2026-09-05 to match shipped reality
 
-### Phase 2.2 (Not Started)
+### Phase 2.2 — ✅ DONE / shipped
 1. Wire up real action handlers
 2. Implement archive/pin/resolve logic
 3. Add database models for Decision tracking
 4. Integrate with Hermes bridge
 
-### Phase 3 (Not Started)
-1. Full auto-wiring to tasks/requests
-2. Hermes bridge enhancements
-3. Performance optimizations
+### Phase 2.3 — ✅ DONE / shipped
+- Dashboard / admin Decision UI + design engineering pass
+
+### Phase 3 — ✅ DONE / shipped on `main` via [#67](https://github.com/diptamahardhika/hermes-agent-mission-control/pull/67) @ `c804116`
+1. Full auto-wiring to tasks/requests (`hermesTaskId`)
+2. Hermes bridge emits structured Decisions
+
+### Next (post–Phase 3)
+1. Prove E2E briefing → Decision → Hermes/kanban
+2. Fix intermittent SQLite `kanban.db` lock on `/api/agents`
+3. Smoke test; keep structured mode opt-in until E2E is green
+4. Then Phase 4 theme = close decision outcomes into AgentRequest / kanban / briefing
 
 ---
 
