@@ -542,20 +542,22 @@ model HermesMemory {
 // Actions: approve (route to Hermes), dismiss (suppress), resolve (mark done).
 
 model Decision {
-  id           String    @id @default(cuid())
-  key          String    @unique // deterministic slug: e.g., "worktrees-dirs"
-  title        String
-  body         String    @db.Text
-  kind         String    @default("confirm") // "archive" | "pin" | "resolve" | "confirm"
-  status       String    @default("pending") // pending | approved | dismissed | resolved | expired
-  actionTarget Json?     // { type: "task" | "request" | "path", id?: string, hash?: string }
-  actions      String[]  @default(["approve", "dismiss", "open"])
-  metadata     Json?
-  decidedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  key               String    @unique // deterministic slug: e.g., "worktrees-dirs"
+  title             String
+  body              String    @db.Text
+  kind              String    @default("confirm") // "archive" | "pin" | "resolve" | "confirm"
+  status            String    @default("pending") // pending | approved | dismissed | resolved | expired
+  actionTarget      Json?     // { type: "task" | "request" | "path", id?: string, hash?: string }
+  actions           String[]  @default(["approve", "dismiss", "open"])
+  metadata          Json?
+  hermesTaskId      String?   // link to Hermes kanban task (nullable, set by bridge)
+  decidedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([status])
   @@index([kind])
   @@index([createdAt])
+  @@index([hermesTaskId])
 }

@@ -1,4 +1,4 @@
-// Shared types for Decision layer (Phase 2.1/2.2/2.3)
+// Shared types for Decision layer (Phase 2.1/2.2/2.3 + Phase 3)
 
 export type DecisionKind = "archive" | "pin" | "resolve" | "confirm";
 export type DecisionAction = "approve" | "dismiss" | "open" | "edit";
@@ -20,6 +20,7 @@ export interface Decision {
   actionTarget?: DecisionActionTarget | null;
   actions: DecisionAction[];
   metadata?: Record<string, unknown> | null;
+  hermesTaskId?: string | null;
   createdAt: string;
   updatedAt: string;
   decidedAt?: string | null;

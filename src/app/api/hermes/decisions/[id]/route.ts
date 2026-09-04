@@ -205,7 +205,7 @@ async function approveDecision(
     }
   });
 
-  // Update decision
+  // Update decision to approved - bridge will update hermesTaskId when it creates the task
   const updated = await prisma.decision.update({
     where: { id: decision.id },
     data: {
@@ -213,12 +213,14 @@ async function approveDecision(
       decidedAt: new Date(),
       metadata: {
         ...decision.metadata,
-        agentRequestId: request.id
+        agentRequestId: request.id,
+        approvalKind: kind,
+        approvedVia: "web"
       }
     }
   });
 
-  console.log(`[Decision] Approved decision ${decision.key} → AgentRequest ${request.id}`);
+  console.log(`[Decision] Approved decision ${decision.key} → AgentRequest ${request.id} (bridge will create Hermes task)`);
   return updated;
 }
 
