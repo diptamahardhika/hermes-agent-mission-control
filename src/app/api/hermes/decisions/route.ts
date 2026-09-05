@@ -31,15 +31,29 @@ export async function GET(req: Request) {
       take: Math.min(limit, 100)
     });
 
-    // Fetch pending count for badge
-    const pendingCount = await prisma.decision.count({
-      where: { status: "pending" }
-    });
+    // Fetch per-status and per-kind counts for filter badges
+    const [statusCounts, kindCounts] = await Promise.all([
+      prisma.decision.groupBy({
+        by: ["status"],
+        _count: true,
+      }),
+      prisma.decision.groupBy({
+        by: ["kind"],
+        _count: true,
+      }),
+    ]);
+
+    const statusMap: Record<string, number> = { pending: 0, approved: 0, dismissed: 0, resolved: 0 };
+    for (const g of statusCounts) statusMap[g.status] = g._count;
+
+    const kindMap: Record<string, number> = { archive: 0, pin: 0, resolve: 0, confirm: 0 };
+    for (const g of kindCounts) kindMap[g.kind] = g._count;
 
     return NextResponse.json({
       decisions,
-      pendingCount,
-      total: decisions.length
+      pendingCount: statusMap.pending || 0,
+      total: decisions.length,
+      counts: { status: statusMap, kind: kindMap },
     });
   } catch (error) {
     console.error("[Decision] Error fetching decisions:", error);
