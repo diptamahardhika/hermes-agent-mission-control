@@ -25,6 +25,7 @@ export default function AdminDecisionsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [counts, setCounts] = useState<{ status: Record<string, number>; kind: Record<string, number> }>({ status: {}, kind: {} });
 
   const [filters, setFilters] = useState<DecisionFilters>({
     status: "all",
@@ -53,6 +54,7 @@ export default function AdminDecisionsPage() {
       const data = await res.json();
       setDecisions(data.decisions || []);
       setTotal(data.total || 0);
+      setCounts(data.counts || { status: {}, kind: {} });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -155,7 +157,7 @@ export default function AdminDecisionsPage() {
                   {s === "all" ? "All" : STATUS_BADGE[s]?.label || s}
                   {s !== "all" && (
                     <span className="ml-auto text-[10px] text-[var(--text-4)]">
-                      ({filteredCount})
+                      ({counts.status[s] ?? 0})
                     </span>
                   )}
                 </button>
@@ -178,6 +180,11 @@ export default function AdminDecisionsPage() {
                   }`}
                 >
                   {k === "all" ? "All Kinds" : KIND_BADGE[k]?.label || k}
+                  {k !== "all" && (
+                    <span className="ml-auto text-[10px] text-[var(--text-4)]">
+                      ({counts.kind[k] ?? 0})
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
