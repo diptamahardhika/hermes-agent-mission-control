@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Clock, X } from "lucide-react";
+import { ArrowUpRight, Clock, Flag, X } from "lucide-react";
 import { Panel, Eyebrow, Button } from "@/components/ui/kit";
 
 import type { Decision } from "@/types/decision";
@@ -48,7 +48,9 @@ export function DecisionDashboardWidget({
     return (
       <Panel className="p-6 h-full">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-4 h-4 rounded-full bg-[var(--surface-2)] animate-pulse" />
+          <div className="w-4 h-4 flex items-center justify-center rounded-full bg-[var(--surface-2)] animate-pulse">
+            <Flag className="w-3 h-3" style={{ color: "var(--text-3)" }} />
+          </div>
           <div className="h-4 w-24 bg-[var(--surface-2)] rounded animate-pulse" />
         </div>
         <div className="space-y-3">
@@ -64,7 +66,7 @@ export function DecisionDashboardWidget({
     return (
       <Panel className="p-6 h-full">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-4 h-4 rounded-full bg-[var(--up)]" />
+          <Flag className="w-4 h-4" style={{ color: "var(--up)" }} />
           <Eyebrow>Decisions</Eyebrow>
         </div>
         <div className="py-6 text-center">
@@ -81,10 +83,11 @@ export function DecisionDashboardWidget({
     <Panel className={`p-6 h-full flex flex-col ${mounted ? "hq-panel-enter" : ""}`}>
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <div
-            className="w-4 h-4 rounded-full"
-            style={{ background: pendingCount > 0 ? "var(--warn)" : "var(--up)" }}
-          />
+          <div className="flex items-center justify-center w-4 h-4 rounded-full"
+              style={{ background: pendingCount > 0 ? "var(--warn)" : "var(--up)" }}
+            >
+              <Flag className="w-2.5 h-2.5" style={{ color: "var(--card)" }} />
+            </div>
           <Eyebrow>Decisions</Eyebrow>
         </div>
 {pendingCount > 0 && (
