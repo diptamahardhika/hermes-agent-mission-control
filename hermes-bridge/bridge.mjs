@@ -875,7 +875,7 @@ async function bridgeDecisionsFromBrief(brief) {
       await q(
         `INSERT INTO "Decision" (id, key, title, body, kind, status, actions, "createdAt", "updatedAt")
          VALUES ($1, $2, $3, $4, $5, 'pending', $6, now(), now())`,
-        [randomUUID(), key, item.slice(0, 100), item, JSON.stringify(actions)]
+        [randomUUID(), key, item.slice(0, 100), item, kind, JSON.stringify(actions)]
       );
       createdCount.push(key);
       log(`bridged decision: ${key} (kind=${kind})`);
