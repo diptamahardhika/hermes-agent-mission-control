@@ -1,29 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { homedir } from "os";
+import { shJson, KANBAN_DB } from "@/lib/kanban-db";
 import { execFile } from "child_process";
-import { promisify } from "util";
-
-const execFileP = promisify(execFile);
-const KANBAN_DB = `${homedir()}/.hermes/kanban.db`;
-
-function shJson<T = any>(sql: string): Promise<T[]> {
-  // -json makes sqlite3 emit one JSON array — no pipe/newline parsing issues
-  return execFileP("sqlite3", ["-json", KANBAN_DB, sql], { timeout: 5000, maxBuffer: 1024 * 1024 })
-    .then((r) => {
-      const text = r.stdout.trim();
-      if (!text) return [];
-      try {
-        return JSON.parse(text);
-      } catch {
-        return [];
-      }
-    })
-    .catch((err) => {
-      console.error("shJson SQL error:", err.message, "- SQL:", sql.substring(0, 100));
-      return [];
-    });
-}
 
 const COMMENT_SQL = `
   SELECT c.id, c.task_id, c.author, c.body, c.created_at, t.title AS task_title, t.status AS task_status

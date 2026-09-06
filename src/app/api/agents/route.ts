@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { execFile } from "child_process";
+import { sh, KANBAN_DB } from "@/lib/kanban-db";
 import { homedir } from "os";
-import { promisify } from "util";
-
-const execFileP = promisify(execFile);
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -65,18 +62,10 @@ const DEFAULT_AGENTS = [
   },
 ];
 
-function sh(cmd: string, args: string[], timeout = 5000): Promise<string | null> {
-  return execFileP(cmd, args, { timeout, maxBuffer: 1024 * 1024 })
-    .then((r) => r.stdout)
-    .catch(() => null);
-}
-
 // ── Hermes kanban board (~/.hermes/state.db via `hermes` CLI schema) ──
 // max/sage/knox/nova are real Hermes profiles. A task on the board assigned
 // to <profile> with status running/todo/ready means that agent is busy.
 const KANBAN_PROFILES = ["max", "sage", "knox", "nova", "pixel"] as const;
-
-const KANBAN_DB = `${homedir()}/.hermes/kanban.db`;
 
 async function hermesKanbanLive(): Promise<Record<string, Live>> {
   // NB: no -readonly here — macOS sqlite3 can't open a WAL db readonly if it

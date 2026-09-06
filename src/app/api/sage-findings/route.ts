@@ -2,14 +2,10 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { NextResponse } from "next/server";
-import { execFile } from "child_process";
+import { shJson } from "@/lib/kanban-db";
 import { homedir } from "os";
-import { promisify } from "util";
 import { readFile } from "fs/promises";
 import path from "path";
-
-const execFileP = promisify(execFile);
-const KANBAN_DB = `${homedir()}/.hermes/kanban.db`;
 
 // Digest directory — may not exist on first run; keep path consistent
 const DIGEST_DIR = `${homedir()}/.hermes/sage-digests`;
@@ -26,15 +22,13 @@ type Finding = {
 
 async function sageFindings(): Promise<Finding[]> {
   try {
-    const { stdout } = await execFileP("sqlite3", [
-      "-json", KANBAN_DB,
-      `SELECT r.task_id, t.title, r.summary, r.ended_at
-       FROM task_runs r JOIN tasks t ON t.id = r.task_id
-       WHERE t.assignee = 'sage' AND r.status = 'done' AND length(coalesce(r.summary,'')) > 50
-       ORDER BY coalesce(r.ended_at, r.started_at) DESC LIMIT 10;`,
-    ], { timeout: 5000, maxBuffer: 1024 * 1024 });
-    if (!stdout.trim()) return [];
-    const rows = JSON.parse(stdout.trim());
+    const rows = await shJson<any>(`
+      SELECT r.task_id, t.title, r.summary, r.ended_at
+      FROM task_runs r JOIN tasks t ON t.id = r.task_id
+      WHERE t.assignee = 'sage' AND r.status = 'done' AND length(coalesce(r.summary,'')) > 50
+      ORDER BY coalesce(r.ended_at, r.started_at) DESC LIMIT 10;
+    `);
+    if (!rows.length) return [];
     const findings = await Promise.all(rows.map(async (r: any) => {
       let summary = String(r.summary || "");
       const title = String(r.title || "");
