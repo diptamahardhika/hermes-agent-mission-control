@@ -810,16 +810,20 @@ async function mirrorBrief() {
   if (typeof brief.greeting !== "string") delete brief.greeting;
   // Skip if summary is empty (empty brief = no content)
   if (!brief.summary || brief.summary.trim().length < 10) return;
+  // Use current DB time as generatedAt so the dashboard "x ago" label is accurate.
+  // Always update on new brief task completion — the user explicitly triggered
+  // a new generation, so the timestamp should reflect that even if content is similar.
+  brief.generatedAt = (await q("SELECT to_char(now() AT TIME ZONE 'GMT', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS t")).rows[0].t;
   const prevRow = (await q(
     `SELECT data FROM "DataStore" WHERE key='hermes-briefing'`
   )).rows[0] ?? {};
   const prev = prevRow.data ?? {};
-  // Only update if the content actually changed — never overwrite a good brief
-  // with an identical or worse one. Compare summary and greeting.
-  const sameContent = prev.summary === brief.summary && prev.greeting === brief.greeting;
-  if (sameContent) return;
-  // Use current DB time as generatedAt so the dashboard "x ago" label is accurate.
-  brief.generatedAt = (await q("SELECT to_char(now() AT TIME ZONE 'GMT', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS t")).rows[0].t;
+  // Only avoid updating if the content is meaningfully identical (same summary & greeting
+  // from the exact same prior generation). We still update generatedAt so the "x ago" label
+  // reflects the new generation time.
+  if (prev.summary === brief.summary && prev.greeting === brief.greeting) {
+    // Still update generatedAt regardless — content-unchanged is not a reason to keep stale time
+  }
   await setStore("hermes-briefing", brief);
   await emit("status", "Daily brief synced from kanban", { level: "up" });
   
