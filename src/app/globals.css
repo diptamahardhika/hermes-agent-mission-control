@@ -335,12 +335,14 @@ textarea, input {
     box-shadow 0.3s var(--ease);
 }
 .panel-interactive { cursor: pointer; }
-.panel-interactive:hover {
+.panel-interactive:hover,
+.panel-interactive:focus-visible {
   border-color: var(--line-strong);
   background: var(--surface-2);
   transform: translateY(-2px);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 32px -14px rgba(0, 0, 0, 0.6);
 }
+.panel-interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 .panel-interactive:active {
   transform: translateY(-1px) scale(0.995);
 }
@@ -466,7 +468,8 @@ textarea, input {
 @media (prefers-reduced-motion: reduce) {
   .hq-rise { animation: none; opacity: 1; }
   .hq-ambient::before { animation: none; }
-  .panel-interactive:hover { transform: none; }
+  .panel-interactive:hover,
+  .panel-interactive:focus-visible { transform: none; }
   .panel-interactive:active,
   .btn-primary:active,
   .btn-ghost:active { transform: none; }
