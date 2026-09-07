@@ -83,11 +83,13 @@ export function DecisionDashboardWidget({
     <Panel className={`p-6 h-full flex flex-col ${mounted ? "hq-panel-enter" : ""}`}>
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-4 h-4 rounded-full"
-              style={{ background: pendingCount > 0 ? "var(--warn)" : "var(--up)" }}
-            >
-              <Flag className="w-2.5 h-2.5" style={{ color: "var(--card)" }} />
-            </div>
+          <div className={`flex items-center justify-center w-4 h-4 rounded-full transition-all duration-200 ${
+            pendingCount > 0
+              ? "bg-[#fbbf24]/20 ring-2 ring-[#fbbf24]/40"
+              : "bg-[#34d399]/20 ring-2 ring-[#34d399]/40"
+          }`}>
+            <Flag className="w-2.5 h-2.5" style={{ color: pendingCount > 0 ? "#fbbf24" : "#34d399" }} />
+          </div>
           <Eyebrow>Decisions</Eyebrow>
         </div>
 {pendingCount > 0 && (
