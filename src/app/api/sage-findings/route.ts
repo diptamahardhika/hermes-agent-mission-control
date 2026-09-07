@@ -43,7 +43,9 @@ async function sageFindings(): Promise<Finding[]> {
         // Fall back to the global (undated) file for entries before this fix.
         const completedAtSec = Number(r.ended_at) || Math.floor(Date.now() / 1000);
         const d = new Date(completedAtSec * 1000);
-        const dateStr = d.toISOString().slice(0, 10); // YYYY-MM-DD
+        const dateStr = d.getFullYear() + '-' +
+          String(d.getMonth() + 1).padStart(2, '0') + '-' +
+          String(d.getDate()).padStart(2, '0'); // YYYY-MM-DD in local TZ
         const datedPath = path.join(DIGEST_DIR, `${category === "ai" ? "ai" : "security"}-digest-${dateStr}.md`);
         try {
           const digestContent = await readFile(datedPath, "utf8");
