@@ -174,7 +174,7 @@ export function DecisionDashboardWidget({
                       <button
                         type="button"
                         onClick={() => onAction("approve", decision.id)}
-                        className="text-[11px] text-[var(--up)] hover:text-[var(--text)] transition-colors duration-150 ease-out decision-btn font-medium"
+                        className="text-[11px] text-[var(--up)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] transition-colors duration-150 ease-out decision-btn font-medium"
                       >
                         Approve
                       </button>
@@ -183,7 +183,7 @@ export function DecisionDashboardWidget({
                       <button
                         type="button"
                         onClick={() => onAction("dismiss", decision.id)}
-                        className="text-[11px] text-[var(--text-3)] hover:text-[var(--down)] transition-colors duration-150 ease-out decision-btn"
+                        className="text-[11px] text-[var(--text-3)] hover:text-[var(--down)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] transition-colors duration-150 ease-out decision-btn"
                       >
                         Dismiss
                       </button>
@@ -192,7 +192,7 @@ export function DecisionDashboardWidget({
                       <button
                         type="button"
                         onClick={() => onAction("open", decision.id)}
-                        className="text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors duration-150 ease-out decision-btn"
+                        className="text-[11px] text-[var(--accent)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] transition-colors duration-150 ease-out decision-btn"
                       >
                         Open
                       </button>

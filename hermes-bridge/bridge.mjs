@@ -76,6 +76,9 @@ const pool = new pg.Pool({ connectionString: DB_URL, max: 4, ssl: isLocal ? unde
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 const q = (text, params) => pool.query(text, params);
 
+const RECONNECT_MAX_ATTEMPTS = 30;
+const RECONNECT_DELAY_MS = 2000; // 2s between attempts
+
 // ── Self-healing: stale kanban.lock recovery ─────────────────────────
 // Hermes's SQLite-backed kanban can be left with a stale 0-byte init/dispatch
 // lock when the gateway or CLI is killed uncleanly (e.g. power loss, OOM).
@@ -943,9 +946,9 @@ async function bridgeDecisionsFromBrief(brief) {
       // Create decision
       try {
         await q(
-          `INSERT INTO "Decision" (id, key, title, body, kind, status, actions, "createdAt", "updatedAt")
-           VALUES ($1, $2, $3, $4, $5, 'pending', $6, now(), now())`,
-          [randomUUID(), key, item.slice(0, 100), item, kind, actions]
+          `INSERT INTO "Decision" (id, key, title, body, kind, status, actions, "createdAt", "updatedAt", "hermesTaskId")
+           VALUES ($1, $2, $3, $4, $5, 'pending', $6, now(), now(), $7)`,
+          [randomUUID(), key, item.slice(0, 100), item, kind, actions, null]
         );
         createdCount.push(key);
         log(`bridged decision: ${key} (kind=${kind}, from ${section.label})`);
@@ -994,9 +997,9 @@ async function bridgeStructuredDecision(decision, sectionLabel) {
   // Create decision record with pending status
   try {
     await q(
-      `INSERT INTO "Decision" (id, key, title, body, kind, status, actions, "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6, now(), now())`,
-      [randomUUID(), decisionKey, title?.slice(0, 200) || "Untitled", body || "", kind, decisionActions]
+      `INSERT INTO "Decision" (id, key, title, body, kind, status, actions, "createdAt", "updatedAt", "hermesTaskId") 
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, now(), now(), $7)`,
+      [randomUUID(), decisionKey, title?.slice(0, 200) || "Untitled", body || "", kind, decisionActions, null]
     );
     log(`bridged structured decision: ${decisionKey} (kind=${kind}, from ${sectionLabel})`);
   } catch (e) {
@@ -1252,6 +1255,27 @@ async function mirrorTick() {
 }
 
 async function main() {
+  // Wait for Postgres to be ready before starting (prevents 324 ECONNREFUSED at startup)
+  log(`waiting for Postgres at ${DB_URL.replace(/:[^:@]+@/, ':****@')} ...`);
+  let connected = false;
+  for (let attempt = 1; attempt <= RECONNECT_MAX_ATTEMPTS; attempt++) {
+    try {
+      await pool.query('SELECT 1');
+      connected = true;
+      log(`Postgres connected (attempt ${attempt})`);
+      break;
+    } catch (e) {
+      if (attempt < RECONNECT_MAX_ATTEMPTS) {
+        log(`Postgres not ready (attempt ${attempt}/${RECONNECT_MAX_ATTEMPTS}): ${e.message.split('\n')[0]} — retrying in ${RECONNECT_DELAY_MS}ms...`);
+        await new Promise(r => setTimeout(r, RECONNECT_DELAY_MS));
+      }
+    }
+  }
+  if (!connected) {
+    console.error(`FATAL: Could not connect to Postgres after ${RECONNECT_MAX_ATTEMPTS} attempts`);
+    process.exit(1);
+  }
+
   log(`hermes-bridge up · host=${HOST} · board=${BOARD} · poll=${POLL_MS}ms · mirror=${MIRROR_MS}ms · run-timeout=${RUN_TIMEOUT_MS}ms`);
   await emit("status", "Bridge connected", { level: "up", meta: { host: HOST } });
   await mirrorTick();

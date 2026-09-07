@@ -102,14 +102,14 @@ function DecisionItemRow({
               <button
                 type="button"
                 onClick={() => onAction("open", itemKey)}
-                className="text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors"
+                className="text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 Open in Hermes
               </button>
               <button
                 type="button"
                 onClick={() => onAction("dismiss", itemKey)}
-                className="text-[11px] text-[var(--text-3)] hover:text-[var(--down)] transition-colors"
+                className="text-[11px] text-[var(--text-3)] hover:text-[var(--down)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 Dismiss
               </button>
@@ -160,7 +160,7 @@ function DecisionItemRow({
               <button
                 type="button"
                 onClick={() => onAction("dismiss", item.id)}
-                className="text-[11px] text-[var(--text-3)] hover:text-[var(--down)] transition-colors"
+                className="text-[11px] text-[var(--text-3)] hover:text-[var(--down)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 Dismiss
               </button>
@@ -169,7 +169,7 @@ function DecisionItemRow({
               <button
                 type="button"
                 onClick={() => onAction("open", item.id)}
-                className="text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors"
+                className="text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 Open
               </button>
@@ -316,7 +316,7 @@ export function HermesBriefing() {
                   <span className="eyebrow !text-[9.5px]">Filter</span>
                   <button
                     onClick={() => setFilterKind(null)}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       filterKind === null
                         ? "bg-[var(--accent)]/10 text-[var(--accent)]"
                         : "bg-[var(--surface-1)] text-[var(--text-3)] hover:text-[var(--text)]"
@@ -339,7 +339,7 @@ export function HermesBriefing() {
                       <button
                         key={kind}
                         onClick={() => setFilterKind(isActive ? null : kind)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                         style={{
                           background: isActive ? `color-mix(in srgb, ${colorMap[kind]} 20%, transparent)` : "var(--surface-1)",
                           color: isActive ? colorMap[kind] : "var(--text-3)",
@@ -354,7 +354,7 @@ export function HermesBriefing() {
                   })}
                   <button
                     onClick={() => setShowDecisionsOnly(prev => !prev)}
-                    className={`ml-auto text-[11px] transition-colors ${
+                    className={`ml-auto text-[11px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       showDecisionsOnly ? "text-[var(--accent)] font-medium" : "text-[var(--text-3)] hover:text-[var(--text)]"
                     }`}
                   >
@@ -363,7 +363,7 @@ export function HermesBriefing() {
                   {(filterKind || showDecisionsOnly) && (
                     <button
                       onClick={() => { setFilterKind(null); setShowDecisionsOnly(false); }}
-                      className="text-[10px] text-[var(--text-4)] hover:text-[var(--text)] transition-colors"
+                      className="text-[10px] text-[var(--text-4)] hover:text-[var(--text)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
                       Clear
                     </button>
