@@ -301,7 +301,7 @@ export default function AdminDecisionsPage() {
         </div>
 
         {/* Table */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto scrollbar-none">
           {loading ? (
             <div className="p-6 text-center">
               <p className="text-[13px] text-[var(--text-3)]">Loading decisions...</p>
