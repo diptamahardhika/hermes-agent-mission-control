@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, X, Trash, ChevronLeft, ChevronRight, Filter, Search } from "lucide-react";
+import { Check, X, Trash, ChevronLeft, ChevronRight, Filter, Search, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 import { DecisionDetailModal } from "@/components/decision-detail-modal";
 import type { Decision, DecisionKind, DecisionStatus } from "@/types/decision";
 import { KIND_BADGE, STATUS_BADGE } from "@/lib/decisions";
@@ -39,6 +39,16 @@ export default function AdminDecisionsPage() {
   const [sortField, setSortField] = useState<"createdAt" | "title">("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    typeof window !== "undefined" &&
+      localStorage.getItem("hermes_decisions_sidebar") === "open"
+  );
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("hermes_decisions_sidebar", sidebarOpen ? "open" : "closed");
+    }
+  }, [sidebarOpen]);
 
   const loadDecisions = useCallback(async () => {
     setLoading(true);
@@ -134,7 +144,17 @@ export default function AdminDecisionsPage() {
   return (
     <div className="flex h-[calc(100vh-4rem)] md:h-screen">
       {/* Left Sidebar - Filters */}
-      <aside className="w-64 border-r border-[var(--line)] p-4 space-y-6 overflow-y-auto hidden md:block">
+      <aside
+        className={`
+          ${sidebarOpen ? "w-64" : "w-0"} border-r border-[var(--line)] overflow-hidden
+          transition-[width] duration-300 ease-out hidden md:block
+        `}
+      >
+        <div
+          className={`transition-opacity duration-300 ease-out ${
+            sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        >
         <div>
           <h2 className="text-[13px] font-semibold text-[var(--text)] mb-3 flex items-center gap-2">
             <Filter className="w-4 h-4" /> Filters
@@ -230,6 +250,7 @@ export default function AdminDecisionsPage() {
         >
           Clear Filters
         </button>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -237,6 +258,14 @@ export default function AdminDecisionsPage() {
         {/* Header */}
         <div className="border-b border-[var(--line)] p-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="p-1.5 rounded hover:bg-[var(--surface-1)] text-[var(--text-3)] hover:text-[var(--text)] transition-colors"
+              title={sidebarOpen ? "Collapse filters" : "Expand filters"}
+              aria-label={sidebarOpen ? "Collapse filter sidebar" : "Expand filter sidebar"}
+            >
+              {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+            </button>
             <button
               onClick={() => router.push("/")}
               className="text-[var(--text-3)] hover:text-[var(--text)] transition-colors"
