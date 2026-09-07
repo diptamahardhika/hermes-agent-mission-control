@@ -126,12 +126,14 @@ export function AgentProposalsWidget() {
           <Eyebrow>Agent proposals</Eyebrow>
           <p className="text-[10px] text-[var(--text-4)] mt-0.5">Review agent work</p>
         </div>
-        <span className="flex items-center gap-2">
-          {pending.length > 0 && <Pill tone="warn">{pending.length} waiting</Pill>}
-          {handled > 0 && (
-            <span className="num text-[10.5px] text-[var(--text-3)]">{handled} handled</span>
-          )}
-        </span>
+              {pending.length > 0 && (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium num transition-colors hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--warn)]"
+                  style={{ color: "var(--warn)", background: "color-mix(in srgb, var(--warn) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--warn) 22%, transparent)" }}
+                >
+                  {pending.length} waiting
+                </span>
+              )}
       </div>
 
       {/* Controls row */}
