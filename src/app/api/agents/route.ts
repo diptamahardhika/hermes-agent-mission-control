@@ -164,13 +164,15 @@ async function hermesSessionLiveMap(): Promise<Record<string, Live>> {
 
     if (leaseOut && leaseOut.trim()) {
       const parts = leaseOut.trim().split("|");
-      const [, title] = parts;
+      const [, title, lastActivityAt] = parts;
       const agentId = profile === "" ? "max" : profile;
       if (!(KANBAN_PROFILES as readonly string[]).includes(agentId) || map[agentId]) continue;
+      // Use actual session last_activity_at, not "now" — polling must not advance the clock
+      const lastActive = lastActivityAt ? new Date(Number(lastActivityAt) * 1000).toISOString() : new Date().toISOString();
       map[agentId] = {
         status: "working",
         currentTask: title && title !== "" ? title.slice(0, 80) : "Working on a task",
-        lastActive: new Date().toISOString(),
+        lastActive,
       };
     }
   }
@@ -214,17 +216,19 @@ async function hermesSessionLiveMap(): Promise<Record<string, Live>> {
 
       if (lastActivity) {
         const now = Date.now() / 1000;
+        // Use actual last activity time, not "now" — polling must not advance the clock
+        const lastActive = new Date(lastActivity * 1000).toISOString();
         // Show "working" if active within 2 minutes, otherwise "online"
         if (now - lastActivity <= 120) {
           map[agentId] = {
             status: "working",
             currentTask: "Active session",
-            lastActive: new Date().toISOString(),
+            lastActive,
           };
         } else {
           map[agentId] = {
             status: "online",
-            lastActive: new Date().toISOString(),
+            lastActive,
           };
         }
       }
