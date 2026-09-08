@@ -135,7 +135,6 @@ export async function POST(req: Request) {
 
   // Handle ping event
   if (action === "ping") {
-    console.log(`[webhook] Ping received: ${deliveryId}`);
     return NextResponse.json({ ok: true, message: "Webhook configured successfully" });
   }
 
@@ -151,11 +150,8 @@ export async function POST(req: Request) {
 
     // Review on open or synchronize
     if (actionType === "opened" || actionType === "synchronize") {
-      console.log(`[webhook] PR #${prNumber} ${actionType} in ${repoName}`);
-
       try {
         const taskId = await enqueuePixelReview(repoName, prNumber, branch, sha, title);
-        console.log(`[webhook] Pixel review task enqueued: ${taskId}`);
 
         return NextResponse.json({
           ok: true,
@@ -164,7 +160,6 @@ export async function POST(req: Request) {
           prUrl: pr.html_url,
         });
       } catch (err) {
-        console.error("[webhook] Failed to enqueue task:", err);
         return NextResponse.json(
           { error: "Failed to enqueue review task", detail: String(err) },
           { status: 500 }
@@ -174,11 +169,8 @@ export async function POST(req: Request) {
 
     // Review on merge (closed + merged) — post-merge security scan
     if (actionType === "closed" && pr.merged) {
-      console.log(`[webhook] PR #${prNumber} merged in ${repoName}`);
-
       try {
         const taskId = await enqueuePixelMergeReview(repoName, prNumber, sha, title);
-        console.log(`[webhook] Pixel merge-review task enqueued: ${taskId}`);
 
         return NextResponse.json({
           ok: true,
@@ -187,7 +179,6 @@ export async function POST(req: Request) {
           prUrl: pr.html_url,
         });
       } catch (err) {
-        console.error("[webhook] Failed to enqueue merge-review task:", err);
         return NextResponse.json(
           { error: "Failed to enqueue merge review task", detail: String(err) },
           { status: 500 }
@@ -200,8 +191,6 @@ export async function POST(req: Request) {
 
   // Handle pull_request_review events (for approval tracking)
   if (action === "pull_request_review" && payload.review) {
-    const pr = payload.pull_request;
-    console.log(`[webhook] PR #${pr.number} review: ${payload.review.state}`);
     return NextResponse.json({ ok: true, reviewState: payload.review.state });
   }
 

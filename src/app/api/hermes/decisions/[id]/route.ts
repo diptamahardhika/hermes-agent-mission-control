@@ -51,7 +51,6 @@ export async function PATCH(
 
     if (!decision) {
       // Decision doesn't exist yet - create it for future tracking
-      console.log(`[Decision] Creating new decision for action: ${action}, id: ${id}`);
       
       // Parse actionTarget from body if provided
       const actionTarget = body.actionTarget as { type?: string; id?: string; hash?: string } | null;
@@ -165,7 +164,6 @@ async function handleDecisionAction(
       return decision;
     
     default:
-      console.warn(`[Decision] Unknown action: ${action}`);
       return decision;
   }
 }
@@ -220,7 +218,7 @@ async function approveDecision(
     }
   });
 
-  console.log(`[Decision] Approved decision ${decision.key} → AgentRequest ${request.id} (bridge will create Hermes task)`);
+  // console.log(`[Decision] Approved decision ${decision.key} → AgentRequest ${request.id} (bridge will create Hermes task)`);
   return updated;
 }
 
@@ -236,7 +234,7 @@ async function dismissDecision(decision: any) {
     }
   });
 
-  console.log(`[Decision] Dismissed decision ${decision.key}`);
+  // console.log(`[Decision] Dismissed decision ${decision.key}`);
   return updated;
 }
 
@@ -283,7 +281,7 @@ async function archiveDecision(
     }
   });
 
-  console.log(`[Decision] Archived decision ${decision.key} → AgentRequest ${request.id}`);
+  // console.log(`[Decision] Archived decision ${decision.key} → AgentRequest ${request.id}`);
   return updated;
 }
 
@@ -331,7 +329,7 @@ async function pinDecision(
     }
   });
 
-  console.log(`[Decision] Pinned decision ${decision.key} → AgentRequest ${request.id}`);
+  // console.log(`[Decision] Pinned decision ${decision.key} → AgentRequest ${request.id}`);
   return updated;
 }
 
@@ -363,7 +361,7 @@ async function resolveDecision(
       }
     });
     
-    console.log(`[Decision] Resolved decision ${decision.key} → Marked task ${target.id} as done`);
+    // console.log(`[Decision] Resolved decision ${decision.key} → Marked task ${target.id} as done`);
   }
 
   return updated;

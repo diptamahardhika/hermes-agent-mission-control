@@ -85,13 +85,12 @@ async function getYouTubeMetrics(url: string) {
 
 async function getTwitterMetrics(tweetUrl: string) {
   const xaiKey = process.env.XAI_API_KEY;
-  if (!xaiKey) { console.error("[scrape-metrics] XAI_API_KEY not set"); return null; }
+  if (!xaiKey) { return null; }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
 
   try {
-    console.log("[scrape-metrics] Calling xAI for:", tweetUrl);
     const res = await fetch("https://api.x.ai/v1/responses", {
       method: "POST",
       headers: { "Authorization": `Bearer ${xaiKey}`, "Content-Type": "application/json" },
@@ -106,20 +105,16 @@ async function getTwitterMetrics(tweetUrl: string) {
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    console.log("[scrape-metrics] xAI status:", res.status);
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("[scrape-metrics] xAI error:", errText.slice(0, 300));
+      await res.text();
       return null;
     }
     const data = await res.json();
     const text = data.output?.find((o: { type: string }) => o.type === "message")
       ?.content?.find((c: { type: string }) => c.type === "output_text")?.text || "";
-    console.log("[scrape-metrics] xAI response text:", text.slice(0, 300));
     const jsonMatch = text.match(/\{[^{}]*\}/);
-    if (!jsonMatch) { console.error("[scrape-metrics] No JSON in response:", text.slice(0, 300)); return null; }
+    if (!jsonMatch) { return null; }
     const parsed = JSON.parse(jsonMatch[0]);
-    console.log("[scrape-metrics] Parsed twitter metrics:", parsed);
     return parsed;
   } catch (e: any) {
     clearTimeout(timeout);
@@ -164,7 +159,7 @@ export async function POST(req: NextRequest) {
         result.saved = true;
         // Return the updated fields in result so client can update UI
         result.updatedScript = saved;
-        console.log("[scrape-metrics] Saved to DB:", scriptId, Object.keys(updates));
+        // Silently saved
       }
     } catch (e) {
       console.error("[scrape-metrics] DB save error:", e);
