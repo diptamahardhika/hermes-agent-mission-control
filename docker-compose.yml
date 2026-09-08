@@ -8,11 +8,10 @@ services:
       - "8080:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/data/hermes.db
+      # Connect to external hermy-postgres on hermy-infra network
+      - DATABASE_URL=postgresql://hermy:xdEHzjIO5TruRa9LFxYS36vYBLvwzQyVZi%2BamYW2ok0%3D@hermy-postgres:5432/hermy_hq
       - NEXTAUTH_SECRET=change-me-in-production
       - INTERNAL_API_SECRET=hermes-internal-secret-change-me
-    volumes:
-      - hermes-data:/data
     networks:
       - default
       - hermy-infra
