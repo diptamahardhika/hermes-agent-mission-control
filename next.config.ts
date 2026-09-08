@@ -19,6 +19,23 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "4mb",
     },
   },
+  // Fix Turbopack CSP issue: Turbopack uses eval() internally,
+  // but Next.js default CSP blocks it in production.
+  // Adding unsafe-eval allows Turbopack runtime to function.
+  async headers() {
+    return [
+      {
+        // Apply to all routes
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
