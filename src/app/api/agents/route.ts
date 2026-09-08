@@ -274,9 +274,11 @@ export async function GET() {
 
     // When the bridge is healthy but an agent has no running kanban task, mark it
     // online (pulsing) so the agents page reflects the real connected state instead
-    // of a static idle dot.
+    // of a static idle dot. Only "working" (running) kanban tasks override this —
+    // queued/ready/blocked tasks are just scheduled work, not active work.
     function bridgeFallback(live: Live | undefined): Live | undefined {
-      if (!bridgeHealthy || live) return live; // kanbanLive already has a verdict
+      if (!bridgeHealthy) return live;
+      if (live?.status === "working") return live; // active work beats bridge status
       return { status: "online" };
     }
 
