@@ -3,10 +3,10 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const SECRET = "296cfa48ad6963eb21ac9deb4981ad0c982cff51631bda9cf43fd0fa7217088b";
+const SECRET = process.env.INTERNAL_API_SECRET || "";
 
 export async function POST(req: Request) {
-  if (req.headers.get("x-internal-secret") !== SECRET)
+  if (!SECRET || req.headers.get("x-internal-secret") !== SECRET)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
