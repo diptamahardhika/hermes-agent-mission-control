@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     const scriptFeedback = feedback.filter((f: { type?: string }) => f.type === 'script' || !f.type);
     if (scriptFeedback.length > 0) {
       const rejections = scriptFeedback.filter((f: { reason?: string }) => f.reason).slice(-20);
-      feedbackContext = `\n\n## CRITICAL: LEARN FROM PAST FEEDBACK\nThe user has reviewed scripts before. Here's what they rejected and WHY. Do NOT repeat these mistakes:\n${rejections.map((f: { title?: string; reason?: string }) => `- REJECTED \"${f.title}\": ${f.reason}`).join('\n')}\n\nKey patterns from feedback:\n- Don't sound \"too AI\" or \"too polished\" — write like a real person talking\n- Always name the SPECIFIC brand/person — never be vague (\"a company\", \"one firm\")\n- Every claim must be real and verifiable — no made-up stories\n- Don't reference old/stale trends as if they're new\n- No generic motivational endings or \"download my free guide\" CTAs\n- The story must have substance and real value, not just a clickbait hook`;
+      feedbackContext = `\n\n## CRITICAL: LEARN FROM PAST FEEDBACK\nThe user has reviewed scripts before. Here's what they rejected and WHY. Do NOT repeat these mistakes:\n${rejections.map((f: { title?: string; reason?: string }) => `- REJECTED \"${f.title}\": ${f.reason}`).join('\n')}\n\nKey patterns from feedback:\n- Don't sound \"too AI\" or \"too polished\" -- write like a real person talking\n- Always name the SPECIFIC brand/person -- never be vague (\"a company\", \"one firm\")\n- Every claim must be real and verifiable -- no made-up stories\n- Don't reference old/stale trends as if they're new\n- No generic motivational endings or \"download my free guide\" CTAs\n- The story must have substance and real value, not just a clickbait hook`;
     }
   } catch { /* ok */ }
 
@@ -115,8 +115,8 @@ export async function POST(req: NextRequest) {
   }
 
   // ── STEP 2: Generate script with REAL source material ──
-  const systemPrompt = `You are a viral short-form scriptwriter for the user, a founder and content creator.\n\n## YOUR PERSONALITY (from John)\n${johnPrompt.slice(0, 1500)}\n\n## CRITICAL: FACT-FIRST APPROACH\nYou have been given REAL source material gathered from web searches and articles. \n|- ONLY use facts that appear in the source material below\n|- DO NOT add any facts, numbers, dates, quotes, or claims not supported by the sources\n|- If you need to generalize because exact data isn't available, use hedging language (\"reportedly\", \"around\", \"roughly\")\n|- If the sources don't have enough detail for a section, keep it shorter rather than inventing details\n\n## SOURCE MATERIAL (verified):\n${sourceContext || \"No sources available — be EXTRA cautious with claims, hedge everything.\"}\n\n## SCRIPT RULES\n|- Target length: 1-2 minutes when read aloud (~150-280 words)\n|- Written as SPOKEN WORD but WITH normal punctuation (commas, periods, question marks).\n|- Every line earns its place. Zero filler.\n|- Use the Hero's Journey: Hook → Story/Setup → Conflict/Pivot → Insight/Payoff → CTA → Caption\n|- Reference REAL pop culture brands/people/stories — must be factually accurate\n|- Always tie back to a lesson for founders, creators, or builders\n\n## HOOK RULES\n|- TOF hooks: Wide appeal, recognizable products/brands, desired outcomes\n|- \"I did X, unexpected Y happened\" = powerful hook format\n|- Call out common mistakes or counter common assumptions\n|- Use cultural icons, pop brands, unexpected comparisons\n|- Start like a viral rant — deliver massive insight up top\n\n## SCRIPT STRUCTURE\n1. HOOK — Scroll-stopping (first 3 seconds decide everything)\n2. STORY SETUP — Context, backstory, make viewer invested\n3. CONFLICT — Create tension, counter assumptions\n4. INSIGHT/PAYOFF — The aha moment, the lesson\n5. CTA — ONE clear action only\n6. CAPTION — One-line summary without spoilers\n\n## FACTUAL ACCURACY\n|- Include a \"factClaims\" array listing every specific factual claim in the script (dates, numbers, events, quotes)\n|- Each claim MUST be traceable to the source material above\n\n## THE USER'S ANGLE\n|- Runs a marketing-focused business\n|- Content: founder branding, marketing, distribution > product, culture > features\n|- Voice: conversational, no fancy words, lowercase energy, real numbers, honest/vulnerable\n${pastScriptsRef}\n${feedbackContext}\n\nOUTPUT FORMAT — valid JSON only:\n{
-  \"title\": \"Brand/Person — Core Lesson (short)\",
+  const systemPrompt = `You are a viral short-form scriptwriter for the user, a founder and content creator.\n\n## YOUR PERSONALITY (from John)\n${johnPrompt.slice(0, 1500)}\n\n## CRITICAL: FACT-FIRST APPROACH\nYou have been given REAL source material gathered from web searches and articles. \n|- ONLY use facts that appear in the source material below\n|- DO NOT add any facts, numbers, dates, quotes, or claims not supported by the sources\n|- If you need to generalize because exact data isn't available, use hedging language (\"reportedly\", \"around\", \"roughly\")\n|- If the sources don't have enough detail for a section, keep it shorter rather than inventing details\n\n## SOURCE MATERIAL (verified):\n${sourceContext || \"No sources available -- be EXTRA cautious with claims, hedge everything.\"}\n\n## SCRIPT RULES\n|- Target length: 1-2 minutes when read aloud (~150-280 words)\n|- Written as SPOKEN WORD but WITH normal punctuation (commas, periods, question marks).\n|- Every line earns its place. Zero filler.\n|- Use the Hero's Journey: Hook → Story/Setup → Conflict/Pivot → Insight/Payoff → CTA → Caption\n|- Reference REAL pop culture brands/people/stories -- must be factually accurate\n|- Always tie back to a lesson for founders, creators, or builders\n\n## HOOK RULES\n|- TOF hooks: Wide appeal, recognizable products/brands, desired outcomes\n|- \"I did X, unexpected Y happened\" = powerful hook format\n|- Call out common mistakes or counter common assumptions\n|- Use cultural icons, pop brands, unexpected comparisons\n|- Start like a viral rant -- deliver massive insight up top\n\n## SCRIPT STRUCTURE\n1. HOOK -- Scroll-stopping (first 3 seconds decide everything)\n2. STORY SETUP -- Context, backstory, make viewer invested\n3. CONFLICT -- Create tension, counter assumptions\n4. INSIGHT/PAYOFF -- The aha moment, the lesson\n5. CTA -- ONE clear action only\n6. CAPTION -- One-line summary without spoilers\n\n## FACTUAL ACCURACY\n|- Include a \"factClaims\" array listing every specific factual claim in the script (dates, numbers, events, quotes)\n|- Each claim MUST be traceable to the source material above\n\n## THE USER'S ANGLE\n|- Runs a marketing-focused business\n|- Content: founder branding, marketing, distribution > product, culture > features\n|- Voice: conversational, no fancy words, lowercase energy, real numbers, honest/vulnerable\n${pastScriptsRef}\n${feedbackContext}\n\nOUTPUT FORMAT -- valid JSON only:\n{
+  \"title\": \"Brand/Person -- Core Lesson (short)\",
   \"hook\": \"Opening 2-4 lines. Scroll-stopping.\",
   \"storySetup\": \"The backstory context. 3-5 sentences.\",
   \"conflict\": \"The tension pivot or controversial statement. 3-5 sentences.\",
@@ -158,14 +158,14 @@ export async function POST(req: NextRequest) {
           const snippets = results.map(r => `${r.title}: ${r.description}`).join(' | ');
           searchResults.push(`Claim: ${claim}\nSearch results: ${snippets || 'No results found'}`);
         } catch {
-          searchResults.push(`Claim: ${claim}\nSearch results: SEARCH FAILED — mark as uncertain`);
+          searchResults.push(`Claim: ${claim}\nSearch results: SEARCH FAILED -- mark as uncertain`);
         }
       }
 
       const checkResult = callOpenAI(apiKey, {
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You are a strict fact-checker. You will receive claims paired with REAL web search results. Use ONLY the search results to determine if each claim is CORRECT, INCORRECT, or UNCERTAIN. Do NOT rely on your own knowledge — only what the search results show. Be very strict: if search results don't clearly confirm a claim, mark it UNCERTAIN.\n\nReturn JSON: { "results": [{ "claim": "...", "verdict": "correct|incorrect|uncertain", "correction": "only if incorrect/uncertain, what the real fact is based on search results" }] }` },
+          { role: 'system', content: 'You are a strict fact-checker. You will receive claims paired with REAL web search results. Use ONLY the search results to determine if each claim is CORRECT, INCORRECT, or UNCERTAIN. Do NOT rely on your own knowledge -- only what the search results show. Be very strict: if search results don't clearly confirm a claim, mark it UNCERTAIN.\n\nReturn JSON: { "results": [{ "claim": "...", "verdict": "correct|incorrect|uncertain", "correction": "only if incorrect/uncertain, what the real fact is based on search results" }] }` },
           { role: 'user', content: `Fact-check these claims using the provided search results:\n\n${searchResults.join("\n\n")}` }
         ],
         temperature: 0,
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
         const fixResult = await callOpenAI(apiKey, {
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'You fix factual errors in video scripts. Return the SAME JSON structure with corrected facts. Keep the style, voice, and structure identical — only fix the wrong facts.' },
+            { role: 'system', content: 'You fix factual errors in video scripts. Return the SAME JSON structure with corrected facts. Keep the style, voice, and structure identical -- only fix the wrong facts.' },
             { role: 'user', content: `Here's a script with factual issues:\n${JSON.stringify(script)}\n\nIssues found:\n${factCheck.issues.join("\n")}\n\nFix ONLY the factual errors. Return valid JSON with same keys: title, hook, storySetup, conflict, insight, cta, caption, onScreenText, hookType, funnelStage` }
           ],
           temperature: 0.3,
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       factCheck.status = '❓';
-      factCheck.issues.push('Fact-check failed — review manually');
+      factCheck.issues.push('Fact-check failed -- review manually');
     }
   }
 
