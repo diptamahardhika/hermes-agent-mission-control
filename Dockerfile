@@ -25,11 +25,12 @@ COPY .env.example ./
 # Generate Prisma client explicitly
 RUN npx prisma generate
 
-# Build Next.js app
+# Build Next.js app with Webpack (disable Turbopack for reliable production builds)
 ARG NEXT_PUBLIC_OWNER_NAME="Docker User"
 ARG NEXT_PUBLIC_BASE_URL="http://localhost:8080"
 ENV NEXT_PUBLIC_OWNER_NAME=$NEXT_PUBLIC_OWNER_NAME
 ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
+ENV NEXT_DISABLE_TURBOPACK=1
 RUN npm run build
 
 # Stage 2: Runner

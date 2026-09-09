@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Vercel-compatible settings
-  output: undefined, // default — Vercel handles this automatically
-  images: {
-    unoptimized: false,
+  // Next.js 16 uses Turbopack by default
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
   },
   // Allow Tailscale and local network origins so dev server assets
   // (fonts, HMR, JS chunks) aren't blocked when accessed via 100.x.x.x
@@ -14,11 +15,6 @@ const nextConfig: NextConfig = {
     "localhost",
     "pradiptas-macbook-pro-m4.flamingo-justitia.ts.net",
   ],
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "4mb",
-    },
-  },
   // Fix Turbopack CSP issue: Turbopack uses eval() internally,
   // but Next.js default CSP blocks it in production.
   // Adding unsafe-eval allows Turbopack runtime to function.

@@ -8,6 +8,7 @@ import { HermesBriefing } from "@/components/hermes-briefing";
 import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget";
 import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 import { Skeleton, Panel } from "@/components/ui/kit";
+import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData } from "@/types/home-dashboard";
 
 // ── Types ─────────────────────────────────────────────────
 interface HLPosition {
@@ -85,43 +86,6 @@ interface KanbanTask { id: string; title: string; assignee: string; status: stri
 interface HermesKanban { board: string; slug: string; total: number; counts: Record<string, number>; tasks: KanbanTask[] }
 interface ScoreComponent { score: number; weight?: number; label: string; detail?: string }
 interface ScoreData { score: number; grade: string; label: string; color: string; period?: string; components: Record<string, ScoreComponent> }
-interface SpendData {
-  syncedAt: string | null;
-  totalTokens: number | null;
-  inputTokens: number | null;
-  outputTokens: number | null;
-  sessions: number | null;
-  toolCalls: number | null;
-  byModel: { model: string; sessions: number; tokens: number; inputTokens?: number; outputTokens?: number; cacheReadTokens?: number }[];
-  days: { date: string; tokens: number }[];
-}
-
-// OmniRoute router usage — mirrored by the bridge from ~/.omniroute SQLite.
-interface OmniSpendData {
-  syncedAt: string | null;
-  totalTokens: number | null;
-  inputTokens: number | null;
-  outputTokens: number | null;
-  cacheReadTokens: number;
-  totalCalls: number;
-  byModel: { model: string; provider: string; calls: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; tokens: number }[];
-  days: { date: string; tokens: number }[];
-}
-
-// FreeLLMAPI router usage — fetched from local router /api/analytics.
-interface FreeLLMData {
-  configured: boolean;
-  syncedAt: string | null;
-  totalRequests: number;
-  totalTokens: number;
-  inputTokens: number;
-  outputTokens: number;
-  successRate: number;
-  avgLatencyMs: number;
-  firstRequestAt: string | null;
-  byModel: { model: string; provider: string; requests: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; tokens: number }[];
-  days: { date: string; requests: number; tokens: number }[];
-}
 
 interface HomeData {
   xFollowers: number; xGoal: number; xHandle: string;
