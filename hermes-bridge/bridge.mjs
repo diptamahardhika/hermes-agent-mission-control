@@ -174,7 +174,7 @@ async function healStuckKanban() {
 let hermesChain = Promise.resolve();
 function hermes(args, { timeout = 30000, env = null } = {}) {
   const run = hermesChain.then(async () => {
-    const { stdout } = await execFileP(HERMES, args, { timeout, maxBuffer: 8 * 1024 * 1024, env });
+    const { stdout } = await execFileP(HERMES, args, { timeout, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, PYTHONPATH: '', PYTHONHOME: '' } });
     return stdout;
   });
   hermesChain = run.catch(() => {});
@@ -655,6 +655,8 @@ async function mirrorHealth() {
   cleanStaleLocks();
   let online = false, gateway = "unknown", detail = "";
   try {
+    // Verify Postgres is connected before calling hermes CLI
+    await pool.query("SELECT 1");
     const out = await hermes(["status"], { timeout: 12000 });
     detail = out.slice(0, 4000);
     // Check for "running" near "gateway" or "online" keywords
