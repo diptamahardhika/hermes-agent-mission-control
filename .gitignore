@@ -86,3 +86,27 @@ graphify-out/cost.json
 # Agent skills (installed dependencies)
 .agents/
 .claude/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# OMH plugin state (do not commit)
+.omh/state/
+.omh/logs/
+
+# OMH plugin state (do not commit)
+.omh/state/
+.omh/logs/
+.omh/specs/
+.omh/state.json
+.omh/ralph-state.json
+.omh/autopilot-state.json
+
+# Editor directories
+.cursor/
+.gemini/
+.grok/
+.kiro/
+.windsurf/
+opencode.json
+.ignore
