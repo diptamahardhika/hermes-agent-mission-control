@@ -144,18 +144,27 @@ function cleanStaleLocks() {
 const STUCK_KANBAN_MINUTES = 10;
 async function healStuckKanban() {
   try {
-    // Check gateway status
-    const statusOut = await hermes(["status"], { timeout: 10000 });
-    const gatewayDown = !/Gateway Service\s*\n[\s\S]*?Status:\s*[✓\s]*running/i.test(statusOut);
+    // Verify Postgres is connected (replaces hermes status CLI call)
+    await pool.query("SELECT 1");
+
+    // Check gateway status via Postgres DataStore instead of hermes CLI
+    const health = await q(`SELECT data FROM "DataStore" WHERE key = 'hermes-health'`);
+    const healthData = health.rows[0]?.data ? JSON.parse(healthData) : null;
+    const gatewayDown = !healthData?.gateway?.includes("running");
+
     if (gatewayDown) {
-      // Gateway is down — try to dispatch any stuck ready tasks
+      // Gateway is down — check for stuck ready tasks via Postgres
       const ageThreshold = Date.now() - STUCK_KANBAN_MINUTES * 60 * 1000;
-      const out = await hermes(["kanban", "--board", BOARD, "list", "--json"], { timeout: 15000 });
-      const tasks = JSON.parse(out || "[]");
-      const stuck = tasks.filter((t) => t.status === "ready" && t.created_at && t.created_at * 1000 < ageThreshold);
-      if (stuck.length > 0) {
-        log(`self-heal: gateway down, ${stuck.length} stuck task(s) — dispatching`);
+      const tasks = await q(
+        `SELECT count(*) as cnt FROM "HermesTask" WHERE status = 'ready' AND created_at * 1000 < $1`,
+        [ageThreshold]
+      );
+      const stuckCount = parseInt(tasks.rows[0].cnt);
+
+      if (stuckCount > 0) {
+        log(`self-heal: gateway down, ${stuckCount} stuck task(s) — dispatching`);
         try {
+          // Fallback: attempt hermes dispatch as last resort
           await hermes(["kanban", "--board", BOARD, "dispatch", "--json"], { timeout: 30000 });
         } catch (e) {
           log(`self-heal: dispatch failed: ${e.message.split("\n")[0]}`);
@@ -300,6 +309,18 @@ async function mirrorKanban() {
     const parsed = JSON.parse(out || "[]");
     tasks = Array.isArray(parsed) ? parsed : parsed.tasks || [];
   } catch (e) { log("kanban list failed:", e.message.split("\n")[0]); return; }
+
+  // Warn if kanban sync is broken (empty result may indicate 0-byte DB)
+  if (tasks.length === 0) {
+    log("kanban sync warning: 0 tasks returned — kanban.db may be empty or corrupted");
+    await setStore("hermes-health", {
+      online: true,
+      gateway: "running",
+      detail: "kanban sync warning: 0 tasks returned",
+      kanbanSync: "broken",
+      lastSeen: new Date().toISOString()
+    });
+  }
 
   // tasks.result is often null (agents write files instead of returning text);
   // the human-readable summary lives in the latest task_runs row of the LOCAL
