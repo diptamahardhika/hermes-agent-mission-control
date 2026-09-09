@@ -110,3 +110,6 @@ graphify-out/cost.json
 .windsurf/
 opencode.json
 .ignore
+GEMINI.md
+graphify-out/
+graphify-out/GRAPH_REPORT.md
