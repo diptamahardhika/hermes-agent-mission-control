@@ -144,12 +144,10 @@ function cleanStaleLocks() {
 const STUCK_KANBAN_MINUTES = 10;
 async function healStuckKanban() {
   try {
-    // Verify Postgres is connected (replaces hermes status CLI call)
-    await pool.query("SELECT 1");
-
     // Check gateway status via Postgres DataStore instead of hermes CLI
     const health = await q(`SELECT data FROM "DataStore" WHERE key = 'hermes-health'`);
-    const healthData = health.rows[0]?.data ? JSON.parse(healthData) : null;
+    let healthData = null;
+    try { healthData = JSON.parse(health.rows[0]?.data); } catch { /* malformed JSON */ }
     const gatewayDown = !healthData?.gateway?.includes("running");
 
     if (gatewayDown) {
@@ -163,8 +161,10 @@ async function healStuckKanban() {
 
       if (stuckCount > 0) {
         log(`self-heal: gateway down, ${stuckCount} stuck task(s) — dispatching`);
+        // Dispatch is a last resort; the gateway being down means
+        // hermes CLI calls will likely fail, but the kanban worker
+        // process may still be alive and can pick up dispatched tasks.
         try {
-          // Fallback: attempt hermes dispatch as last resort
           await hermes(["kanban", "--board", BOARD, "dispatch", "--json"], { timeout: 30000 });
         } catch (e) {
           log(`self-heal: dispatch failed: ${e.message.split("\n")[0]}`);
@@ -314,8 +314,8 @@ async function mirrorKanban() {
   if (tasks.length === 0) {
     log("kanban sync warning: 0 tasks returned — kanban.db may be empty or corrupted");
     await setStore("hermes-health", {
-      online: true,
-      gateway: "running",
+      online: false,
+      gateway: "unknown",
       detail: "kanban sync warning: 0 tasks returned",
       kanbanSync: "broken",
       lastSeen: new Date().toISOString()

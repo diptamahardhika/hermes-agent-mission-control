@@ -1,0 +1,72 @@
+{
+  "strengths": [
+    "Eliminated the `hermes status` CLI dependency in `healStuckKanban` — uses Postgres `SELECT 1` for connectivity and `DataStore` for gateway status, removing a brittle CLI dependency for health checks.",
+    "`healStuckKanban` stuck-task detection replaced CLI `kanban list --json` with a single `SELECT count(*)` query — more efficient, avoids JSON parsing overhead, and works even when the hermes CLI is broken.",
+    "`mirrorKanban` now detects 0-task results and warns via `setStore`, adding a diagnostic signal for empty/corrupted kanban.db.",
+    "Both `healStuckKanban` and `mirrorKanban` changes correctly use parameterized queries ($1) via the `q()` helper, preventing SQL injection.",
+    "The `hermesChain` serialization ensures the `hermes([\"kanban\", \"dispatch\"])` fallback in `healStuckKanban` won't collide with concurrent calls."
+  ],
+  "issues": [
+    {
+      "severity": "Critical",
+      "description": "healStuckKanban() uses `created_at * 1000 < $1` but the HermesTask Prisma model has NO `created_at` column — only `updatedAt` and `syncedAt` (both DateTime). This query will fail at runtime with a column-not-found error. The stuck-task count will always be 0 or throw, making self-healing non-functional.",
+      "location": "hermes-bridge/bridge.mjs:158-159",
+      "suggestion": "Replace `created_at * 1000 < $1` with a valid column. Either: (a) use `syncedAt < to_timestamp($1 / 1000.0)` if `syncedAt` is the creation proxy, or (b) add a `createdAt` column to HermesTask in schema.prisma and migration. Verify against actual DB schema before deploying."
+    },
+    {
+      "severity": "Critical",
+      "description": "DataStore key collision: both `mirrorKanban()` (line 316) and `mirrorHealth()` (line 694) write to the `hermes-health` key. In mirrorKanban's 0-task path, it sets gateway='running' with kanbanSync:'broken' — directly contradicting mirrorHealth which sets gateway based on the actual hermes status CLI check. These runs in the same mirrorTick() loop sequentially; whichever runs last wins, silently overwriting the other's health data.",
+      "location": "hermes-bridge/bridge.mjs:316-323 and 694",
+      "suggestion": "Either: (a) use a separate key like `hermes-health-kanban` for the kanban sync warning, or (b) merge the health objects into a single write at the end of mirrorTick(), or (c) have mirrorKanban set a flag and let mirrorHealth incorporate it. The current code guarantees the kanban warning health record overwrites the real gateway status."
+    },
+    {
+      "severity": "Required",
+      "description": "healStuckKanban() calls `await pool.query(\"SELECT 1\")` AND `q()` calls all within the same try/catch. If Postgres is unreachable, `pool.query(\"SELECT 1\")` throws, and the function falls to the catch block — but the `hermes([\"kanban\", \"dispatch\"])` fallback (line 168) depends on the gateway being down. If Postgres is up but DataStore has no hermes-health row, `healthData` is null and `gatewayDown` is true — which means it will dispatch even when the gateway is actually up (false positive).",
+      "location": "hermes-bridge/bridge.mjs:147-153",
+      "suggestion": "Add a null-check guard: if healthData is null (no hermes-health row exists), treat gateway as 'unknown' not 'down'. Only trigger dispatch when there is affirmative evidence of gateway failure."
+    },
+    {
+      "severity": "Required",
+      "description": "healStuckKanban() has no error handling for JSON.parse(healthData) on line 152. If the DataStore row contains corrupted or non-JSON data, the entire function throws and falls to the catch — same as any other error, but the parse failure is silent and indistinguishable from a DB connectivity issue in logs.",
+      "location": "hermes-bridge/bridge.mjs:152",
+      "suggestion": "Wrap JSON.parse in try/catch or use a safe parse helper: `try { healthData = JSON.parse(healthData) } catch { healthData = null }`."
+    },
+    {
+      "severity": "Required",
+      "description": "The `q()` function is a thin alias for `pool.query(text, params)` with no error logging, retry, or type-checking. While used consistently, the `SELECT count(*)` query in healStuckKanban and the `SELECT data` query both rely on Postgres table/column names that may not exist. There is no migration guarantee that the Postgres schema matches the queries.",
+      "location": "hermes-bridge/bridge.mjs:77, 151, 158",
+      "suggestion": "Add a schema validation step or migration check at startup that verifies required tables/columns exist before the mirror loop starts. Alternatively, add a `LIMIT 1` to the count query so partial schema issues produce a smaller error."
+    },
+    {
+      "severity": "Nit",
+      "description": "healStuckKanban() calls `pool.query(\"SELECT 1\")` (raw pool.query) separately from `q()` calls in the same try block. This inconsistency in query method (raw vs q helper) adds cognitive overhead. The `SELECT 1` is just a connectivity check; `q()` would work fine for it too.",
+      "location": "hermes-bridge/bridge.mjs:148",
+      "suggestion": "Use `q(\"SELECT 1\")` for consistency with the rest of the function's query patterns."
+    },
+    {
+      "severity": "Nit",
+      "description": "The `hermes([\"kanban\", \"dispatch\"])` fallback in healStuckKanban (line 168) is inside the `if (stuckCount > 0)` block but outside any inner try/catch. If the hermes CLI dispatch fails, the catch on line 169-171 handles it, but note that the hermesChain serialization means this dispatch competes with the ongoing mirrorKanban hermes call that's already in-flight. The dispatch could be queued behind a long-running kanban list operation.",
+      "location": "hermes-bridge/bridge.mjs:166-171",
+      "suggestion": "Consider adding a timeout or priority mechanism for self-heal dispatches, or log the queue position to understand dispatch latency."
+    },
+    {
+      "severity": "Optional",
+      "description": "The `STUCK_KANBAN_MINUTES = 10` constant is used in healStuckKanban but the age threshold calculation `Date.now() - STUCK_KANBAN_MINUTES * 60 * 1000` assumes `created_at` is in milliseconds. If the actual DB column stores seconds (Unix epoch), the comparison is off by 1000x.",
+      "location": "hermes-bridge/bridge.mjs:157-159",
+      "suggestion": "Clarify column semantics with a schema check. If `created_at` doesn't exist but `syncedAt` does, confirm whether `syncedAt` stores seconds or milliseconds."
+    },
+    {
+      "severity": "FYI",
+      "description": "mirrorKanban's 0-task warning path sets `gateway: \"running\"` unconditionally, which is optimistic. If the gateway is actually down and kanban.db is empty (because the gateway crashed mid-write), this record will falsely report the gateway as running.",
+      "location": "hermes-bridge/bridge.mjs:316-323",
+      "suggestion": "Consider deriving the gateway status from the same DataStore health row that mirrorHealth writes, rather than hardcoding it."
+    },
+    {
+      "severity": "FYI",
+      "description": "The diff adds 30 lines and removes 9, making the file 21 lines longer. No new functions were introduced; the changes are all within existing functions. The `q()` helper pattern is consistent and well-established (line 77).",
+      "location": "hermes-bridge/bridge.mjs:1-21",
+      "suggestion": "None — cosmetic observation only."
+    }
+  ],
+  "verdict": "BLOCKED — Two critical issues must be resolved before merge: (1) `HermesTask` has no `created_at` column — the stuck-task query will fail at runtime, breaking self-healing entirely; (2) `mirrorKanban` and `mirrorHealth` both write to `hermes-health` key with contradictory data, causing silent health-status corruption. The Required-level issues (null-safety on healthData, JSON.parse error handling) should also be fixed. The overall direction of replacing CLI calls with Postgres queries is correct and improves reliability, but the implementation has schema mismatches that will cause runtime failures."
+}
