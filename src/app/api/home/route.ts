@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import ideasJson from "@/data/ideas.json" assert { type: "json" };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -607,6 +608,23 @@ export async function GET() {
       agent: r.agent,
     }));
   } catch { /* non-fatal */ }
+
+  // Fallback to static seed data when Prisma has no ideas yet (no migrations).
+  if (!topIdeas.length) {
+    topIdeas = ideasJson
+      .filter(i => !["done", "rejected", "dismissed"].includes(i.status))
+      .slice(0, 5)
+      .map(i => ({
+        id: i.id,
+        title: i.title,
+        description: i.description || "",
+        category: i.category || "build",
+        status: i.status || "new",
+        source: i.source ?? null,
+        estimatedTime: i.estimatedTime ?? null,
+        agent: i.agent ?? null,
+      }));
+  }
 
   // ─── YouTube ─────────────────────────────────────────────────────────────────
   type YTItem = { id?: { videoId?: string }; snippet?: { title?: string; thumbnails?: { high?: { url?: string } }; publishedAt?: string } };
