@@ -1103,6 +1103,8 @@ async function runRequest(r) {
       result = `wrote ${rel}`;
     } else if (r.kind === "briefing.generate") {
       await generateBriefing();
+      await mirrorKanban();
+      await mirrorBrief();
       result = "brief updated";
     } else if (r.kind.startsWith("decision.")) {
       const op = r.kind.split(".")[1]; // archive | confirm | pin | resolve
