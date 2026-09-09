@@ -179,6 +179,29 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "no updatable fields" }, { status: 400 });
   }
 
+  // If Prisma has no ideas yet (static fallback active), create from JSON first
+  const existing = await prisma.idea.findUnique({ where: { id } });
+  if (!existing) {
+    const seed = ideasJson.find((i) => i.id === id);
+    if (!seed) return NextResponse.json({ error: "not found" }, { status: 404 });
+    await prisma.idea.create({
+      data: {
+        id: seed.id,
+        title: seed.title,
+        description: seed.description ?? null,
+        category: seed.category ?? null,
+        type: seed.type ?? null,
+        model: seed.model ?? null,
+        status: seed.status ?? "new",
+        source: seed.source ?? null,
+        estimatedTime: seed.estimatedTime ?? null,
+        agent: seed.agent ?? null,
+        rejectionReason: null,
+        timestamp: new Date(),
+      },
+    });
+  }
+
   try {
     const idea = await prisma.idea.update({
       where: { id },
