@@ -9,6 +9,7 @@ import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget"
 import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 import { Panel } from "@/components/ui/kit";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { DiagnosticsStrip } from "@/components/diagnostics-strip";
 import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData } from "@/types/home-dashboard";
 
 // ── Types ─────────────────────────────────────────────────
@@ -187,8 +188,10 @@ function timeAgo(d: string) {
   const diff = Date.now() - new Date(d).getTime();
   const days = Math.floor(diff / 86400000);
   const hrs  = Math.floor(diff / 3600000);
+  const mins = Math.floor(diff / 60000);
   if (days > 0) return `${days}d ago`;
   if (hrs  > 0) return `${hrs}h ago`;
+  if (mins > 0) return `${mins}m ago`;
   return "just now";
 }
 function greeting() {
@@ -1714,6 +1717,7 @@ export default function Dashboard() {
     return () => clearInterval(t);
   }, []);
   const [refreshing, setRefreshing] = useState(false);
+  const fetchFailureCount = useRef<number>(0);
   const loadHome = () => {
     setRefreshing(true);
     fetch("/api/home")
@@ -1723,9 +1727,12 @@ export default function Dashboard() {
           const { freeLLM, ...home } = d;
           setData(prev => ({ ...prev, ...home }));
           setTimeout(() => setLoaded(true), 100);
+          fetchFailureCount.current = 0;
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        fetchFailureCount.current += 1;
+      })
       .finally(() => setTimeout(() => setRefreshing(false), 500));
   };
   useEffect(() => {
@@ -1806,6 +1813,20 @@ export default function Dashboard() {
   return (
     <>
       <div className="relative z-10 w-full mx-auto pb-16">
+
+        {/* ── Stale-data warning banner ─────────────── */}
+        {fetchFailureCount.current >= 2 && (
+          <div className="sticky top-0 z-50 mx-auto mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-[13px] font-medium"
+            style={{
+              color: "var(--hq-warn)",
+              borderColor: "rgba(251,191,36,0.25)",
+              background: "rgba(251,191,36,0.08)",
+            }}>
+            <span className="inline-block h-2 w-2 rounded-full animate-pulse"
+              style={{ background: "var(--hq-warn)" }} />
+            <span>Data feed interrupted — dashboard may be showing stale information</span>
+          </div>
+        )}
 
         {/* ── Header ─────────────────────────────────────── */}
         <div className="hq-rise pt-4 pb-10 flex flex-wrap items-end justify-between gap-6" style={rise(0)}>
@@ -2018,6 +2039,13 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="lg:col-span-2 hq-rise" style={rise(6)}><AIModelNewsPanel /></div>
           </div>
+        </div>
+        </ErrorBoundary>
+
+        {/* ── Diagnostics ──────────────────────────────────── */}
+        <ErrorBoundary>
+        <div className="mt-14">
+          <DiagnosticsStrip />
         </div>
         </ErrorBoundary>
 
