@@ -7,7 +7,8 @@ import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
 import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget";
 import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
-import { Skeleton, Panel } from "@/components/ui/kit";
+import { Panel } from "@/components/ui/kit";
+import { ErrorBoundary } from "@/components/error-boundary";
 import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData } from "@/types/home-dashboard";
 
 // ── Types ─────────────────────────────────────────────────
@@ -1733,19 +1734,6 @@ export default function Dashboard() {
     return () => clearInterval(iv);
   }, []);
 
-  // FreeLLMAPI metrics — independent fetch, no polling needed (refreshes with loadHome)
-  useEffect(() => {
-    fetch("/api/freellm")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d) {
-          setData(prev => ({ ...prev, freeLLM: d }));
-          setTimeout(() => setLoaded(true), 50);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   // Decisions fetch — independent fetch, no polling needed (refreshes with loadHome)
   useEffect(() => {
     fetch("/api/hermes/decisions")
@@ -2012,6 +2000,7 @@ export default function Dashboard() {
         </div>
 
         {/* ── Crypto ──────────────────────────────────────── */}
+        <ErrorBoundary>
         <div className="mt-14">
           <SectionLabel>Crypto</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -2020,16 +2009,20 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        </ErrorBoundary>
 
         {/* ── AI model news ───────────────────────────────── */}
+        <ErrorBoundary>
         <div className="mt-14">
           <SectionLabel>AI Models</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="lg:col-span-2 hq-rise" style={rise(6)}><AIModelNewsPanel /></div>
           </div>
         </div>
+        </ErrorBoundary>
 
         {/* ── Signal ──────────────────────────────────────── */}
+        <ErrorBoundary>
         <div className="mt-14">
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -2037,11 +2030,14 @@ export default function Dashboard() {
             <div className="hq-rise" style={rise(6)}><IdeasPanel boardIdeas={data.topIdeas} sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
           </div>
         </div>
+        </ErrorBoundary>
 
         {/* ── Agents strip ────────────────────────────────── */}
+        <ErrorBoundary>
         <div className="mt-14">
           <AgentsStrip processes={data.processes} />
         </div>
+        </ErrorBoundary>
 
         {/* ── X / Twitter stats — pinned to the very bottom ── */}
         <div className="mt-14">
