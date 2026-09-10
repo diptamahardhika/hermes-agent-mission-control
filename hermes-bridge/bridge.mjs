@@ -59,7 +59,7 @@ function briefPrompt() {
     '{"label":"Recently shipped","items":["..."]},{"label":"Next actions","items":["..."]}]}. ' +
     "Keep every item short, concrete, and specific. " +
     "Always include all four sections in this exact order — use an empty items array for a section with nothing. " +
-    `The current date and time is ${new Date().toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} (operator's local time). ` +
+    `The current date and time is ${new Date().toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Bangkok" })} (operator's local time, Asia/Bangkok). ` +
     "Use this to greet with the correct time of day (good morning / good afternoon / good evening) and to describe recent activity accurately.";
 }
 
