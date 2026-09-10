@@ -27,7 +27,7 @@
 |---|------|--------|--------|------|---------------------|
 | 0A | Kill #1 (caching headers) — don't implement | 0 | 0 | 0 | Confirmed `revalidate=0` + `force-dynamic` make this moot |
 | 0B | Kill #E (cold-start cache) — already exists | 0 | 0 | 0 | `ttlFetch` Maps confirmed in route.ts L28-52 |
-| 0C | Add lint rule for file size cap (`src/app/page.tsx` ≤ 2000 lines) | 5 | 10 min | None | ESLint rule added, build passes |
+| 0C | Add lint rule for file size cap (`src/app/page.tsx` ≤ 2000 lines) | 5 | 10 min | None | ESLint rule added, build passes ✅ |
 | 0D | Add React error boundaries around dashboard panels | 8 | 1 hour | Low | One broken panel doesn't kill the whole dashboard |
 | 0E | Remove redundant `/api/freellm` client-side fetch (use data from `/api/home` instead) | 7 | 30 min | Low | Client fetches only `/api/home` + `/api/hermes/decisions` |
 
@@ -92,6 +92,8 @@
 3. **Are error boundaries the right abstraction?** An alternative is per-panel try/catch with graceful degradation. Error boundaries catch render errors but not async failures.
 4. **Should the diagnostics panel be a separate section or inline?** The architect noted it's "45% built" but the component itself doesn't exist yet on the dashboard.
 
-## Consensus: YES
+## Consensus: YES ✅
 
-All three roles reached consensus with reservations. The revised plan addresses the architect's and critic's concerns while preserving the planner's useful prioritization. Next action: **implement Tier 0 items (0C, 0D, 0E)** and verify with `curl` against the running dev server.
+All Tier 0 items implemented and verified (commit pending). ESLint config fixed, all purity errors resolved.
+
+**Next action: Implement Tier 2 — structural improvements (split page.tsx into reusable components).**

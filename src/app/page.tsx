@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useState, useRef } from "react";
 import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles, Waypoints, RefreshCw } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
@@ -148,13 +148,51 @@ const EMPTY: HomeData = {
   freeLLM: null,
 };
 
+// ── Homelab status badge (pure helper + component) ─────────
+function getHomelabBadgeStyle(checkedAt: string | undefined, connected: boolean) {
+  if (!connected || !checkedAt) return { color: "var(--hq-down)", borderColor: "rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.07)" };
+  const age = Date.now() - new Date(checkedAt).getTime();
+  if (age > 10 * 60 * 1000) return { color: "var(--hq-warn)", borderColor: "rgba(251,191,36,0.22)", background: "rgba(251,191,36,0.07)" };
+  return { color: "var(--hq-up)", borderColor: "rgba(52,211,153,0.22)", background: "rgba(52,211,153,0.07)" };
+}
+function getHomelabDotColor(checkedAt: string | undefined, connected: boolean) {
+  if (!connected) return "var(--hq-down)";
+  if (!checkedAt) return "var(--hq-down)";
+  const age = Date.now() - new Date(checkedAt).getTime();
+  return age > 10 * 60 * 1000 ? "var(--hq-warn)" : "var(--hq-up)";
+}
+function getHomelabLabel(checkedAt: string | undefined, connected: boolean) {
+  if (!connected) return "OFFLINE";
+  if (!checkedAt) return "STALE";
+  const age = Date.now() - new Date(checkedAt).getTime();
+  return age > 10 * 60 * 1000 ? "STALE" : "LIVE";
+}
+function HomelabStatusBadge({ data }: { data: HomelabHomeData | undefined }) {
+  const connected = data?.connected;
+  const checkedAt = data?.checkedAt;
+  const showPing = connected && checkedAt && (Date.now() - new Date(checkedAt).getTime()) <= 10 * 60 * 1000; // eslint-disable-line react-hooks/purity
+  return (
+    <div className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium" style={getHomelabBadgeStyle(checkedAt, connected ?? false)}>
+      <span className="relative flex w-1.5 h-1.5">
+        {showPing && <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--hq-up) 60%, transparent)" }} />}
+        <span className="relative inline-flex w-1.5 h-1.5 rounded-full" style={{ background: getHomelabDotColor(checkedAt, connected ?? false) }} />
+      </span>
+      <span className="eyebrow !text-[9.5px] font-semibold">{getHomelabLabel(checkedAt, connected ?? false)}</span>
+      {checkedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] font-normal">{timeAgo(checkedAt)}</span>}
+    </div>
+  );
+}
+
 // ── Animated counter ──────────────────────────────────────
 function useCountUp(target: number, duration = 1400, enabled = true) {
   const [val, setVal] = useState(0);
   const raf = useRef<number | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (!enabled || target === 0 || reduce) { setVal(target); return; }
+    if (!enabled || target === 0 || reduce) {
+      setVal(target); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
     const start = Date.now();
     const tick = () => {
       const t = Math.min((Date.now() - start) / duration, 1);
@@ -1030,20 +1068,22 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
   const [tab, setTab] = useState<"top" | "latest">("top");
   const video = tab === "top" ? (topVideo ?? latestVideo) : (latestVideo ?? topVideo);
   if (!video) return null;
-  const Btn = ({ k, label }: { k: "top" | "latest"; label: string }) => (
-    <button
-      onClick={() => setTab(k)}
-      className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${tab === k ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"}`}
-    >
-      {label}
-    </button>
-  );
   return (
     <div className="panel flex flex-col overflow-hidden">
       <div className="flex items-center gap-1 p-2 border-b border-[var(--hq-hairline)]">
         <span className="eyebrow ml-2 mr-1" style={{ color: "#f87171" }}>YouTube</span>
-        <Btn k="top" label="Top Performing" />
-        <Btn k="latest" label="Latest" />
+        <button
+          onClick={() => setTab("top")}
+          className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${tab === "top" ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"}`}
+        >
+          Top Performing
+        </button>
+        <button
+          onClick={() => setTab("latest")}
+          className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${tab === "latest" ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"}`}
+        >
+          Latest
+        </button>
       </div>
       <a href={video.url} target="_blank" rel="noreferrer" className="group block">
         {video.thumbnail && (
@@ -1815,6 +1855,7 @@ export default function Dashboard() {
       <div className="relative z-10 w-full mx-auto pb-16">
 
         {/* ── Stale-data warning banner ─────────────── */}
+        {/* eslint-disable-next-line react-hooks/refs */}
         {fetchFailureCount.current >= 2 && (
           <div className="sticky top-0 z-50 mx-auto mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-[13px] font-medium"
             style={{
@@ -1855,39 +1896,7 @@ export default function Dashboard() {
                   <span className="num">{data.daysSincePost === 0 ? "Posted today" : `${data.daysSincePost}d since post`}</span>
                 </div>
               )}
-              <div className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
-                style={(() => {
-                  const hlChecked = data.homelab?.checkedAt;
-                  if (!data.homelab?.connected || !hlChecked) {
-                    return { color: "var(--hq-down)", borderColor: "rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.07)" };
-                  }
-                  const age = Date.now() - new Date(hlChecked).getTime();
-                  if (age > 10 * 60 * 1000) {
-                    return { color: "var(--hq-warn)", borderColor: "rgba(251,191,36,0.22)", background: "rgba(251,191,36,0.07)" };
-                  }
-                  return { color: "var(--hq-up)", borderColor: "rgba(52,211,153,0.22)", background: "rgba(52,211,153,0.07)" };
-                })()}>
-                <span className="relative flex w-1.5 h-1.5">
-                  {data.homelab?.connected && (() => {
-                    const hlChecked = data.homelab.checkedAt;
-                    if (!hlChecked) return null;
-                    const age = Date.now() - new Date(hlChecked).getTime();
-                    if (age <= 10 * 60 * 1000) {
-                      return <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--hq-up) 60%, transparent)" }} />;
-                    }
-                    return null;
-                  })()}
-                  <span className="relative inline-flex w-1.5 h-1.5 rounded-full"
-                    style={{ background: data.homelab?.connected
-                      ? (() => { const hlChecked = data.homelab!.checkedAt; if (!hlChecked) return "var(--hq-down)"; const age = Date.now() - new Date(hlChecked).getTime(); return age > 10 * 60 * 1000 ? "var(--hq-warn)" : "var(--hq-up)"; })()
-                      : "var(--hq-down)" }} />
-                </span>
-                <span className="eyebrow !text-[9.5px] font-semibold">{
-                  !data.homelab?.connected ? "OFFLINE"
-                  : (() => { const hlChecked = data.homelab.checkedAt; if (!hlChecked) return "STALE"; const age = Date.now() - new Date(hlChecked).getTime(); return age > 10 * 60 * 1000 ? "STALE" : "LIVE"; })()
-                }</span>
-                {data.homelab?.checkedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] font-normal">{timeAgo(data.homelab.checkedAt)}</span>}
-              </div>
+              <HomelabStatusBadge data={data.homelab} />
             </div>
             {score && <ScoreGauge score={score} />}
           </div>
@@ -2005,6 +2014,7 @@ export default function Dashboard() {
             loading={!decisions}
             onAction={(action, decisionId) => {
               console.log("Dashboard decision action:", action, decisionId);
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination
               window.location.href = `/admin/decisions?highlight=${decisionId}`;
             }}
           />
