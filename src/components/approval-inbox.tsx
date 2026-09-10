@@ -143,7 +143,7 @@ function InboxCard({
                   prompt: draftPrompt,
                 })
               }
-              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               style={{
                 color: "var(--accent)",
                 border:
@@ -161,7 +161,7 @@ function InboxCard({
                 setDraftTitle(req.title);
                 setDraftPrompt(req.prompt ?? "");
               }}
-              className="btn-ghost inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-medium"
+              className="btn-ghost inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             >
               Cancel
             </button>
@@ -171,7 +171,7 @@ function InboxCard({
             <button
               type="button"
               onClick={() => patch({ action: "approve" })}
-              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               style={{
                 color: "var(--up)",
                 border: "1px solid color-mix(in srgb, var(--up) 30%, transparent)",
@@ -184,7 +184,7 @@ function InboxCard({
             <button
               type="button"
               onClick={() => patch({ action: "reject" })}
-              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors text-[var(--text-2)] hover:text-[var(--down)]"
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors text-[var(--text-2)] hover:text-[var(--down)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               style={{ border: "1px solid var(--line)" }}
             >
               <X className="w-3.5 h-3.5" />
@@ -193,7 +193,7 @@ function InboxCard({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors text-[var(--text-2)] hover:text-[var(--text)]"
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors text-[var(--text-2)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               style={{ border: "1px solid var(--line)" }}
             >
               <Pencil className="w-3.5 h-3.5" />

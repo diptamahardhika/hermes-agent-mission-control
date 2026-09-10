@@ -151,7 +151,7 @@ function DecisionItemRow({
               <button
                 type="button"
                 onClick={() => onAction("approve", item.id)}
-                className="text-[11px] text-[var(--up)] hover:text-[var(--text)] transition-colors font-medium"
+                className="text-[11px] text-[var(--up)] hover:text-[var(--text)] transition-colors font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 Approve
               </button>
