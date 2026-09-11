@@ -42,9 +42,9 @@ export function DiagnosticsStrip() {
           <div key={id} className="flex items-center gap-2 text-[11px]">
             <span className="font-mono text-[var(--hq-text-ghost)] truncate">{id}</span>
             {error ? (
-              <span className="text-[var(--hq-down)] truncate">{error}</span>
+              <span className="font-semibold text-[var(--hq-down)] truncate">{error}</span>
             ) : (
-              <span className="text-[var(--hq-text-ghost)]">ok</span>
+              <span className="text-[var(--hq-text-ghost)] opacity-60">ok</span>
             )}
           </div>
         ))}
