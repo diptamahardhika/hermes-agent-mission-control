@@ -1251,13 +1251,20 @@ async function runRequest(r) {
         result = "bridge_restart skipped: another restart already in-flight";
       } else {
         result = "bridge_restart scheduled in " + restartDelayMs + "ms";
+        // DB update FIRST — must persist before the restart file exists
+        await q(`UPDATE "AgentRequest" SET status='done', result=$2, "finishedAt"=now(), "updatedAt"=now() WHERE id=$1`,
+          [r.id, result.slice(0, 8000)]);
         const restartInfo = {
           pid: bridgePid,
           scheduledAt: new Date().toISOString(),
           delayMs: restartDelayMs,
           requestId: r.id
         };
-        fs.writeFileSync(path.join(__dirname, ".restart-requested"), JSON.stringify(restartInfo));
+        // Write restart file with fsync for durability before process.exit
+        const restartFd = fs.openSync(path.join(__dirname, ".restart-requested"), 'w');
+        fs.writeFileSync(restartFd, JSON.stringify(restartInfo));
+        fs.fsyncSync(restartFd);
+        fs.closeSync(restartFd);
         setTimeout(() => { process.exit(0); }, restartDelayMs);
       }
     } else {
