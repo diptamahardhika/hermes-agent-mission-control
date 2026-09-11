@@ -844,6 +844,80 @@ let hlBalance = 0;
     days: Array.isArray(omniRaw.days) ? omniRaw.days : [],
   } : null;
 
+  let freeLLM: {
+    configured: boolean;
+    syncedAt: string | null;
+    totalTokens: number;
+    inputTokens: number;
+    outputTokens: number;
+    successRate: number;
+    avgLatencyMs: number;
+    byModel: Array<{
+      model: string;
+      provider: string;
+      requests: number;
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadTokens: number;
+      tokens: number;
+      successRate: number | null;
+      avgLatencyMs: number | null;
+      pinnedRequests: number;
+      estimatedCost: number | null;
+    }>;
+    days: Array<{ date: string; requests: number; tokens: number; successCount: number; failureCount: number }>;
+    totalRequests: number;
+    lifetimeTotalRequests: number | null;
+    estimatedCostSavings: number | null;
+    pinnedRequests: number | null;
+    pinHonoredRequests: number | null;
+    requestTypeCounts: Record<string, number> | null;
+    firstRequestAt: string | null;
+  } | null = null;
+
+  try {
+    const freellmRes = await fetch("http://localhost:3000/api/freellm", { cache: "no-store" });
+    if (freellmRes.ok) {
+      const data = await freellmRes.json();
+      freeLLM = {
+        configured: true,
+        syncedAt: new Date().toISOString(),
+        totalTokens: data.totalTokens || 0,
+        inputTokens: data.inputTokens || 0,
+        outputTokens: data.outputTokens || 0,
+        successRate: data.successRate || 0,
+        avgLatencyMs: data.avgLatencyMs || 0,
+        byModel: (data.byModel || []).map((row: any) => ({
+          model: row.model || "unknown",
+          provider: row.provider || "unknown",
+          requests: row.requests || 0,
+          inputTokens: row.inputTokens || 0,
+          outputTokens: row.outputTokens || 0,
+          cacheReadTokens: row.cacheReadTokens || 0,
+          tokens: row.tokens || 0,
+          successRate: row.successRate ?? null,
+          avgLatencyMs: row.avgLatencyMs ?? null,
+          pinnedRequests: row.pinnedRequests ?? 0,
+          estimatedCost: row.estimatedCost ?? null,
+        })),
+        days: (data.days || []).map((row: any) => ({
+          date: row.date || "",
+          requests: row.requests || 0,
+          tokens: row.tokens || 0,
+          successCount: row.successCount ?? null,
+          failureCount: row.failureCount ?? null,
+        })),
+        totalRequests: data.totalRequests || 0,
+        lifetimeTotalRequests: data.lifetimeTotalRequests ?? null,
+        estimatedCostSavings: data.estimatedCostSavings ?? null,
+        pinnedRequests: data.pinnedRequests ?? null,
+        pinHonoredRequests: data.pinHonoredRequests ?? null,
+        requestTypeCounts: data.requestTypeCounts ?? null,
+        firstRequestAt: data.firstRequestAt || null,
+      };
+    }
+  } catch { /* FreeLLM not available — leave as null, card won't render */ }
+
   return NextResponse.json({
     // X
     xFollowers: xStats.xFollowers,
@@ -902,6 +976,8 @@ let hlBalance = 0;
     // Agent compute spend
     spend,
     omniSpend,
+    // FreeLLMAPI usage
+    freeLLM,
     // Legacy
     pendingDrafts: rawPendingDrafts.length,
     tweetIdeas: await prisma.idea.count({ where: { status: { notIn: ["done", "dismissed"] } } }).catch(() => 0),

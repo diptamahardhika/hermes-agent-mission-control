@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles, Waypoints, RefreshCw } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
 import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget";
+import type { Decision } from "@/types/decision";
 import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 import { Panel } from "@/components/ui/kit";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -170,7 +171,9 @@ function getHomelabLabel(checkedAt: string | undefined, connected: boolean) {
 function HomelabStatusBadge({ data }: { data: HomelabHomeData | undefined }) {
   const connected = data?.connected;
   const checkedAt = data?.checkedAt;
-  const showPing = connected && checkedAt && (Date.now() - new Date(checkedAt).getTime()) <= 10 * 60 * 1000; // eslint-disable-line react-hooks/purity
+  const ageRef = useRef<number>(0);
+  const [age, setAge] = useState<number>(0);
+  const showPing = connected && checkedAt && age <= 10 * 60 * 1000;
   return (
     <div className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium" style={getHomelabBadgeStyle(checkedAt, connected ?? false)}>
       <span className="relative flex w-1.5 h-1.5">
@@ -183,11 +186,27 @@ function HomelabStatusBadge({ data }: { data: HomelabHomeData | undefined }) {
   );
 }
 
+// ── Panel skeleton loader ─────────────────────────────────
+function PanelSkeleton({ className = "" }: { className?: string }) {
+  return (
+    <div className={`panel flex flex-col p-6 ${className}`} role="status" aria-busy="true" aria-label="Loading">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="sk h-3 w-20 rounded" />
+      </div>
+      <div className="space-y-3">
+        <div className="sk h-10 w-3/4 rounded" />
+        <div className="sk h-4 w-full rounded" />
+        <div className="sk h-4 w-5/6 rounded" />
+      </div>
+    </div>
+  );
+}
+
 // ── Animated counter ──────────────────────────────────────
 function useCountUp(target: number, duration = 1400, enabled = true) {
   const [val, setVal] = useState(0);
   const raf = useRef<number | null>(null);
-  useLayoutEffect(() => {
+  useEffect(() => {
     const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (!enabled || target === 0 || reduce) {
       setVal(target); // eslint-disable-line react-hooks/set-state-in-effect
@@ -784,22 +803,7 @@ function AIModelNewsPanel() {
         <span className="eyebrow">AI Models &amp; News</span>
       </div>
       {!news ? (
-        <div className="space-y-4 py-4">
-          <div className="flex gap-6">
-            <div className="flex-1 space-y-2">
-              <div className="sk h-3 w-24 rounded-full" />
-              <div className="sk h-3 w-full rounded" />
-              <div className="sk h-3 w-4/5 rounded" />
-            </div>
-            <div className="flex-1 space-y-2">
-              <div className="sk h-3 w-20 rounded-full" />
-              <div className="sk h-3 w-full rounded" />
-              <div className="sk h-3 w-3/5 rounded" />
-            </div>
-          </div>
-          <div className="sk h-3 w-48 rounded-full" />
-          <div className="sk h-20 rounded-md" />
-        </div>
+        <PanelSkeleton />
       ) : news.newModels.length === 0 && news.freeModels.length === 0 && news.news.length === 0 ? (
         <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">No catalog or news data available right now.</div>
       ) : (
@@ -1685,7 +1689,7 @@ function SageFindingsPanel() {
         <a href="/agents" className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] hover:text-[var(--hq-text-dim)] transition-colors">via Agents Floor</a>
       </div>
       {!findings ? (
-        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">Loading Sage&apos;s latest research…</div>
+        <PanelSkeleton />
       ) : findings.length === 0 ? (
         <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">
           No completed research yet. Sage&apos;s digests will appear here after his daily run.
@@ -1742,7 +1746,7 @@ function SageFindingsPanel() {
 
 export default function Dashboard() {
   const [data, setData] = useState<HomeData>(EMPTY);
-  const [decisions, setDecisions] = useState<{ decisions: any[]; pendingCount: number; total: number } | null>(null);
+  const [decisions, setDecisions] = useState<{ decisions: Decision[]; pendingCount: number; total: number } | null>(null);
   const [time, setTime] = useState(new Date());
   const [loaded, setLoaded] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -1765,7 +1769,7 @@ export default function Dashboard() {
       .then(d => {
         if (d) {
           const { freeLLM, ...home } = d;
-          setData(prev => ({ ...prev, ...home }));
+          setData(prev => ({ ...prev, ...home, freeLLM }));
           setTimeout(() => setLoaded(true), 100);
           fetchFailureCount.current = 0;
         }
@@ -1795,51 +1799,6 @@ export default function Dashboard() {
   }, []);
 
   if (!mounted) return null;
-
-  // ── Loading skeleton (mirrors the grid structure on first paint) ──
-  if (!loaded) {
-    return (
-      <div className="relative z-10 w-full mx-auto pb-16 p-6 md:p-8">
-        <div className="hq-rise mb-10">
-          <div className="sk h-5 w-28 rounded-full mb-3" />
-          <div className="sk h-10 w-72 rounded-full mb-5" />
-          <div className="sk h-3 w-48 rounded-full" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* GitHub */}
-          <div className="flex flex-col gap-5">
-            <div className="sk h-28 rounded-[var(--r-lg)]" />
-            <div className="sk h-64 rounded-[var(--r-lg)]" />
-          </div>
-          {/* Homelab */}
-          <div className="flex flex-col gap-5">
-            <div className="sk h-28 rounded-[var(--r-lg)]" />
-            <div className="sk h-64 rounded-[var(--r-lg)]" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-          <div className="sk h-72 rounded-[var(--r-lg)]" />
-          <div className="sk h-72 rounded-[var(--r-lg)]" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-          <div className="sk h-48 rounded-[var(--r-lg)]" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-          <div className="sk h-64 rounded-[var(--r-lg)]" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-          <div className="sk h-40 rounded-[var(--r-lg)]" />
-          <div className="sk h-40 rounded-[var(--r-lg)]" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-          <div className="sk h-64 rounded-[var(--r-lg)]" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-          <div className="sk h-48 rounded-[var(--r-lg)]" />
-        </div>
-      </div>
-    );
-  }
 
   const xd = withDevPreview(snapDelta(data.snapshots, "xf"), data.xFollowers);
   const ytd = withDevPreview(snapDelta(data.snapshots, "yt"), data.ytSubscribers);

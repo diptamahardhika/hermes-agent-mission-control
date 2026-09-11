@@ -96,4 +96,6 @@
 
 All Tier 0 items implemented and verified (commit pending). ESLint config fixed, all purity errors resolved.
 
-**Next action: Implement Tier 2 — structural improvements (split page.tsx into reusable components).**
+**Tier 2 ralplan complete.** Consensus: APPROVE_WITH_RESERVATIONS. P1 (per-panel loading skeletons) is the highest-value next step — delivers UX win + eliminates brittle monolithic skeleton. Effort revised to 3-4 hours.
+
+**Next action: Implement P1 — per-panel loading skeletons.**

@@ -9,9 +9,13 @@ function useCountUp(target: number, duration = 1400, enabled = true) {
   const [val, setVal] = useState(0);
   const raf = useRef<number | null>(null);
   useEffect(() => {
-    const reduce = typeof window !== "undefined"
+    const reduceMotion = typeof window !== "undefined"
       && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (!enabled || target === 0 || reduce) { setVal(target); return; }
+    if (!enabled || target === 0 || reduceMotion) {
+      // Defer state update to avoid synchronous setState in effect
+      const id = requestAnimationFrame(() => setVal(target));
+      return () => cancelAnimationFrame(id);
+    }
     const start = Date.now();
     const tick = () => {
       const t = Math.min((Date.now() - start) / duration, 1);
@@ -76,7 +80,7 @@ export function MetricCard({
         </div>
         {hasDelta && (
           <span
-            className="flex items-center gap-0.5 text-[12.5px] font-semibold num focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] transition-colors duration-150 ease-out"
+            className="flex items-center gap-0.5 text-[12.5px] font-semibold num transition-colors duration-150 ease-out"
             style={{ color: deltaColor }}
           >
             <DeltaIcon className="w-3.5 h-3.5" strokeWidth={2.25} />
@@ -88,7 +92,7 @@ export function MetricCard({
       </div>
 
       {/* value — big quiet number */}
-      <div className="mt-5 num font-semibold leading-[0.95] tracking-[-0.02em] text-[52px] text-[var(--hq-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] transition-all duration-150 ease-out">
+      <div className="mt-5 num font-semibold leading-[0.95] tracking-[-0.02em] text-[52px] text-[var(--hq-text)] transition-all duration-150 ease-out">
         {format(counted)}
       </div>
 
@@ -107,11 +111,11 @@ export function MetricCard({
         <div className="mt-auto pt-4 space-y-1.5">
           <div className="h-[3px] w-full rounded-full bg-white/[0.06] overflow-hidden">
             <div
-              className="h-full rounded-full transition-all duration-[1200ms] ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+              className="h-full rounded-full transition-all duration-[1200ms] ease-out"
               style={{ width: loaded ? `${pct}%` : "0%", background: accent, opacity: 0.85 }}
             />
           </div>
-          <div className="flex items-center justify-between text-[11px] num text-[var(--hq-text-ghost)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
+          <div className="flex items-center justify-between text-[11px] num text-[var(--hq-text-ghost)]">
             <span style={{ color: accent }} className="opacity-90">{pct.toFixed(1)}%</span>
             <span>{deltaLabel ? `${deltaLabel} · ` : ""}goal {(goalFormat ?? format)(goal as number)}</span>
           </div>

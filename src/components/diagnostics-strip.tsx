@@ -7,12 +7,18 @@ interface DiagnosticsResult {
   [taskId: string]: string;
 }
 
+const DIAGNOSTIC_TASK_IDS = [
+  "t_1562a80a", "t_09b132b9", "t_c94938e7", "t_85a6deff",
+  "t_cc301918", "t_cc2be007",
+];
+const DIAGNOSTIC_IDS_QUERY = DIAGNOSTIC_TASK_IDS.join(",");
+
 export function DiagnosticsStrip() {
   const [results, setResults] = useState<DiagnosticsResult>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/hermes/tasks/diagnostics?ids=t_1562a80a,t_09b132b9,t_c94938e7,t_85a6deff,t_cc301918,t_cc2be007")
+    fetch(`/api/hermes/tasks/diagnostics?ids=${DIAGNOSTIC_IDS_QUERY}`)
       .then(r => r.ok ? r.json() : {})
       .then(d => {
         setResults(d);
