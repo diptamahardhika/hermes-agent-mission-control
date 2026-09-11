@@ -22,11 +22,11 @@ export async function POST(req: Request) {
   const kind = (body.kind || "oneshot").toString();
   const title = (body.title || kind).toString().slice(0, 200);
   const prompt = body.prompt ? body.prompt.toString().slice(0, 8000) : undefined;
-  const sideEffecting = Boolean(body.sideEffecting);
+  const sideEffecting = body.sideEffecting === true;
   const origin = (body.origin || "web").toString();
 
   // Safety check: control.bridge_restart requires explicit confirmation
-  if (kind === "control.bridge_restart" && !body.confirmed) {
+  if (kind === "control.bridge_restart" && body.confirmed !== true) {
     return NextResponse.json(
       { error: "control.bridge_restart requires confirmed: true in body" },
       { status: 400 }

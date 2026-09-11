@@ -144,7 +144,6 @@ function cleanStaleLocks() {
 const STUCK_KANBAN_MINUTES = 10;
 const WATCHDOG_INTERVAL_MS = Number(process.env.BRIDGE_WATCHDOG_MS || 60_000);
 const WATCHDOG_TIMEOUT_MS = Number(process.env.BRIDGE_WATCHDOG_TIMEOUT_MS || 120_000);
-const RESTART_CONFIRM_TIMEOUT_MS = 30_000;
 const bridgePid = process.pid;
 async function healStuckKanban() {
   try {
@@ -1381,7 +1380,7 @@ async function main() {
           pid: bridgePid,
           scheduledAt: new Date().toISOString(),
           delayMs: 1000,
-          requestId: "watchdog:" + new Date().toISOString()
+          requestId: "watchdog-" + Date.now()
         }));
         process.exit(0);
       }
