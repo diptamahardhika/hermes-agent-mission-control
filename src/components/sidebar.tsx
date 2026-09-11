@@ -111,27 +111,19 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--bg)]/90 backdrop-blur-xl border-b border-[var(--line)] px-4 py-3 flex items-center justify-between">
         <Logo isOpen={isOpen} />
         <div className="flex items-center gap-1">
-          <div className="relative">
-            {showSearchHint && (
-              <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[11px] text-[var(--text-2)] shadow-lg">
-                Search &middot; ⌘K
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-2 w-2 rotate-45 bg-[var(--surface-2)] border-r border-b border-[var(--line)]" />
-              </div>
-            )}
-            <button
-              onClick={() => {
-                dismissSearchHint();
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(new CustomEvent("open-command-palette"));
-                }
-              }}
-              className={`p-2 text-[var(--text-2)] hover:text-[var(--text)] transition-colors rounded-lg hover:bg-[var(--surface-1)] ${showSearchHint ? "animate-pulse" : ""}`}
-              aria-label="Search, or ask Hermes…"
-              title="Search"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              dismissSearchHint();
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("open-command-palette"));
+              }
+            }}
+            className={`p-2 text-[var(--text-2)] hover:text-[var(--text)] transition-colors rounded-lg hover:bg-[var(--surface-1)] ${showSearchHint ? "animate-pulse" : ""}`}
+            aria-label="Search, or ask Hermes…"
+            title="Search"
+          >
+            <Search className="w-5 h-5" />
+          </button>
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="p-2 text-[var(--text-2)] hover:text-[var(--text)] transition-colors rounded-lg hover:bg-[var(--surface-1)]"
@@ -150,13 +142,7 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
             const Icon = item.icon;
             if (item.action) {
               return (
-                <div key="search" className="relative">
-                  {showSearchHint && (
-                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[11px] text-[var(--text-2)] shadow-lg">
-                      Search &middot; ⌘K
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-2 w-2 rotate-45 bg-[var(--surface-2)] border-r border-b border-[var(--line)]" />
-                    </div>
-                  )}
+                <div key="search">
                   <button
                     onClick={() => {
                       dismissSearchHint();

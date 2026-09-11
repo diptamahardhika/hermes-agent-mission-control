@@ -128,5 +128,10 @@ export function MetricCard({
     </div>
   );
 
-  return href ? <a href={href} className={`block ${fill ? "h-full" : ""}`}>{inner}</a> : inner;
+  const deltaPctStr = hasDelta && deltaPct !== null
+    ? `${Math.abs(deltaPct).toFixed(Math.abs(deltaPct) < 10 && deltaPct !== 0 ? 1 : 0)}%`
+    : "";
+  const ariaLabel = `${label}: ${format(counted)}${hasDelta ? `, ${up ? "up" : "down"} ${deltaPctStr}` : ""}`;
+
+  return href ? <a href={href} className={`block ${fill ? "h-full" : ""}`} tabIndex={0} role="link" aria-label={ariaLabel}>{inner}</a> : inner;
 }
