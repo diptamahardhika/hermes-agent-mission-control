@@ -163,8 +163,14 @@ export async function GET(request: Request) {
     // nothing to decide (already implemented / no remaining action / just a
     // completion note). These are informational, not calls for approval.
     // Also filter out completed implementations and research digests.
+    //
+    // NOTE: intentionally excludes:
+    // - "added.*status column" — real feature implementations like Knox's
+    //   Blocked status column get caught here (false positive)
+    // - bare "complete\." — audit/review summaries like "self-audit complete"
+    //   are legitimate findings, not status notifications
     const NOT_A_PROPOSAL =
-          /\b(already (implemented|completed|shipped|done)|duplicate of|no remaining work|nothing to (do|decide)|no further action|system healthy|no action (required|needed)|complete\.|review complete|reading (complete|inspection)|verified all|applied patch|implemented all|wrote.*(ai|cyber|security).*(digest|md)|mapped both|audit-only hygiene|added.*status column)\b/i;
+          /\b(already (implemented|completed|shipped|done)|duplicate of|no remaining work|nothing to (do|decide)|no further action|system healthy|no action (required|needed)|review complete|reading (complete|inspection)|verified all|applied patch|implemented all|wrote.*(ai|cyber|security).*(digest|md)|mapped both|audit-only hygiene)\b/i;
     const actionable = proposals.filter((p: any) => {
       if (p.status !== "pending") return true;           // reviewed items stay visible
       if (p.taskStatus === "done" && NOT_A_PROPOSAL.test(p.body || "")) return false;
