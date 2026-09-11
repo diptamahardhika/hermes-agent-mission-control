@@ -304,6 +304,8 @@ function IdeasPanel({ boardIdeas, sageDrafts, ytIdeas, buildIdeas }: {
   boardIdeas: BoardIdea[]; sageDrafts: Draft[]; ytIdeas: YTIdea[]; buildIdeas: BuildIdea[];
 }) {
   const [tab, setTab] = useState<IdeaTab>("board");
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [boardIdeas, sageDrafts, ytIdeas, buildIdeas]);
   const tabs: { key: IdeaTab; label: string; count: number }[] = [
     { key: "board", label: "Board", count: boardIdeas.length },
     { key: "x", label: "X", count: sageDrafts.length },
@@ -312,6 +314,7 @@ function IdeasPanel({ boardIdeas, sageDrafts, ytIdeas, buildIdeas }: {
   ];
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center justify-between mb-4">
         <span className="eyebrow">Top Ideas</span>
         <div className="flex gap-1 rounded-lg border border-[var(--hq-hairline)] p-0.5">
@@ -422,8 +425,11 @@ const CATEGORY_COLOR: Record<string, string> = {
 
 // ── Top tweets ────────────────────────────────────────────
 function TopTweetsPanel({ tweets }: { tweets: Tweet[] }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [tweets]);
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Twitter className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
         <span className="eyebrow">Top Tweets · 7d</span>
@@ -457,8 +463,11 @@ function TopTweetsPanel({ tweets }: { tweets: Tweet[] }) {
 function XAnalyticsPanel({ views, trend, totalTweets, bestDay, bestHour }: {
   views: number; trend: number[]; totalTweets: number; bestDay: string; bestHour: string;
 }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [views, trend, totalTweets, bestDay, bestHour]);
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Twitter className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
         <span className="eyebrow">X Analytics</span>
@@ -489,10 +498,13 @@ function XAnalyticsPanel({ views, trend, totalTweets, bestDay, bestHour }: {
 
 // ── Agent compute spend panel ─────────────────────────────
 function SpendPanel({ spend }: { spend: SpendData }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [spend]);
   const series = spend.days.map(d => d.tokens);
   const topModel = [...spend.byModel].sort((a, b) => b.tokens - a.tokens)[0];
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Cpu className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
         <span className="eyebrow">Agent Compute · 7d</span>
@@ -549,12 +561,15 @@ function SpendPanel({ spend }: { spend: SpendData }) {
 
 // ── OmniRoute compute spend panel — twin of SpendPanel for the router ──
 function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [omni]);
   const series = omni.days.map(d => d.tokens);
   const topModel = [...omni.byModel].sort((a, b) => b.tokens - a.tokens)[0];
   const topCache = topModel?.cacheReadTokens ?? 0;
   const topCachePct = topModel && topModel.tokens ? Math.round((topCache / topModel.tokens) * 100) : 0;
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Waypoints className="w-3.5 h-3.5" style={{ color: "#2dd4bf" }} />
         <span className="eyebrow">OmniRoute Compute · 7d</span>
@@ -603,6 +618,9 @@ function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
 // ── FreeLLMAPI per-model share bars (provider from local router) ──
 const FREELLM_TOK_COLORS = { input: "#f59e0b", cache: "#fcd34d", output: "#fbbf24" };
 function FreeLLMShareBars({ byModel, total }: { byModel: FreeLLMData["byModel"]; total: number }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [byModel, total]);
+  if (loading) return <PanelSkeleton />;
   const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   if (!top.length || !total) return null;
 
@@ -660,9 +678,12 @@ function FreeLLMShareBars({ byModel, total }: { byModel: FreeLLMData["byModel"];
 
 // ── FreeLLM spend panel (lightweight mirror of OmniRoutePanel) ──
 function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [data]);
   const series = data.days.map(d => d.tokens);
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Cpu className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} />
         <span className="eyebrow">FreeLLM Compute · 7d</span>
@@ -718,6 +739,7 @@ interface AINewsData { newModels: ModelCard[]; freeModels: ModelCard[]; totalFre
 
 function AIModelNewsPanel() {
   const [news, setNews] = useState<AINewsData | null>(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     fetch("/api/ai-news").then(r => r.ok ? r.json() : null).then(d => { if (d) setNews(d); }).catch(() => {});
     const iv = setInterval(() => {
@@ -798,6 +820,7 @@ function AIModelNewsPanel() {
 
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
         <span className="eyebrow">AI Models &amp; News</span>
@@ -876,6 +899,9 @@ function modelProvider(model: string): string {
 }
 
 function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; total: number | null }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [byModel, total]);
+  if (loading) return <PanelSkeleton />;
   const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   if (!top.length || !total) return null;
 
@@ -939,6 +965,9 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
 //   in = deep cyan · cached = soft aqua · out = pale ice
 const OMNI_TOK_COLORS = { input: "#22d3ee", cache: "#5eead4", output: "#a5f3fc" };
 function OmniShareBars({ omni }: { omni: OmniSpendData }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [omni]);
+  if (loading) return <PanelSkeleton />;
   const top = [...omni.byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   const total = omni.totalTokens;
   if (!top.length || !total) return null;
@@ -998,6 +1027,9 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
 }
 
 function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | null; output: number | null; cache?: number; colors?: { input: string; cache: string; output: string } }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [input, output]);
+  if (loading) return <PanelSkeleton />;
   if (input == null || output == null) return null;
   // Default legend = the Hermes purple/pink/blue; the OmniRoute card passes its
   // cyan triad so each card keeps one coherent color story.
@@ -1036,6 +1068,9 @@ function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | nu
 
 // ── Daily-usage history tracker (fades out once the sparkline has data) ──
 function HistoryBuilding({ days }: { days: SpendData["days"] }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [days]);
+  if (loading) return <PanelSkeleton />;
   const live = days.filter(d => d.tokens > 0).length;
   if (live >= 2) return null;
   const n = Math.min(days.length, 7);
@@ -1070,10 +1105,13 @@ function YouTubeCard({ video, label }: { video: Video; label: string }) {
 // ── YouTube: Top Performing vs Latest (tabbed) ────────────
 function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; latestVideo: Video | null }) {
   const [tab, setTab] = useState<"top" | "latest">("top");
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, []);
   const video = tab === "top" ? (topVideo ?? latestVideo) : (latestVideo ?? topVideo);
   if (!video) return null;
   return (
     <div className="panel flex flex-col overflow-hidden">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center gap-1 p-2 border-b border-[var(--hq-hairline)]">
         <span className="eyebrow ml-2 mr-1" style={{ color: "#f87171" }}>YouTube</span>
         <button
@@ -1107,6 +1145,9 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
 const GH_LEVEL_COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
 
 function GitHubContributionMatrix({ weeks }: { weeks: GitHubContribDay[][] }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [weeks]);
+  if (loading) return <PanelSkeleton />;
   // GitHub-details style orientation: rows = weeks flowing down (oldest top → newest bottom),
   // columns = weekdays Sun..Sat left→right — time reads like text, newest at bottom-right.
   const paddedWeeks = weeks.map((week) => {
@@ -1155,8 +1196,11 @@ function GitHubHomeCard({
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [profile, pinnedRepos, activity, status, contributions]);
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       {/* Avatar + name */}
       <div className="flex items-center gap-3 mb-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1301,6 +1345,8 @@ function GitHubHomeCard({
 
 // ── Homelab card for dashboard home ─────────────────────────
 function HomelabHomeCard({ homelab }: { homelab: HomeData["homelab"] }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [homelab]);
   const c = homelab.counts;
   const sys = homelab.system;
   const allUp = c.servers > 0 && c.serversUp === c.servers && c.servicesUp === c.services;
@@ -1313,6 +1359,7 @@ function HomelabHomeCard({ homelab }: { homelab: HomeData["homelab"] }) {
 
   return (
     <div className="panel flex flex-col p-6 flex-1">
+      {loading && <PanelSkeleton />}
       {/* Status header */}
       <div className="flex items-center gap-2 mb-4">
         <span className="relative flex w-2 h-2">
@@ -1414,6 +1461,9 @@ function HomelabHomeCard({ homelab }: { homelab: HomeData["homelab"] }) {
 
 // ── Agents strip ──────────────────────────────────────────
 function AgentsStrip({ processes }: { processes: Process[] }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [processes]);
+  if (loading) return <PanelSkeleton />;
   if (processes.length === 0) return null;
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -1434,6 +1484,8 @@ function AgentsStrip({ processes }: { processes: Process[] }) {
 
 // ── Hermes Kanban ─────────────────────────────────────────
 function HermesKanbanPanel({ kanban }: { kanban: HermesKanban }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [kanban]);
   const statusColor = (s: string) => {
     const k = s.toLowerCase();
     if (k.includes("done") || k.includes("complete")) return "var(--hq-up)";
@@ -1444,6 +1496,7 @@ function HermesKanbanPanel({ kanban }: { kanban: HermesKanban }) {
   const entries = Object.entries(kanban.counts || {});
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center justify-between mb-4">
         <div className="min-w-0">
           <span className="eyebrow">Hermes Board</span>
@@ -1528,12 +1581,15 @@ function ScoreGauge({ score }: { score: ScoreData }) {
 
 // ── Crypto portfolio card ─────────────────────────────────
 function CryptoPortfolioCard({ data }: { data: HomeData }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(false); }, [data]);
   const { hlBalance: balance, hlTodayPnl: todayPnl, hlAllTimePnl: allTimePnl, hlAssets: assets } = data;
   const hasData = balance > 0 || (assets?.length ?? 0) > 0;
   const pnlColor = todayPnl > 0 ? "var(--up)" : todayPnl < 0 ? "var(--down)" : "var(--hq-text-ghost)";
   const allColor = allTimePnl > 0 ? "var(--up)" : allTimePnl < 0 ? "var(--down)" : "var(--hq-text-ghost)";
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-base leading-none">🪙</span>
         <span className="eyebrow">Binance / Crypto</span>
@@ -1663,6 +1719,7 @@ interface SageFinding {
 }
 function SageFindingsPanel() {
   const [findings, setFindings] = useState<SageFinding[] | null>(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     fetch("/api/sage-findings").then(r => r.ok ? r.json() : null).then(d => { if (d) setFindings(d.findings ?? []); }).catch(() => {});
     const iv = setInterval(() => {
@@ -1683,6 +1740,7 @@ function SageFindingsPanel() {
 
   return (
     <div className="panel flex flex-col p-6">
+      {loading && <PanelSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-base leading-none">🌿</span>
         <span className="eyebrow">Sage · Research Findings</span>
