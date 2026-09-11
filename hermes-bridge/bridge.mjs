@@ -142,6 +142,10 @@ function cleanStaleLocks() {
 // no dispatcher is polling to claim them. This function detects that condition
 // and manually triggers a dispatch pass to unstick them.
 const STUCK_KANBAN_MINUTES = 10;
+const WATCHDOG_INTERVAL_MS = Number(process.env.BRIDGE_WATCHDOG_MS || 60_000);
+const WATCHDOG_TIMEOUT_MS = Number(process.env.BRIDGE_WATCHDOG_TIMEOUT_MS || 120_000);
+const RESTART_CONFIRM_TIMEOUT_MS = 30_000;
+const bridgePid = process.pid;
 async function healStuckKanban() {
   try {
     // Check gateway status via Postgres DataStore instead of hermes CLI
@@ -1215,10 +1219,52 @@ async function runRequest(r) {
       } else {
         throw new Error(`unknown decision op ${op}`);
       }
+    } else if (r.kind === "control.sync_all") {
+      await mirrorKanban();
+      const cronOut = await mirrorCrons().catch(() => null);
+      if (cronOut) await healCronDrift(cronOut).catch(() => {});
+      await mirrorHealth();
+      await mirrorWiki();
+      await mirrorCost();
+      await mirrorOmniRoute();
+      await mirrorBrief();
+      await mirrorHomelab();
+      await healStuckKanban();
+      result = "sync_all complete: all channels mirrored";
+    } else if (r.kind === "control.refresh_briefing") {
+      await generateBriefing();
+      await mirrorKanban();
+      await mirrorBrief();
+      result = "briefing refreshed";
+    } else if (r.kind === "control.bridge_restart") {
+      const restartDelayMs = Number(r.prompt || "{}")?.delayMs || 5000;
+      await setStore("bridge-restart-scheduled", {
+        scheduledAt: new Date().toISOString(),
+        delayMs: restartDelayMs,
+        requestedBy: r.id,
+      });
+      await emit("status", "Bridge restart scheduled", { level: "warn", meta: { requestId: r.id, delayMs: restartDelayMs } });
+      const alreadyRestarting = await q(
+        "SELECT 1 FROM \"AgentRequest\" WHERE kind='control.bridge_restart' AND status='running' AND id != $1 AND \"createdAt\" > now() - make_interval(secs => 120) LIMIT 1",
+        [r.id]
+      );
+      if (alreadyRestarting.rows.length > 0) {
+        result = "bridge_restart skipped: another restart already in-flight";
+      } else {
+        result = "bridge_restart scheduled in " + restartDelayMs + "ms";
+        const restartInfo = {
+          pid: bridgePid,
+          scheduledAt: new Date().toISOString(),
+          delayMs: restartDelayMs,
+          requestId: r.id
+        };
+        fs.writeFileSync(path.join(__dirname, ".restart-requested"), JSON.stringify(restartInfo));
+        setTimeout(() => { process.exit(0); }, restartDelayMs);
+      }
     } else {
       throw new Error(`unknown kind ${r.kind}`);
     }
-    await q(`UPDATE "AgentRequest" SET status='done', result=$2, "finishedAt"=now(), "updatedAt"=now() WHERE id=$1`,
+    await q(`UPDATE \"AgentRequest\" SET status='done', result=$2, "finishedAt"=now(), "updatedAt"=now() WHERE id=$1`,
       [r.id, result.slice(0, 8000)]);
     await emit("run", `Done: ${r.title}`, { level: "up", detail: result.slice(0, 400), meta: { requestId: r.id, host: HOST } });
     log(`request done: ${r.id} ${r.kind} in ${Math.round((Date.now() - t0) / 1000)}s`);
@@ -1303,6 +1349,17 @@ async function main() {
 
   log(`hermes-bridge up · host=${HOST} · board=${BOARD} · poll=${POLL_MS}ms · mirror=${MIRROR_MS}ms · run-timeout=${RUN_TIMEOUT_MS}ms`);
   await emit("status", "Bridge connected", { level: "up", meta: { host: HOST } });
+  const restartFile = path.join(__dirname, ".restart-requested");
+  if (fs.existsSync(restartFile)) {
+    try {
+      const restartInfo = JSON.parse(fs.readFileSync(restartFile, "utf8"));
+      log("pending restart request from control.bridge_restart, pid=" + restartInfo.pid + ", requestId=" + restartInfo.requestId);
+      fs.unlinkSync(restartFile);
+      await q("UPDATE \"AgentRequest\" SET status='done', result=$2, \"finishedAt\"=now(), \"updatedAt\"=now() WHERE id=$1 AND status='running'", [restartInfo.requestId, "restart initiated — bridge exiting for launchd respawn"]);
+      log("bridge restarting (self-exit for launchd respawn)");
+      process.exit(0);
+    } catch { /* no restart file or parse error */ }
+  }
   await mirrorTick();
   setInterval(() => mirrorTick().catch((e) => log("mirror loop", e.message)), MIRROR_MS);
   // queue loop — NOTE: cleanStaleLocks() is NOT called here. It runs in
@@ -1311,5 +1368,26 @@ async function main() {
   // aggressive).
   const tick = async () => { try { await processQueue(); } catch (e) { log("queue loop", e.message); } finally { setTimeout(tick, POLL_MS); } };
   tick();
+  setInterval(async () => {
+    try {
+      const health = await q("SELECT data FROM \"DataStore\" WHERE key = 'hermes-health'");
+      const healthData = health.rows[0]?.data ? JSON.parse(health.rows[0].data) : null;
+      const gatewayDown = !healthData?.gateway?.includes("running");
+      const lastSeen = healthData?.lastSeen ? new Date(healthData.lastSeen).getTime() : 0;
+      const stalled = Date.now() - lastSeen > WATCHDOG_TIMEOUT_MS;
+      if (gatewayDown && stalled) {
+        log("watchdog: gateway DOWN + stalled — triggering bridge_restart");
+        fs.writeFileSync(path.join(__dirname, ".restart-requested"), JSON.stringify({
+          pid: bridgePid,
+          scheduledAt: new Date().toISOString(),
+          delayMs: 1000,
+          requestId: "watchdog:" + new Date().toISOString()
+        }));
+        process.exit(0);
+      }
+    } catch (e) {
+      log("watchdog tick error:", e.message.split("\n")[0]);
+    }
+  }, WATCHDOG_INTERVAL_MS);
 }
 main().catch((e) => { console.error("fatal", e); process.exit(1); });
