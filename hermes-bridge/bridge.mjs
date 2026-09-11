@@ -145,6 +145,8 @@ const STUCK_KANBAN_MINUTES = 10;
 const WATCHDOG_INTERVAL_MS = Number(process.env.BRIDGE_WATCHDOG_MS || 60_000);
 const WATCHDOG_TIMEOUT_MS = Number(process.env.BRIDGE_WATCHDOG_TIMEOUT_MS || 120_000);
 const bridgePid = process.pid;
+
+import { runControl } from "./control.mjs";
 async function healStuckKanban() {
   try {
     // Check gateway status via Postgres DataStore instead of hermes CLI
@@ -1218,55 +1220,8 @@ async function runRequest(r) {
       } else {
         throw new Error(`unknown decision op ${op}`);
       }
-    } else if (r.kind === "control.sync_all") {
-      await mirrorKanban();
-      const cronOut = await mirrorCrons().catch(() => null);
-      if (cronOut) await healCronDrift(cronOut).catch(() => {});
-      await mirrorHealth();
-      await mirrorWiki();
-      await mirrorCost();
-      await mirrorOmniRoute();
-      await mirrorBrief();
-      await mirrorHomelab();
-      await healStuckKanban();
-      result = "sync_all complete: all channels mirrored";
-    } else if (r.kind === "control.refresh_briefing") {
-      await generateBriefing();
-      await mirrorKanban();
-      await mirrorBrief();
-      result = "briefing refreshed";
-    } else if (r.kind === "control.bridge_restart") {
-      const restartDelayMs = Number(r.prompt || "{}")?.delayMs || 5000;
-      await setStore("bridge-restart-scheduled", {
-        scheduledAt: new Date().toISOString(),
-        delayMs: restartDelayMs,
-        requestedBy: r.id,
-      });
-      await emit("status", "Bridge restart scheduled", { level: "warn", meta: { requestId: r.id, delayMs: restartDelayMs } });
-      const alreadyRestarting = await q(
-        "SELECT 1 FROM \"AgentRequest\" WHERE kind='control.bridge_restart' AND status='running' AND id != $1 AND \"createdAt\" > now() - make_interval(secs => 120) LIMIT 1",
-        [r.id]
-      );
-      if (alreadyRestarting.rows.length > 0) {
-        result = "bridge_restart skipped: another restart already in-flight";
-      } else {
-        result = "bridge_restart scheduled in " + restartDelayMs + "ms";
-        // DB update FIRST — must persist before the restart file exists
-        await q(`UPDATE "AgentRequest" SET status='done', result=$2, "finishedAt"=now(), "updatedAt"=now() WHERE id=$1`,
-          [r.id, result.slice(0, 8000)]);
-        const restartInfo = {
-          pid: bridgePid,
-          scheduledAt: new Date().toISOString(),
-          delayMs: restartDelayMs,
-          requestId: r.id
-        };
-        // Write restart file with fsync for durability before process.exit
-        const restartFd = fs.openSync(path.join(__dirname, ".restart-requested"), 'w');
-        fs.writeFileSync(restartFd, JSON.stringify(restartInfo));
-        fs.fsyncSync(restartFd);
-        fs.closeSync(restartFd);
-        setTimeout(() => { process.exit(0); }, restartDelayMs);
-      }
+    } else if (r.kind.startsWith("control.")) {
+      result = await runControl(r, { q, setStore, emit, log, fs, path, bridgePid });
     } else {
       throw new Error(`unknown kind ${r.kind}`);
     }
