@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles, Waypoints, RefreshCw } from "lucide-react";
+import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles, Waypoints, RefreshCw, Activity, CircleDot, Zap } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
@@ -178,7 +178,7 @@ function HomelabStatusBadge({ data }: { data: HomelabHomeData | undefined }) {
     <div className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium" style={getHomelabBadgeStyle(checkedAt, connected ?? false)}>
       <span className="relative flex w-1.5 h-1.5">
         {showPing && <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--hq-up) 60%, transparent)" }} />}
-        <span className="relative inline-flex w-1.5 h-1.5 rounded-full" style={{ background: getHomelabDotColor(checkedAt, connected ?? false) }} />
+        <Activity className="relative inline-flex w-1.5 h-1.5" style={{ color: getHomelabDotColor(checkedAt, connected ?? false) }} />
       </span>
       <span className="eyebrow !text-[9.5px] font-semibold">{getHomelabLabel(checkedAt, connected ?? false)}</span>
       {checkedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] font-normal">{timeAgo(checkedAt)}</span>}
@@ -1046,20 +1046,20 @@ function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | nu
       </div>
       <div className="flex items-center justify-between mt-1.5 text-[10px] num text-[var(--hq-text-ghost)]">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.input }} />
+          <ArrowDownRight className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.input }} />
           in {fmt(input)}
         </span>
         <span className="flex items-center gap-1.5">
           {cache > 0 && (
             <>
               cached {fmt(cache)}
-              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.cache }} />
+          <Activity className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.cache }} />
             </>
           )}
         </span>
         <span className="flex items-center gap-1.5">
           out {fmt(output)}
-          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.output }} />
+          <ArrowUpRight className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.output }} />
         </span>
       </div>
     </div>
@@ -1266,7 +1266,7 @@ function GitHubHomeCard({
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-2.5 py-1.5">
           <div className="relative flex w-1.5 h-1.5">
             <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] animate-ping opacity-50" />
-            <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+            <Zap className="relative inline-flex w-1.5 h-1.5" style={{ color: "var(--accent)" }} />
           </div>
           <span className="text-[11.5px] text-[var(--hq-text-dim)]">{status}</span>
         </div>
@@ -1472,7 +1472,7 @@ function AgentsStrip({ processes }: { processes: Process[] }) {
         <div key={i} className="flex items-center gap-1.5 rounded-lg border border-[var(--hq-hairline)] bg-white/[0.02] px-2.5 py-1.5">
           <span className="relative flex w-1.5 h-1.5">
             {p.status === "online" && <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--up) 60%, transparent)" }} />}
-            <span className="relative inline-flex w-1.5 h-1.5 rounded-full" style={{ background: p.status === "online" ? "var(--up)" : "var(--down)" }} />
+            <Server className="relative inline-flex w-1.5 h-1.5" style={{ color: p.status === "online" ? "var(--up)" : "var(--down)" }} />
           </span>
           <span className="text-[var(--hq-text-dim)] text-[12px]">{p.name}</span>
           <span className="num text-[var(--hq-text-ghost)] text-[10px]">{p.uptime}</span>
@@ -1521,7 +1521,7 @@ function HermesKanbanPanel({ kanban }: { kanban: HermesKanban }) {
           {kanban.tasks.slice(0, 5).map((t) => (
             <div key={t.id} className="py-2.5 border-b border-[var(--hq-hairline)] last:border-0">
               <div className="flex items-center gap-3">
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusColor(t.status) }} />
+                <CircleDot className="w-1.5 h-1.5 shrink-0" style={{ color: statusColor(t.status) }} />
                 <p className="text-[13px] text-[var(--hq-text-dim)] leading-snug line-clamp-1 flex-1">{t.title}</p>
                 {t.assignee && <span className="num text-[10.5px] text-[var(--hq-text-ghost)] shrink-0">{t.assignee}</span>}
               </div>
@@ -1760,7 +1760,7 @@ function SageFindingsPanel() {
             return (
               <div key={group.key}>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: group.dot }} />
+                  <CircleDot className="w-1.5 h-1.5" style={{ color: group.dot }} />
                   <span className="eyebrow !text-[9.5px]" style={{ color: group.dot }}>{group.label}</span>
                 </div>
                 <div className="space-y-3">
