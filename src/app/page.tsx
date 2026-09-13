@@ -708,8 +708,20 @@ function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
           </div>
         </div>
         {data.avgLatencyMs > 0 && (
-          <div className="text-[12px] text-[var(--hq-text-dim)]">
-            Avg latency <span className="num text-[var(--hq-text)] font-medium">{data.avgLatencyMs}ms</span>
+          <div>
+            <div className="eyebrow mb-1.5 !text-[9.5px]">Avg latency · 7d</div>
+            <div className="text-[12px] text-[var(--hq-text-dim)]">
+              <span className="num text-[var(--hq-text)] font-medium">{data.avgLatencyMs}ms</span>
+              {data.byModel.length > 0 && (
+                <Sparkline
+                  data={data.byModel.map(m => m.avgLatencyMs ?? 0)}
+                  color="#f59e0b"
+                  area
+                  idSeed="freellm-latency"
+                  className="h-8 mt-2"
+                />
+              )}
+            </div>
           </div>
         )}
       </div>
