@@ -34,6 +34,7 @@ export interface OmniSpendByModel extends BaseByModel {
  */
 export interface FreeLLMByModel extends BaseByModel {
   requests: number;
+  avgLatencyMs: number | null;
 }
 
 /**
@@ -90,7 +91,7 @@ export interface FreeLLMData {
   avgLatencyMs: number;
   firstRequestAt: string | null;
   byModel: FreeLLMByModel[];
-  days: { date: string; requests: number; tokens: number }[];
+  days: { date: string; requests: number; tokens: number; avgLatencyMs: number | null }[];
 }
 
 /**

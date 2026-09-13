@@ -79,6 +79,7 @@ export async function GET() {
           failureCount?: number;
           inputTokens?: number;
           outputTokens?: number;
+          avgLatencyMs?: number;
         }>
       | null;
 
@@ -117,6 +118,7 @@ export async function GET() {
       tokens: (row.inputTokens || 0) + (row.outputTokens || 0),
       successCount: row.successCount ?? null,
       failureCount: row.failureCount ?? null,
+      avgLatencyMs: row.avgLatencyMs ?? null,
     }));
 
     return NextResponse.json({
