@@ -29,8 +29,6 @@ function useCountUp(target: number, duration = 1400, enabled = true) {
   return val;
 }
 
-const UP = "#34d399";
-const DOWN = "#fb7185";
 const GHOST = "#52525b";
 
 export interface MetricCardProps {
@@ -64,7 +62,7 @@ export function MetricCard({
   const hasDelta = delta !== null && delta !== undefined;
   const up = hasDelta && (delta as number) > 0;
   const down = hasDelta && (delta as number) < 0;
-  const deltaColor = up ? UP : down ? DOWN : GHOST;
+  const deltaColor = up ? "var(--up)" : down ? "var(--down)" : GHOST;
   const DeltaIcon = down ? ArrowDownRight : ArrowUpRight;
 
   const series = trend && trend.length >= 2 ? trend : null;

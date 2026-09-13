@@ -84,7 +84,7 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
       aria-controls={isExpanded ? `${agent.id}-panel` : undefined}
     >
       {/* Main card */}
-      <div className="p-5 cursor-pointer" onClick={onToggle}>
+      <div className="p-5 cursor-pointer" onClick={onToggle} role="region" aria-label={`${agent.name} details`}>
         <div className="flex items-start gap-3.5">
           {/* Avatar */}
           <div className="w-12 h-12 rounded-[var(--r-md)] flex items-center justify-center text-2xl shrink-0"
@@ -118,7 +118,7 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
           </div>
 
           {/* Stats */}
-          <div className="text-right shrink-0">
+          <div className="text-right shrink-0 min-w-0">
             <div className="num text-[22px] font-semibold text-[var(--text)] leading-none">{agent.tasksCompleted}</div>
             <div className="eyebrow mt-1.5">tasks</div>
             {agent.lastActive && (
@@ -153,7 +153,7 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
       {/* Chat button — visible on Cards view */}
       {onChat && (
         <div className="px-5 py-3" style={{ borderTop: "1px solid var(--line)" }}>
-          <button onClick={onChat} className="flex items-center gap-2 w-full rounded-full py-2 text-[12px] text-[var(--text-2)] transition-colors panel-interactive hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          <button onClick={onChat} className="flex items-center gap-2 w-full rounded-full min-h-[44px] px-4 py-2.5 text-[13px] text-[var(--text-2)] transition-colors panel-interactive hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             style={{ background: "var(--surface-1)", border: "1px solid var(--line)" }}>
             <span>{agent.emoji}</span> Chat with {agent.name}
           </button>
@@ -179,12 +179,18 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
     }
   }, []);
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   // Trap focus within modal
   useEffect(() => {
     const modal = modalRef.current;
     if (!modal) return;
     const focusable = modal.querySelectorAll<HTMLElement>(
-      'button, input, [tabindex]:not([tabindex="-1"])'
+      'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"]), [contenteditable="true"]'
     );
     if (focusable.length === 0) return;
     const first = focusable[0];
@@ -200,7 +206,7 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
     }
     modal.addEventListener("keydown", trap);
     return () => modal.removeEventListener("keydown", trap);
-  }, [msgs, loading]);
+  }, []);
 
   // Escape closes, and restores focus to the chat trigger
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -452,7 +458,8 @@ export default function AgentsPage() {
 
   return (
     <>
-      <div className="relative z-10 w-full mx-auto text-[var(--text)] p-8 pb-16 space-y-8">
+      <div className="relative z-10 w-full mx-auto text-[var(--text)] p-8 pb-16 space-y-8"
+        aria-hidden={chatAgent ? "true" : undefined}>
       {/* Header */}
       <div className="hq-rise flex flex-wrap items-end justify-between gap-4">
         <div>
