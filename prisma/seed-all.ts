@@ -4,6 +4,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
+import { AGENTS } from '@/lib/agent-registry'
 
 const prisma = new PrismaClient()
 
@@ -58,13 +59,12 @@ async function seedAgentStateFromKanban() {
   console.log('\n🤖 Seeding AgentState from kanban.db...')
 
   // Agent metadata (name, emoji, role, status)
-  const agents = [
-    { id: 'max', name: 'Max', emoji: '🐺', role: 'Chief of Staff / Orchestrator' },
-    { id: 'sage', name: 'Sage', emoji: '🌿', role: 'AI Research Analyst' },
-    { id: 'knox', name: 'Knox', emoji: '🔐', role: 'Security & Infrastructure Engineer' },
-    { id: 'nova', name: 'Nova', emoji: '⭐', role: 'UI/UX & Frontend Review Agent' },
-    { id: 'pixel', name: 'Pixel', emoji: '🎨', role: 'Repo Hygiene & Visual Polish Agent' },
-  ]
+  const agents = AGENTS.map((a) => ({
+    id: a.id,
+    name: a.name,
+    emoji: a.emoji,
+    role: a.role,
+  }))
 
   // Query kanban.db via SQLite3 CLI for each agent's stats
   for (const agent of agents) {

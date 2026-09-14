@@ -59,6 +59,12 @@
 :root {
   --background: #0a0b0d;
   --foreground: #e7e8ea;
+  --color-success: #5fd0a0;
+  --color-warning: #f5c451;
+  --color-info: #6ea8fe;
+  --color-danger: #f28b82;
+  --color-purple: #a855f7;
+  --color-pink: #ec4899;
 }
 
 @theme inline {

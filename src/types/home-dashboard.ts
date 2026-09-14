@@ -124,6 +124,15 @@ export interface GitHubHomeData {
 }
 
 /**
+ * Coq Finance data — spending, budget, and category breakdowns.
+ */
+export interface CoqFinanceData {
+  spending: { total: number; byCategory: { name: string; spent: number; budget: number; color: string }[] };
+  budget: { totalBudget: number; remaining: number; percentageUsed: number };
+  days: { date: string; amount: number }[];
+}
+
+/**
  * Interface for snapshot data
  */
 export interface Snapshot {

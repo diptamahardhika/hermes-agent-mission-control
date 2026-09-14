@@ -11,7 +11,7 @@ import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 import { Panel } from "@/components/ui/kit";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { DiagnosticsStrip } from "@/components/diagnostics-strip";
-import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData } from "@/types/home-dashboard";
+import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData, CoqFinanceData } from "@/types/home-dashboard";
 
 // ── Types ─────────────────────────────────────────────────
 interface HLPosition {
@@ -121,6 +121,7 @@ interface HomeData {
   spend: SpendData;
   omniSpend?: OmniSpendData | null;
   freeLLM?: FreeLLMData | null;
+  coq?: CoqFinanceData | null;
 }
 
 const EMPTY: HomeData = {
@@ -240,6 +241,11 @@ function fmtUsd(n: number, alwaysSign = false) {
   const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const sign = n >= 0 ? (alwaysSign ? "+" : "") : "-";
   return `${sign}$${abs}`;
+}
+function fmtThb(n: number, alwaysSign = false) {
+  const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sign = n >= 0 ? (alwaysSign ? "+" : "") : "-";
+  return `${sign}฿${abs}`;
 }
 function timeAgo(d: string) {
   const diff = Date.now() - new Date(d).getTime();
@@ -2070,6 +2076,79 @@ export default function Dashboard() {
           </div>
         </div>
         </ErrorBoundary>
+
+        {/* ── Coq Finance Advisor ─────────────────────── */}
+        {data.coq && (
+          <ErrorBoundary>
+          <div className="mt-14">
+            <SectionLabel>Finance</SectionLabel>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <MetricCard
+                label="Coq · Spending · 7d"
+                value={data.coq.spending.total}
+                format={fmtThb}
+                delta={null} deltaPct={null} deltaLabel={undefined}
+                trend={undefined}
+                goal={undefined} goalFormat={undefined}
+                icon={<Activity className="w-4 h-4" />} accent="#f59e0b" href="/coq" loaded={loaded}
+              >
+                <div className="space-y-2 mt-2">
+                  {data.coq.spending.byCategory.map((cat) => {
+                  const pct = cat.budget > 0 ? Math.round((cat.spent / cat.budget) * 100) : 0;
+                  return (
+                    <div key={cat.name} className="space-y-1">
+                      <div className="flex items-center justify-between text-[12px]">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cat.color }} />
+                          <span className="text-[var(--hq-text-dim)]">{cat.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 bg-[var(--surface-1)] rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: cat.color }} />
+                          </div>
+                          <span className="num text-[var(--hq-text)]">{fmtThb(cat.spent)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                </div>
+              </MetricCard>
+              <div className="panel flex flex-col p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Activity className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} />
+                  <span className="eyebrow">Coq · Finance · Budget</span>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <div className="eyebrow mb-1.5 !text-[9.5px]">Total Budget</div>
+                    <div className="num font-semibold text-[32px] leading-[0.95] text-[var(--hq-text)]">
+                      {fmtThb(data.coq.budget.totalBudget)}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <div className="eyebrow mb-1.5 !text-[9.5px]">Remaining</div>
+                      <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{fmtThb(data.coq.budget.remaining)}</div>
+                    </div>
+                    <div>
+                      <div className="eyebrow mb-1.5 !text-[9.5px]">Used</div>
+                      <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{data.coq.budget.percentageUsed}%</div>
+                    </div>
+                  </div>
+                  {data.coq.days.length > 0 && (
+                    <div className="text-[12px] text-[var(--hq-text-dim)]">
+                      {data.coq.days.map((d) => (
+                        <span key={d.date} className="mr-3">{d.date}: {fmtThb(d.amount)}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          </ErrorBoundary>
+        )}
 
         {/* ── AI model news ───────────────────────────────── */}
         <ErrorBoundary>

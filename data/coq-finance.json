@@ -1,0 +1,19 @@
+{
+  "spending": {
+    "total": 65422.92,
+    "byCategory": [
+      { "name": "Food & Drink", "spent": 6625.71, "budget": 8000, "color": "var(--color-success)" },
+      { "name": "Shopping", "spent": 5589.47, "budget": 6000, "color": "var(--color-warning)" },
+      { "name": "Transport", "spent": 4200.00, "budget": 5000, "color": "var(--color-info)" },
+      { "name": "Housing", "spent": 18000.00, "budget": 20000, "color": "var(--color-danger)" },
+      { "name": "Entertainment", "spent": 3200.00, "budget": 4000, "color": "var(--color-purple)" },
+      { "name": "Health", "spent": 2800.00, "budget": 3000, "color": "var(--color-pink)" }
+    ]
+  },
+  "budget": {
+    "totalBudget": 65422.92,
+    "remaining": 0,
+    "percentageUsed": 100
+  },
+  "days": []
+}

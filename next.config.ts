@@ -34,4 +34,15 @@ const nextConfig: NextConfig = {
   },
 };
 
+
+// ─── Sure Finance Dashboard ───
+// Expose server-side env vars to Next.js runtime
+const sureEnv = {
+  SURE_API_TOKEN: process.env.SURE_API_TOKEN || "",
+  SURE_URL: process.env.SURE_URL || "https://sure.diptamahardhika.cloud",
+};
+
 export default nextConfig;
+
+// Sure Finance Dashboard env vars
+// These are exposed to server-side code via runtime config

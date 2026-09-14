@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sh, KANBAN_DB } from "@/lib/kanban-db";
 import { homedir } from "os";
+import { AGENTS } from "@/lib/agent-registry";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -9,63 +10,21 @@ export const revalidate = 0;
 // Default agent roster — each maps to a REAL runtime:
 // max/sage/knox/nova → Hermes kanban profiles (~/.hermes/profiles/<id>),
 // pixel → OpenCode sessions. Status derives live in GET().
-const DEFAULT_AGENTS = [
-  {
-    id: "max",
-    name: "Max",
-    emoji: "\uD83D\uDC3A",
-    role: "Chief of Staff \u00B7 Orchestrator",
-    status: "idle",
+const DEFAULT_AGENTS = AGENTS.map((a) => ({
+    id: a.id,
+    name: a.name,
+    emoji: a.emoji,
+    role: a.role,
+    status: "idle" as const,
     tasksCompleted: 0,
     totalCost: 0,
-    recentActivity: [],
-  },
-  {
-    id: "sage",
-    name: "Sage",
-    emoji: "\uD83C\uDF3F",
-    role: "AI Research Analyst \u00B7 Model News & Market Watch",
-    status: "idle",
-    tasksCompleted: 0,
-    totalCost: 0,
-    recentActivity: [],
-  },
-  {
-    id: "knox",
-    name: "Knox",
-    emoji: "\uD83D\uDD10",
-    role: "Ops/Infra Engineer \u00B7 Homelab & Monitoring",
-    status: "idle",
-    tasksCompleted: 0,
-    totalCost: 0,
-    recentActivity: [],
-  },
-  {
-    id: "nova",
-    name: "Nova",
-    emoji: "\u2B50",
-    role: "UI/UX Designer \u00B7 Product Interfaces",
-    status: "idle",
-    tasksCompleted: 0,
-    totalCost: 0,
-    recentActivity: [],
-  },
-  {
-    id: "pixel",
-    name: "Pixel",
-    emoji: "\uD83C\uDFA8",
-    role: "Repo Hygiene Engineer \u00B7 Codebase Cleanliness",
-    status: "idle",
-    tasksCompleted: 0,
-    totalCost: 0,
-    recentActivity: [],
-  },
-];
+    recentActivity: [] as string[],
+  }));
 
 // ── Hermes kanban board (~/.hermes/state.db via `hermes` CLI schema) ──
 // max/sage/knox/nova are real Hermes profiles. A task on the board assigned
 // to <profile> with status running/todo/ready means that agent is busy.
-const KANBAN_PROFILES = ["max", "sage", "knox", "nova", "pixel"] as const;
+const KANBAN_PROFILES = [...AGENTS.map((a) => a.id), "default"] as const;
 
 async function hermesKanbanLive(): Promise<Record<string, Live>> {
   // NB: no -readonly here — macOS sqlite3 can't open a WAL db readonly if it

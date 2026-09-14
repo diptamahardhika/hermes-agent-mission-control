@@ -918,6 +918,15 @@ let hlBalance = 0;
     }
   } catch { /* FreeLLM not available — leave as null, card won't render */ }
 
+  // Read Coq finance data
+  let rawCoq: any = null;
+  try {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const raw = readFileSync(join(process.cwd(), "data", "coq-finance.json"), "utf-8");
+    rawCoq = JSON.parse(raw);
+  } catch {}
+
   return NextResponse.json({
     // X
     xFollowers: xStats.xFollowers,
@@ -978,6 +987,8 @@ let hlBalance = 0;
     omniSpend,
     // FreeLLMAPI usage
     freeLLM,
+    // Coq Finance Advisor
+    coq: rawCoq ?? { spending: { total: 0, byCategory: [] }, budget: { totalBudget: 0, remaining: 0, percentageUsed: 0 }, days: [] },
     // Legacy
     pendingDrafts: rawPendingDrafts.length,
     tweetIdeas: await prisma.idea.count({ where: { status: { notIn: ["done", "dismissed"] } } }).catch(() => 0),
