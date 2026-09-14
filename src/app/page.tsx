@@ -311,7 +311,7 @@ function IdeasPanel({ boardIdeas, sageDrafts, ytIdeas, buildIdeas }: {
 }) {
   const [tab, setTab] = useState<IdeaTab>("board");
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [boardIdeas, sageDrafts, ytIdeas, buildIdeas]);
+  useEffect(() => { setLoading(false); }, []);
   const tabs: { key: IdeaTab; label: string; count: number }[] = [
     { key: "board", label: "Board", count: boardIdeas.length },
     { key: "x", label: "X", count: sageDrafts.length },
@@ -432,7 +432,7 @@ const CATEGORY_COLOR: Record<string, string> = {
 // ── Top tweets ────────────────────────────────────────────
 function TopTweetsPanel({ tweets }: { tweets: Tweet[] }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [tweets]);
+  useEffect(() => { setLoading(false); }, []);
   return (
     <div className="panel flex flex-col p-6">
       {loading && <PanelSkeleton />}
@@ -470,7 +470,7 @@ function XAnalyticsPanel({ views, trend, totalTweets, bestDay, bestHour }: {
   views: number; trend: number[]; totalTweets: number; bestDay: string; bestHour: string;
 }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [views, trend, totalTweets, bestDay, bestHour]);
+  useEffect(() => { setLoading(false); }, []);
   return (
     <div className="panel flex flex-col p-6">
       {loading && <PanelSkeleton />}
@@ -505,7 +505,7 @@ function XAnalyticsPanel({ views, trend, totalTweets, bestDay, bestHour }: {
 // ── Agent compute spend panel ─────────────────────────────
 function SpendPanel({ spend }: { spend: SpendData }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [spend]);
+  useEffect(() => { setLoading(false); }, []);
   const series = spend.days.map(d => d.tokens);
   const topModel = [...spend.byModel].sort((a, b) => b.tokens - a.tokens)[0];
   return (
@@ -568,7 +568,7 @@ function SpendPanel({ spend }: { spend: SpendData }) {
 // ── OmniRoute compute spend panel — twin of SpendPanel for the router ──
 function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [omni]);
+  useEffect(() => { setLoading(false); }, []);
   const series = omni.days.map(d => d.tokens);
   const topModel = [...omni.byModel].sort((a, b) => b.tokens - a.tokens)[0];
   const topCache = topModel?.cacheReadTokens ?? 0;
@@ -625,7 +625,7 @@ function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
 const FREELLM_TOK_COLORS = { input: "#f59e0b", cache: "#fcd34d", output: "#fbbf24" };
 function FreeLLMShareBars({ byModel, total }: { byModel: FreeLLMData["byModel"]; total: number }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [byModel, total]);
+  useEffect(() => { setLoading(false); }, []);
   if (loading) return <PanelSkeleton />;
   const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   if (!top.length || !total) return null;
@@ -685,7 +685,7 @@ function FreeLLMShareBars({ byModel, total }: { byModel: FreeLLMData["byModel"];
 // ── FreeLLM spend panel (lightweight mirror of OmniRoutePanel) ──
 function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [data]);
+  useEffect(() => { setLoading(false); }, []);
   const series = data.days.map(d => d.tokens);
   return (
     <div className="panel flex flex-col p-6">
@@ -759,9 +759,16 @@ function AIModelNewsPanel() {
   const [news, setNews] = useState<AINewsData | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    fetch("/api/ai-news").then(r => r.ok ? r.json() : null).then(d => { if (d) setNews(d); }).catch(() => {});
+    fetch("/api/ai-news").then(r => r.ok ? r.json() : null).then(d => {
+      if (d) setNews(d);
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+    });
     const iv = setInterval(() => {
-      fetch("/api/ai-news").then(r => r.ok ? r.json() : null).then(d => { if (d) setNews(d); }).catch(() => {});
+      fetch("/api/ai-news").then(r => r.ok ? r.json() : null).then(d => {
+        if (d) setNews(d);
+      }).catch(() => {});
     }, 3600_000);
     return () => clearInterval(iv);
   }, []);
@@ -918,7 +925,7 @@ function modelProvider(model: string): string {
 
 function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; total: number | null }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [byModel, total]);
+  useEffect(() => { setLoading(false); }, []);
   if (loading) return <PanelSkeleton />;
   const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   if (!top.length || !total) return null;
@@ -984,7 +991,7 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
 const OMNI_TOK_COLORS = { input: "#22d3ee", cache: "#5eead4", output: "#a5f3fc" };
 function OmniShareBars({ omni }: { omni: OmniSpendData }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [omni]);
+  useEffect(() => { setLoading(false); }, []);
   if (loading) return <PanelSkeleton />;
   const top = [...omni.byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   const total = omni.totalTokens;
@@ -1046,7 +1053,7 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
 
 function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | null; output: number | null; cache?: number; colors?: { input: string; cache: string; output: string } }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [input, output]);
+  useEffect(() => { setLoading(false); }, []);
   if (loading) return <PanelSkeleton />;
   if (input == null || output == null) return null;
   // Default legend = the Hermes purple/pink/blue; the OmniRoute card passes its
@@ -1087,7 +1094,7 @@ function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | nu
 // ── Daily-usage history tracker (fades out once the sparkline has data) ──
 function HistoryBuilding({ days }: { days: SpendData["days"] }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [days]);
+  useEffect(() => { setLoading(false); }, []);
   if (loading) return <PanelSkeleton />;
   const live = days.filter(d => d.tokens > 0).length;
   if (live >= 2) return null;
@@ -1164,7 +1171,7 @@ const GH_LEVEL_COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
 
 function GitHubContributionMatrix({ weeks }: { weeks: GitHubContribDay[][] }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [weeks]);
+  useEffect(() => { setLoading(false); }, []);
   if (loading) return <PanelSkeleton />;
   // GitHub-details style orientation: rows = weeks flowing down (oldest top → newest bottom),
   // columns = weekdays Sun..Sat left→right — time reads like text, newest at bottom-right.
@@ -1215,7 +1222,7 @@ function GitHubHomeCard({
   refreshing?: boolean;
 }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [profile, pinnedRepos, activity, status, contributions]);
+  useEffect(() => { setLoading(false); }, []);
   return (
     <div className="panel flex flex-col p-6">
       {loading && <PanelSkeleton />}
@@ -1364,7 +1371,7 @@ function GitHubHomeCard({
 // ── Homelab card for dashboard home ─────────────────────────
 function HomelabHomeCard({ homelab }: { homelab: HomeData["homelab"] }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [homelab]);
+  useEffect(() => { setLoading(false); }, []);
   const c = homelab.counts;
   const sys = homelab.system;
   const allUp = c.servers > 0 && c.serversUp === c.servers && c.servicesUp === c.services;
@@ -1480,7 +1487,7 @@ function HomelabHomeCard({ homelab }: { homelab: HomeData["homelab"] }) {
 // ── Agents strip ──────────────────────────────────────────
 function AgentsStrip({ processes }: { processes: Process[] }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [processes]);
+  useEffect(() => { setLoading(false); }, []);
   if (loading) return <PanelSkeleton />;
   if (processes.length === 0) return null;
   return (
@@ -1503,7 +1510,7 @@ function AgentsStrip({ processes }: { processes: Process[] }) {
 // ── Hermes Kanban ─────────────────────────────────────────
 function HermesKanbanPanel({ kanban }: { kanban: HermesKanban }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [kanban]);
+  useEffect(() => { setLoading(false); }, []);
   const statusColor = (s: string) => {
     const k = s.toLowerCase();
     if (k.includes("done") || k.includes("complete")) return "var(--hq-up)";
@@ -1600,7 +1607,7 @@ function ScoreGauge({ score }: { score: ScoreData }) {
 // ── Crypto portfolio card ─────────────────────────────────
 function CryptoPortfolioCard({ data }: { data: HomeData }) {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, [data]);
+  useEffect(() => { setLoading(false); }, []);
   const { hlBalance: balance, hlTodayPnl: todayPnl, hlAllTimePnl: allTimePnl, hlAssets: assets } = data;
   const hasData = balance > 0 || (assets?.length ?? 0) > 0;
   const pnlColor = todayPnl > 0 ? "var(--up)" : todayPnl < 0 ? "var(--down)" : "var(--hq-text-ghost)";
@@ -1739,9 +1746,16 @@ function SageFindingsPanel() {
   const [findings, setFindings] = useState<SageFinding[] | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    fetch("/api/sage-findings").then(r => r.ok ? r.json() : null).then(d => { if (d) setFindings(d.findings ?? []); }).catch(() => {});
+    fetch("/api/sage-findings").then(r => r.ok ? r.json() : null).then(d => {
+      if (d) setFindings(d.findings ?? []);
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+    });
     const iv = setInterval(() => {
-      fetch("/api/sage-findings").then(r => r.ok ? r.json() : null).then(d => { if (d) setFindings(d.findings ?? []); }).catch(() => {});
+      fetch("/api/sage-findings").then(r => r.ok ? r.json() : null).then(d => {
+        if (d) setFindings(d.findings ?? []);
+      }).catch(() => {});
     }, 300_000);
     return () => clearInterval(iv);
   }, []);

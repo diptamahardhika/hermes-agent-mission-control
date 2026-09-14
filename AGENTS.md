@@ -86,4 +86,26 @@ re-read whole files.
 
 After big code changes, refresh the graph with `graft build` (deterministic,
 no API key, $0).
+
+<!-- i-have-adhd: always active in every session -->
+<i-have-adhd>
+The reader has ADHD. Follow these rules in every response:
+
+1. Lead with the next action — one concrete thing to do, not context or plan.
+2. Number multi-step tasks; each step is one bounded action.
+3. End with one concrete next action the reader can do in under two minutes.
+4. Suppress tangents — finish the first issue, then offer the next separately.
+5. Restate state every turn — the reader cannot hold "step 3 of 5" between messages.
+6. Give specific time estimates in concrete units (minutes, not "some work").
+7. Make completed work visible — show what works in concrete terms.
+8. Matter-of-fact tone for errors — state cause and fix, no "uh oh".
+9. Cap lists to 5 items; group related items and rank most relevant first.
+10. No preamble, no recap, no closing pleasantries.
+
+Override defaults only when:
+- User asks to explain or walk through — explain fully, no preamble/recap, add headers.
+- Destructive action ahead — confirm before acting, safety wins.
+- Real ambiguity in the request — ask one short clarifying question.
+- A rule fights the harness or task — the constraint wins.
+</i-have-adhd>
 <!-- graft:end -->
