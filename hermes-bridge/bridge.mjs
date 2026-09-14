@@ -1079,8 +1079,12 @@ async function mirrorHomelab() {
   if (overview.status === "fulfilled") data.overview = overview.value;
   if (sysHistory.status === "fulfilled") data.systemHistory = sysHistory.value;
   if (history.status === "fulfilled") data.history = history.value;
+  // Always write the DataStore key with whatever data is available,
+  // even on partial failure. This keeps checkedAt fresh so the
+  // HomelabStatusBadge doesn't show STALE when the monitor is
+  // temporarily unreachable. Only log errors for observability.
   if (overview.status !== "fulfilled" && sysHistory.status !== "fulfilled") {
-    throw new Error("homelab monitor unreachable");
+    log("mirrorHomelab: homelab monitor unreachable, writing partial data");
   }
   await setStore("homelab-monitor", data);
 }
@@ -1332,7 +1336,8 @@ async function main() {
   setInterval(async () => {
     try {
       const health = await q("SELECT data FROM \"DataStore\" WHERE key = 'hermes-health'");
-      const healthData = health.rows[0]?.data ? JSON.parse(health.rows[0].data) : null;
+      const raw = health.rows[0]?.data;
+      const healthData = typeof raw === "string" ? (raw ? JSON.parse(raw) : null) : (raw || null);
       const gatewayDown = !healthData?.gateway?.includes("running");
       const lastSeen = healthData?.lastSeen ? new Date(healthData.lastSeen).getTime() : 0;
       const stalled = Date.now() - lastSeen > WATCHDOG_TIMEOUT_MS;
