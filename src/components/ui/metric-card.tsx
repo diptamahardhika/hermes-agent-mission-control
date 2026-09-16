@@ -95,7 +95,9 @@ export function MetricCard({
       </div>
 
       {/* custom mini-viz slot */}
-      {children}
+      {children && (
+        <div className="mt-2 min-h-0">{children}</div>
+      )}
 
       {/* sparkline */}
       {series && (

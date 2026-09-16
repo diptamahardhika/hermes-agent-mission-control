@@ -159,7 +159,7 @@ async function healStuckKanban() {
       // Gateway is down — check for stuck ready tasks via Postgres
       const ageThreshold = Date.now() - STUCK_KANBAN_MINUTES * 60 * 1000;
       const tasks = await q(
-        `SELECT count(*) as cnt FROM "HermesTask" WHERE status = 'ready' AND created_at * 1000 < $1`,
+        `SELECT count(*) as cnt FROM "HermesTask" WHERE status = 'ready' AND "updatedAt" < to_timestamp($1 / 1000.0)`,
         [ageThreshold]
       );
       const stuckCount = parseInt(tasks.rows[0].cnt);
@@ -1319,9 +1319,9 @@ async function main() {
     try {
       const restartInfo = JSON.parse(fs.readFileSync(restartFile, "utf8"));
       log("pending restart request from control.bridge_restart, pid=" + restartInfo.pid + ", requestId=" + restartInfo.requestId);
-      fs.unlinkSync(restartFile);
       await q("UPDATE \"AgentRequest\" SET status='done', result=$2, \"finishedAt\"=now(), \"updatedAt\"=now() WHERE id=$1 AND status='running'", [restartInfo.requestId, "restart initiated — bridge exiting for launchd respawn"]);
       log("bridge restarting (self-exit for launchd respawn)");
+      fs.unlinkSync(restartFile);
       process.exit(0);
     } catch { /* no restart file or parse error */ }
   }
@@ -1347,7 +1347,7 @@ async function main() {
           pid: bridgePid,
           scheduledAt: new Date().toISOString(),
           delayMs: 1000,
-          requestId: "watchdog-" + Date.now()
+          requestId: randomUUID()
         }));
         process.exit(0);
       }

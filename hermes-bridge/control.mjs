@@ -78,7 +78,7 @@ export function getWatchdogCheck(q, fs, path, __dirname, bridgePid, WATCHDOG_TIM
           pid: bridgePid,
           scheduledAt: new Date().toISOString(),
           delayMs: 1000,
-          requestId: "watchdog-" + Date.now()
+          requestId: randomUUID()
         }));
         process.exit(0);
       }

@@ -1,16 +1,16 @@
-# Graph Report - hermes-agent-mission-control  (2026-09-09)
+# Graph Report - hermes-agent-mission-control  (2026-09-14)
 
 ## Corpus Check
-- 186 files · ~160,868 words
+- 201 files · ~169,708 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1536 nodes · 2186 edges · 135 communities (90 shown, 38 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 6 edges (avg confidence: 0.85)
+- 1676 nodes · 2346 edges · 146 communities (102 shown, 36 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 8 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c0e718fe`
+- Built from commit: `ff5efd69`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -25,20 +25,20 @@
 - README.md
 - 🐘 Hermy HQ Self-Hosted PostgreSQL Migration Guide
 - HermesBriefing Decision Layer - Phase 2 Plan
-- lucide-react
+- decision-dashboard-widget.tsx
 - articles/page.tsx
 - Phase 2.2 Implementation Summary
 - hermes-runs.tsx
 - package.json
 - ai-news/route.ts
 - fetchUrlContent
-- react
+- kit.tsx
 - Phase 2.1 Implementation Summary
 - hermes/page.tsx
 - memory-wiki/page.tsx
 - client-pulse/route.ts
 - Daily UI/UX Review: hermy-hq Pages
-- layout.tsx
+- react
 - dependencies
 - compilerOptions
 - outlier-scanner.js
@@ -47,7 +47,7 @@
 - content-os/page.tsx
 - timeAgo
 - github-review.ts
-- command-palette.tsx
+- Final Plan
 - Ralplan: Comment Response & System Improvements
 - OutlierFeed.tsx
 - hermes-briefing.tsx
@@ -110,17 +110,17 @@
 - x-analytics/route.ts
 - viral-score/route.ts
 - ideas/generate/route.ts
-- generate-visuals/route.ts
+- Ralplan: Tier 2 Structural Improvements — Consensus Plan
 - tasks/page.tsx
 - test-phase2.sh
 - graft
 - map-chat/route.ts
-- toast-context.tsx
+- lucide-react
 - diagnostics/route.ts
 - retry/route.ts
 - longform/tweak/route.ts
-- kit.tsx
-- sidebar.tsx
+- hermes-dispatches.tsx
+- Ralplan: hermy-hq Dashboard Improvement Priorities
 - top-tweets/route.ts
 - youtube-scrape/route.ts
 - breadcrumbs.tsx
@@ -129,7 +129,6 @@
 - middleware.ts
 - vercel.json
 - verify_github_panel.py
-- eslint.config.mjs
 - setup.sh
 - update-env.sh
 - orchestrator_append.md
@@ -138,22 +137,33 @@
 - app
 - feedback/route.ts
 - calendar/route.ts
-- outliers/route.ts
-- SageFindingsPanel
-- watchlist-radar/update/route.ts
+- Critic Review: Tier 2 Structural Improvements
+- Ralplan: Tier 2 Structural Improvements — Prioritized Plan
+- Architectural Review: Tier 2 Structural Improvements
 - watchlist-radar/route.ts
 - trends/update/route.ts
+- coq/route.ts
+- Panel
+- CSS Custom Properties in Inline Styles
+- TasksPage
+- Ralplan Update: Tier 0C Fixed + Next Steps
+- funnel-chart.tsx
+- next.config.ts
+- youtube/ideas/route.ts
+- HomelabStatusBadge
+- ErrorBoundary
+- ModelShareBars
 
 ## God Nodes (most connected - your core abstractions)
 1. `prisma` - 51 edges
-2. `react` - 38 edges
+2. `react` - 41 edges
 3. `lucide-react` - 24 edges
-4. `runRequest()` - 17 edges
-5. `EmptyState()` - 16 edges
-6. `compilerOptions` - 16 edges
-7. `log()` - 15 edges
-8. `q()` - 14 edges
-9. `Panel()` - 14 edges
+4. `runRequest()` - 18 edges
+5. `log()` - 16 edges
+6. `Panel()` - 16 edges
+7. `EmptyState()` - 16 edges
+8. `compilerOptions` - 16 edges
+9. `q()` - 15 edges
 10. `mirrorTick()` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -171,27 +181,27 @@
 ## Import Cycles
 - None detected.
 
-## Communities (135 total, 38 thin omitted)
+## Communities (146 total, 36 thin omitted)
 
 ### Community 0 - "bridge.mjs"
-Cohesion: 0.12
-Nodes (49): bridgeDecisionsFromBrief(), bridgeStructuredDecision(), briefPrompt(), cachedInfCfg, cleanStaleLocks(), currentInferenceProvider(), __dirname, driftHealedAt (+41 more)
+Cohesion: 0.10
+Nodes (52): bridgeDecisionsFromBrief(), bridgeStructuredDecision(), briefPrompt(), cachedInfCfg, cleanStaleLocks(), currentInferenceProvider(), __dirname, driftHealedAt (+44 more)
 
 ### Community 1 - "app/page.tsx"
 Cohesion: 0.05
-Nodes (30): AINewsData, BoardIdea, BuildIdea, CATEGORY_COLOR, CATEGORY_LABEL, Draft, FREELLM_TOK_COLORS, GH_LEVEL_COLORS (+22 more)
+Nodes (31): AINewsData, BoardIdea, BuildIdea, CATEGORY_COLOR, CATEGORY_LABEL, Draft, FREELLM_TOK_COLORS, GH_LEVEL_COLORS (+23 more)
 
 ### Community 2 - "prisma.ts"
-Cohesion: 0.07
-Nodes (7): dynamic, maxDuration, DaySnap, dynamic, dynamic, globalForPrisma, prisma
+Cohesion: 0.06
+Nodes (10): dynamic, dynamic, maxDuration, maxDuration, DaySnap, dynamic, dynamic, dynamic (+2 more)
 
 ### Community 3 - "x-content/page.tsx"
 Cohesion: 0.07
 Nodes (35): Signal, SignalCard(), timeAgo(), WatchlistData, WatchlistRadarPage(), AnalyticsData, DAYS, fmt() (+27 more)
 
 ### Community 4 - "agents/route.ts"
-Cohesion: 0.09
-Nodes (30): epochToIso(), firstLine(), GET(), POST(), toProposal(), Activity, ACTIVITY_PROFILE_MAP, DEFAULT_AGENTS (+22 more)
+Cohesion: 0.07
+Nodes (40): execSqlite(), JsonValue, main(), prisma, seedAgentStateFromKanban(), seedDatastore(), upsert(), epochToIso() (+32 more)
 
 ### Community 5 - "agents/page.tsx"
 Cohesion: 0.06
@@ -213,13 +223,13 @@ Nodes (31): Accessing Remotely (Tailscale/SSH Tunnel), Backup failing, Connect v
 Cohesion: 0.06
 Nodes (31): 1. TypeScript Type Updates, 2. Component Updates, 3. Feature Flag System, 4. API Endpoints, Backend, Backward Compatibility, Changes Required, Current status & next (+23 more)
 
-### Community 10 - "lucide-react"
+### Community 10 - "decision-dashboard-widget.tsx"
 Cohesion: 0.23
-Nodes (14): lucide-react, DecisionFilters, DecisionDashboardWidget(), DecisionDashboardWidgetProps, timeAgo(), DecisionDetailModal(), BadgeDef, KIND_BADGE (+6 more)
+Nodes (13): DecisionFilters, DecisionDashboardWidget(), DecisionDashboardWidgetProps, timeAgo(), DecisionDetailModal(), BadgeDef, KIND_BADGE, STATUS_BADGE (+5 more)
 
 ### Community 11 - "articles/page.tsx"
 Cohesion: 0.08
-Nodes (22): Article, ArticlesPageContent(), CalendarTabProps, ChatMessage, ComposeTabProps, LibraryTabProps, SavedTitle, STATUS_COLUMNS (+14 more)
+Nodes (15): Article, ArticlesPageContent(), CalendarTabProps, ChatMessage, ComposeTabProps, LibraryTabProps, SavedTitle, STATUS_COLUMNS (+7 more)
 
 ### Community 12 - "Phase 2.2 Implementation Summary"
 Cohesion: 0.06
@@ -241,17 +251,17 @@ Nodes (23): decodeEntities(), deriveTags(), dynamic, fetchHN(), fetchNews(), GET
 Cohesion: 0.12
 Nodes (23): dynamic, maxDuration, POST(), TRACK_FORMULAS, dynamic, maxDuration, POST(), TRACK_DESCRIPTIONS (+15 more)
 
-### Community 17 - "react"
+### Community 17 - "kit.tsx"
 Cohesion: 0.13
-Nodes (15): react, EMPTY_FORM, GardenBlob, Plant, LongformScript, TONE, Idea, LongformTab (+7 more)
+Nodes (16): EMPTY_FORM, GardenBlob, Plant, LongformScript, TONE, Idea, LongformTab, Script (+8 more)
 
 ### Community 18 - "Phase 2.1 Implementation Summary"
 Cohesion: 0.08
 Nodes (24): 1. TypeScript Types (`src/components/hermes-briefing.tsx`), 2. Feature Flag System (`src/lib/features.ts`), 3. Component Updates (`src/components/hermes-briefing.tsx`), 4. Backend Endpoint (`src/app/api/hermes/decisions/[id]/route.ts`), Backward Compatibility, Changes Made, Deployment Notes, Documentation (+16 more)
 
 ### Community 19 - "hermes/page.tsx"
-Cohesion: 0.13
-Nodes (22): ActivityFeed(), COLUMN_LABEL, COLUMN_ORDER, columnFor(), columnTone(), CronJob, CronPanel(), Ev (+14 more)
+Cohesion: 0.12
+Nodes (24): ActivityFeed(), COLUMN_LABEL, COLUMN_ORDER, columnFor(), columnTone(), CronJob, CronPanel(), Ev (+16 more)
 
 ### Community 20 - "memory-wiki/page.tsx"
 Cohesion: 0.13
@@ -265,9 +275,9 @@ Nodes (3): AnalysisWithClient, asStringArray(), GET()
 Cohesion: 0.10
 Nodes (20): 1. DecisionDashboardWidget Action Buttons - MISSING FOCUS VISIBILITY ⭐ HIGH IMPACT, 2. Agent Proposals Widget Badge Styling - INCONSISTENT VISUAL LANGUAGE ⭐ MEDIUM IMPACT, 3. Decision Filtering - INCOMPLETE FOCUS SUPPORT ⭐ MEDIUM IMPACT, 4. MetricCard Focus Consistency - MINOR VISUAL INCONSISTENCY ⭐ LOW IMPACT, 5. Brand Voice Alignment - NOT APPLICABLE ⭐ LOW IMPACT, Accessibility ✅, 🚨 CRITICAL ISSUES FIXED, Daily UI/UX Review: hermy-hq Pages (+12 more)
 
-### Community 23 - "layout.tsx"
-Cohesion: 0.20
-Nodes (7): nextConfig, next, geist, geistMono, metadata, viewport, ToastProvider()
+### Community 23 - "react"
+Cohesion: 0.13
+Nodes (14): react, geist, geistMono, metadata, viewport, ConditionalLayout(), ChartPoint, fmt() (+6 more)
 
 ### Community 24 - "dependencies"
 Cohesion: 0.10
@@ -282,7 +292,7 @@ Cohesion: 0.22
 Nodes (16): API_KEYS, fetchJSON(), formatDuration(), fs, getApiKey(), getChannelInfo(), getChannelMedianViews(), getVideoDetails() (+8 more)
 
 ### Community 27 - "home/route.ts"
-Cohesion: 0.13
+Cohesion: 0.11
 Nodes (12): BN_CACHE, BoardIdeaRoute, dynamic, extractMetrics(), formatHermesKanban(), GET(), GH_CACHE, HERMES_KANBAN_DEMO_TASKS (+4 more)
 
 ### Community 28 - "tauri.conf.json"
@@ -295,31 +305,31 @@ Nodes (14): bestViews(), ColKey, COLS, ContentOSPage(), Draft, fmt(), isTweet(),
 
 ### Community 30 - "timeAgo"
 Cohesion: 0.16
-Nodes (17): CryptoPortfolioCard(), fmt(), fmtExact(), FreeLLMShareBars(), FreeLLMSpendPanel(), HomelabHomeCard(), modelProvider(), ModelShareBars() (+9 more)
+Nodes (17): CryptoPortfolioCard(), fmt(), fmtExact(), FreeLLMShareBars(), FreeLLMSpendPanel(), HomelabHomeCard(), OmniRoutePanel(), OmniShareBars() (+9 more)
 
 ### Community 31 - "github-review.ts"
 Cohesion: 0.20
 Nodes (14): checkUnusedDeps(), DANGEROUS_PATTERNS, DEBUG_PATTERNS, getRepoPath(), performSecurityReview(), REPO_MAP, ReviewFinding, ReviewResult (+6 more)
 
-### Community 32 - "command-palette.tsx"
-Cohesion: 0.20
-Nodes (9): DispatchBar(), getJSON(), HermesPage(), CommandPalette(), NAV, NavItem, Row, ConditionalLayout() (+1 more)
+### Community 32 - "Final Plan"
+Cohesion: 0.13
+Nodes (14): Consensus Status, Design Decisions (from Architect+Critic debate), Files to Create/Modify, Final Plan, Finance Advisor Bot — Consensus Implementation Plan, Phase 1: Profile Setup, Phase 2: Agent Registration (single source of truth), Phase 3: API Route (+6 more)
 
 ### Community 33 - "Ralplan: Comment Response & System Improvements"
 Cohesion: 0.10
 Nodes (20): 1. Fix False-Positive Health Reporting in self-heal, 2. Fix healStuckKanban() to not depend on hermes CLI, 3. Add kanban sync health check to bridge, 4. Improve launchd health verification, 5. Fix kanban dispatcher stuck workers, Bridge & Dashboard restarted, Consensus Status, Context (+12 more)
 
 ### Community 34 - "OutlierFeed.tsx"
-Cohesion: 0.19
-Nodes (14): analyzeTitlePatterns(), formatNumber(), MinScore, NICHE_COLORS, NicheCount, OutlierData, OutlierFeed(), scoreBadgeColor() (+6 more)
+Cohesion: 0.17
+Nodes (15): OutlierFeed, analyzeTitlePatterns(), formatNumber(), MinScore, NICHE_COLORS, NicheCount, OutlierData, OutlierFeed() (+7 more)
 
 ### Community 35 - "hermes-briefing.tsx"
 Cohesion: 0.17
 Nodes (13): Briefing, Decision, DecisionAction, DecisionActionTarget, DecisionItem, DecisionKind, HermesBriefing(), Section (+5 more)
 
 ### Community 36 - "seed.ts"
-Cohesion: 0.13
-Nodes (27): execSqlite(), JsonValue, main(), prisma, seedAgentStateFromKanban(), seedDatastore(), upsert(), main() (+19 more)
+Cohesion: 0.18
+Nodes (20): main(), prisma, upsert(), main(), prisma, readJson(), safeDate(), seedAgentState() (+12 more)
 
 ### Community 37 - "homelab/page.tsx"
 Cohesion: 0.17
@@ -442,8 +452,8 @@ Cohesion: 0.53
 Nodes (5): ACCENT_COLORS, esc(), POST(), stripBullet(), wrapText()
 
 ### Community 69 - "Dashboard"
-Cohesion: 0.40
-Nodes (6): Dashboard(), EMPTY, greeting(), sampleSeries(), snapDelta(), withDevPreview()
+Cohesion: 0.33
+Nodes (7): Dashboard(), EMPTY, fmtThb(), greeting(), sampleSeries(), snapDelta(), withDevPreview()
 
 ### Community 70 - "readme-validator.ts"
 Cohesion: 0.47
@@ -494,8 +504,8 @@ Cohesion: 0.50
 Nodes (4): overrides, @babel/core, brace-expansion, deepmerge-ts
 
 ### Community 87 - "home-dashboard.ts"
-Cohesion: 0.22
-Nodes (12): HomeData, BaseByModel, FreeLLMByModel, FreeLLMData, GitHubHomeData, HomelabHomeData, HomelabSystem, OmniSpendByModel (+4 more)
+Cohesion: 0.21
+Nodes (13): HomeData, BaseByModel, CoqFinanceData, FreeLLMByModel, FreeLLMData, GitHubHomeData, HomelabHomeData, HomelabSystem (+5 more)
 
 ### Community 90 - "format/route.ts"
 Cohesion: 0.67
@@ -517,41 +527,89 @@ Nodes (3): analyzeContent(), dynamic, POST()
 Cohesion: 0.83
 Nodes (3): braveSearch(), callOpenAI(), POST()
 
+### Community 95 - "Ralplan: Tier 2 Structural Improvements — Consensus Plan"
+Cohesion: 0.13
+Nodes (14): 1. The Real Problem Isn't File Size, 2. Per-Panel Skeletons Solve Two Problems, 3. Simplified Loading State Approach, Consensus Status, Final Prioritized Plan, Implementation Notes, Key Insights from Reviews, Next Step (+6 more)
+
 ### Community 96 - "tasks/page.tsx"
-Cohesion: 0.24
-Nodes (9): columns, STATUS_COLORS, statusColor(), Task, TaskCard(), TaskDraft, TaskEditor(), taskToDraft() (+1 more)
+Cohesion: 0.28
+Nodes (8): columns, STATUS_COLORS, statusColor(), Task, TaskCard(), TaskDraft, TaskEditor(), taskToDraft()
 
-### Community 100 - "toast-context.tsx"
+### Community 100 - "lucide-react"
+Cohesion: 0.11
+Nodes (16): lucide-react, DispatchBar(), InboxCard(), Req, timeAgo(), CommandPalette(), NAV, NavItem (+8 more)
+
+### Community 104 - "hermes-dispatches.tsx"
+Cohesion: 0.33
+Nodes (6): ago(), HermesDispatches(), LABEL, Req, TONE, SectionHeader()
+
+### Community 105 - "Ralplan: hermy-hq Dashboard Improvement Priorities"
+Cohesion: 0.14
+Nodes (13): Consensus Status, Consensus: YES ✅, Dependency Map (Revised), Key Design Decisions, Ralplan: hermy-hq Dashboard Improvement Priorities, Revised Priority Plan, Risks and Open Questions, Round 1 Revision Summary (+5 more)
+
+### Community 129 - "Critic Review: Tier 2 Structural Improvements"
+Cohesion: 0.14
+Nodes (13): Accessibility, Bundle Size (Minor), C1: P1 Effort Underestimated — Confirmed and Deepened, C2: Prioritization Is Correct — Challenge the Framing, C3: Missing Dimensions, C4: Simplicity Test — There's an Even Simpler Path, C5: Principle Test — Minimal Disruption, C6: The One Thing the Plan Gets Wrong (+5 more)
+
+### Community 130 - "Ralplan: Tier 2 Structural Improvements — Prioritized Plan"
+Cohesion: 0.17
+Nodes (11): Final Verdicts, Foundational Facts, (META) Is "page.tsx is too big" the right problem?, Opportunity Cost, P1: Per-Panel Loading Skeletons ⭐ HIGH VALUE, LOW EFFORT, P2: Extract High-Cost Panels Reactively (when adding new ones), P3: Monitor Lint Rule Headroom, Ralplan: Tier 2 Structural Improvements — Prioritized Plan (+3 more)
+
+### Community 131 - "Architectural Review: Tier 2 Structural Improvements"
+Cohesion: 0.20
+Nodes (9): 1. Prioritization — Sound ✓, 2. Hidden Risks — One Not Addressed, 3. Loading Skeleton Approach — Correct Abstraction ✓, 4. Extraction Timing — Wait is Correct ✓, 5. Recommendations, Architectural Review: Tier 2 Structural Improvements, Per-panel loading state adds state machinery to 19 panels, Summary (+1 more)
+
+### Community 135 - "coq/route.ts"
+Cohesion: 0.31
+Nodes (8): DATA_PATH, dynamic, emptyState(), FinanceCategory, FinanceData, GET(), readFinanceData(), revalidate
+
+### Community 136 - "Panel"
 Cohesion: 0.22
-Nodes (6): Toast, ToastContext, ToastContextValue, ToastTone, TONE_COLORS, TONE_ICON
+Nodes (7): DIAGNOSTIC_IDS_QUERY, DIAGNOSTIC_TASK_IDS, DiagnosticsResult, DiagnosticsStrip(), Props, State, Panel()
 
-### Community 104 - "kit.tsx"
-Cohesion: 0.12
-Nodes (16): AgentProposalsWidget(), FilterMode, Proposal, SortMode, InboxCard(), Req, timeAgo(), ago() (+8 more)
+### Community 137 - "CSS Custom Properties in Inline Styles"
+Cohesion: 0.29
+Nodes (6): CSS Custom Properties in Inline Styles, Fix Pattern, Stale Cache Trap, The Pattern, Verification Loop, Why `:root`, Not `@theme inline`
 
-### Community 105 - "sidebar.tsx"
+### Community 138 - "TasksPage"
+Cohesion: 0.57
+Nodes (7): TasksPage(), deleteTask(), fetchTasks(), quickAdd(), saveTaskEdit(), tidyTask(), updateTaskStatus()
+
+### Community 139 - "Ralplan Update: Tier 0C Fixed + Next Steps"
+Cohesion: 0.33
+Nodes (5): Next Step: Tier 2 — Structural Improvements, Pending Work, Ralplan Update: Tier 0C Fixed + Next Steps, Tier 0C — ESLint line cap (NOW WORKING ✅), What Changed
+
+### Community 140 - "funnel-chart.tsx"
 Cohesion: 0.40
-Nodes (4): Logo(), mobileTabsRaw, navGroups, Sidebar()
+Nodes (4): Category, fmtMoney(), FunnelChart(), FunnelChartProps
+
+### Community 141 - "next.config.ts"
+Cohesion: 0.50
+Nodes (3): nextConfig, sureEnv, next
+
+### Community 143 - "HomelabStatusBadge"
+Cohesion: 0.50
+Nodes (4): getHomelabBadgeStyle(), getHomelabDotColor(), getHomelabLabel(), HomelabStatusBadge()
 
 ## Knowledge Gaps
-- **677 isolated node(s):** `graft`, `eslintConfig`, `__dirname`, `HOST`, `POLL_MS` (+672 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 859 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **38 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **760 isolated node(s):** `graft`, `__dirname`, `HOST`, `POLL_MS`, `MIRROR_MS` (+755 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 961 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **36 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `@prisma/client` connect `seed.ts` to `prisma.ts`, `client-pulse/route.ts`, `package.json`?**
-  _High betweenness centrality (0.151) - this node is a cross-community bridge._
-- **Why does `react` connect `react` to `app/page.tsx`, `x-content/page.tsx`, `agents/page.tsx`, `lucide-react`, `articles/page.tsx`, `hermes-runs.tsx`, `package.json`, `hermes/page.tsx`, `memory-wiki/page.tsx`, `content-os/page.tsx`, `command-palette.tsx`, `OutlierFeed.tsx`, `hermes-briefing.tsx`, `homelab/page.tsx`, `ideas/page.tsx`, `client-pulse/page.tsx`, `github/page.tsx`, `metric-card.tsx`, `tasks/page.tsx`, `toast-context.tsx`, `kit.tsx`, `sidebar.tsx`?**
-  _High betweenness centrality (0.126) - this node is a cross-community bridge._
-- **Why does `lucide-react` connect `lucide-react` to `tasks/page.tsx`, `app/page.tsx`, `command-palette.tsx`, `hermes-briefing.tsx`, `metric-card.tsx`, `agents/page.tsx`, `homelab/page.tsx`, `toast-context.tsx`, `kit.tsx`, `sidebar.tsx`, `hermes-runs.tsx`, `package.json`, `ideas/page.tsx`, `react`, `hermes/page.tsx`, `memory-wiki/page.tsx`, `content-os/page.tsx`, `github/page.tsx`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
-- **What connects `graft`, `eslintConfig`, `__dirname` to the rest of the system?**
-  _677 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `@prisma/client` connect `seed.ts` to `prisma.ts`, `agents/route.ts`, `client-pulse/route.ts`, `package.json`?**
+  _High betweenness centrality (0.140) - this node is a cross-community bridge._
+- **Why does `react` connect `react` to `app/page.tsx`, `x-content/page.tsx`, `agents/page.tsx`, `Panel`, `decision-dashboard-widget.tsx`, `articles/page.tsx`, `funnel-chart.tsx`, `hermes-runs.tsx`, `package.json`, `kit.tsx`, `hermes/page.tsx`, `memory-wiki/page.tsx`, `content-os/page.tsx`, `OutlierFeed.tsx`, `hermes-briefing.tsx`, `homelab/page.tsx`, `ideas/page.tsx`, `client-pulse/page.tsx`, `github/page.tsx`, `metric-card.tsx`, `tasks/page.tsx`, `lucide-react`, `hermes-dispatches.tsx`?**
+  _High betweenness centrality (0.109) - this node is a cross-community bridge._
+- **Why does `lucide-react` connect `lucide-react` to `tasks/page.tsx`, `app/page.tsx`, `metric-card.tsx`, `hermes-briefing.tsx`, `agents/page.tsx`, `homelab/page.tsx`, `hermes-dispatches.tsx`, `decision-dashboard-widget.tsx`, `hermes-runs.tsx`, `package.json`, `ideas/page.tsx`, `kit.tsx`, `hermes/page.tsx`, `memory-wiki/page.tsx`, `react`, `content-os/page.tsx`, `github/page.tsx`?**
+  _High betweenness centrality (0.062) - this node is a cross-community bridge._
+- **Are the 2 inferred relationships involving `runRequest()` (e.g. with `log()` and `q()`) actually correct?**
+  _`runRequest()` has 2 INFERRED edges - model-reasoned connections that need verification._
+- **What connects `graft`, `__dirname`, `HOST` to the rest of the system?**
+  _760 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `bridge.mjs` be split into smaller, more focused modules?**
-  _Cohesion score 0.11673469387755102 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09935064935064936 - nodes in this community are weakly interconnected._
 - **Should `app/page.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.05128205128205128 - nodes in this community are weakly interconnected._
-- **Should `prisma.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.06923076923076923 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04878048780487805 - nodes in this community are weakly interconnected._
