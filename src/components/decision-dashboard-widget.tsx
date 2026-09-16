@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Clock, Flag, X } from "lucide-react";
+import { ArrowUpRight, Clock, Flag, X, CircleDot } from "lucide-react";
 import { Panel, Eyebrow, Button } from "@/components/ui/kit";
 
 import type { Decision } from "@/types/decision";
@@ -124,9 +124,9 @@ export function DecisionDashboardWidget({
                 onClick={() => toggleExpand(decision.id)}
                 className="w-full flex items-center gap-2.5 py-2.5 px-3 text-left decision-row transition-[background,border-color,transform] duration-150 ease-out"
               >
-                <span
-                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ background: kindInfo.color }}
+                <CircleDot
+                  className="w-1.5 h-1.5 shrink-0"
+                  style={{ color: kindInfo.color }}
                 />
                 <p className="flex-1 text-[13px] leading-snug text-[var(--text)] font-medium truncate">
                   {decision.title}

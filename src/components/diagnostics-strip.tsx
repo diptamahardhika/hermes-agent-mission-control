@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Panel } from "@/components/ui/kit";
+import { CircleDot } from "lucide-react";
 
 interface DiagnosticsResult {
   [taskId: string]: string;
@@ -35,7 +36,7 @@ export function DiagnosticsStrip() {
     <Panel className="p-4">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[11px] font-semibold text-[var(--hq-text)]">Diagnostics</span>
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--hq-up)]" />
+        <CircleDot className="inline-block h-1.5 w-1.5" style={{ color: "var(--hq-up)" }} />
       </div>
       <div className="space-y-1">
         {entries.map(([id, error]) => (

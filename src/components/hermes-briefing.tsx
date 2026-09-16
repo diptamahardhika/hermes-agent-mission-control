@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sunrise, RefreshCw, ArrowUpRight } from "lucide-react";
+import { Sunrise, RefreshCw, ArrowUpRight, CircleDot } from "lucide-react";
 import { Panel, Eyebrow, Button } from "@/components/ui/kit";
 import { FEATURES, getDecisionLayerFromBriefing } from "@/lib/features";
 
@@ -323,7 +323,6 @@ export function HermesBriefing() {
                     }`}
                   >
                     All
-                    {filterKind === null && <span className="ml-0.5">×</span>}
                   </button>
                   {(["archive", "pin", "resolve", "confirm"] as const).map(kind => {
                     const count = (data!.sections ?? []).reduce(
@@ -374,7 +373,7 @@ export function HermesBriefing() {
               {data!.sections!.map((s, i) => (
                 <div key={i}>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: sectionTone(s.label) }} />
+                    <CircleDot className="w-1.5 h-1.5 shrink-0" style={{ color: sectionTone(s.label) }} />
                     <Eyebrow className="!text-[9.5px]">{s.label}</Eyebrow>
                   </div>
                   <div>

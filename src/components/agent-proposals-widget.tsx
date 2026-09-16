@@ -142,34 +142,37 @@ export function AgentProposalsWidget() {
         <div className="flex rounded-full p-0.5 gap-0.5" style={{ border: "1px solid var(--line)" }}>
           <button
             onClick={() => setSortBy("newest")}
-            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
               sortBy === "newest"
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
             title="Sort by newest first"
+            type="button"
           >
             <SortDesc className="w-3 h-3" />
           </button>
           <button
             onClick={() => setSortBy("oldest")}
-            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
               sortBy === "oldest"
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
             title="Sort by oldest first"
+            type="button"
           >
             <SortAsc className="w-3 h-3" />
           </button>
           <button
             onClick={() => setSortBy("agent")}
-            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
               sortBy === "agent"
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
             title="Sort by title (A-Z)"
+            type="button"
           >
             A-Z
           </button>
@@ -179,17 +182,18 @@ export function AgentProposalsWidget() {
         <div className="flex rounded-full p-0.5 gap-0.5 ml-auto" style={{ border: "1px solid var(--line)" }}>
           <button
             onClick={() => setFilter("all")}
-            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
               filter === "all"
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
+            title="Filter by all"
           >
             All
           </button>
           <button
             onClick={() => setFilter("pending")}
-            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
               filter === "pending"
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"

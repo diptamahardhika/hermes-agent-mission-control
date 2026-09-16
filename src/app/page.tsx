@@ -1079,7 +1079,7 @@ function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | nu
           {cache > 0 && (
             <>
               cached {fmt(cache)}
-          <Activity className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.cache }} />
+          <CircleDot className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.cache }} />
             </>
           )}
         </span>
