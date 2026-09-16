@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sh, KANBAN_DB } from "@/lib/kanban-db";
 import { homedir } from "os";
 import { AGENTS } from "@/lib/agent-registry";
+import { withCache, CACHE_TTL } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -198,7 +199,7 @@ async function hermesSessionLiveMap(): Promise<Record<string, Live>> {
 }
 
 
-export async function GET() {
+async function getAgentsData() {
   try {
     const [states, sessionLiveMap, kanbanLive, kanbanActivity, healthRow] = await Promise.all([
       prisma.agentState.findMany(),
@@ -260,14 +261,18 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json(agents, {
-      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
-    });
+    return NextResponse.json(agents);
   } catch (error) {
     console.error("Agents API error:", error);
     return NextResponse.json(DEFAULT_AGENTS, { status: 200 });
   }
 }
+
+const cachedAgentsGet = withCache(async (request: Request) => {
+  return getAgentsData();
+}, { ttl: CACHE_TTL.DYNAMIC });
+
+export { cachedAgentsGet as GET };
 
 // POST to update agent state (called by cron jobs)
 export async function POST(request: Request) {

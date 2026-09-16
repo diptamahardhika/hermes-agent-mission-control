@@ -483,7 +483,7 @@ function XAnalyticsPanel({ views, trend, totalTweets, bestDay, bestHour }: {
         <div>
           <div className="eyebrow mb-2 !text-[9.5px]">Views · 7d</div>
           <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">{fmt(views)}</div>
-          {trend.some(v => v > 0) && <Sparkline data={trend} color="#38bdf8" area idSeed="xviews" className="h-9 mt-3" />}
+          {trend.some(v => v > 0) && <Sparkline data={trend} color="#38bdf8" area idSeed="xviews" className="h-9 mt-3" aria-label="X views trend over 7 days" />}
         </div>
         <div className="grid grid-cols-2 gap-3 pt-1">
           <div>
@@ -523,7 +523,7 @@ function SpendPanel({ spend }: { spend: SpendData }) {
           <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
             {spend.totalTokens != null ? fmtExact(spend.totalTokens) : "—"}
           </div>
-          {series.some(v => v > 0) && <Sparkline data={series} color="#a78bfa" area idSeed="spend" className="h-9 mt-3" />}
+          {series.some(v => v > 0) && <Sparkline data={series} color="#a78bfa" area idSeed="spend" className="h-9 mt-3" aria-label="Agent tokens trend over 7 days" />}
         </div>
         {(() => {
           const cached = spend.byModel.reduce((s, m) => s + (m.cacheReadTokens ?? 0), 0);
@@ -588,7 +588,7 @@ function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
           <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
             {omni.totalTokens != null ? fmtExact(omni.totalTokens) : "—"}
           </div>
-          {series.some(v => v > 0) && <Sparkline data={series} color="#2dd4bf" area idSeed="omni-spend" className="h-9 mt-3" />}
+          {series.some(v => v > 0) && <Sparkline data={series} color="#2dd4bf" area idSeed="omni-spend" className="h-9 mt-3" aria-label="OmniRoute tokens trend over 7 days" />}
         </div>
         <div className="grid grid-cols-2 gap-3 pt-1">
           <div>
@@ -702,7 +702,7 @@ function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
           <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
             {fmt(data.totalTokens)}
           </div>
-          {series.some(v => v > 0) && <Sparkline data={series} color="#f59e0b" area idSeed="freellm-spend" className="h-9 mt-3" />}
+          {series.some(v => v > 0) && <Sparkline data={series} color="#f59e0b" area idSeed="freellm-spend" className="h-9 mt-3" aria-label="FreeLLM tokens trend over 7 days" />}
         </div>
         <div className="grid grid-cols-2 gap-3 pt-1">
           <div>
@@ -726,13 +726,14 @@ function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
                   area
                   idSeed="freellm-latency"
                   className="h-8 mt-2"
+                  aria-label="FreeLLM average latency trend over 7 days"
                 />
               )}
             </div>
           </div>
         )}
       </div>
-      <a href="http://localhost:3001" target="_blank" rel="noopener noreferrer" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
+      <a href={process.env.NEXT_PUBLIC_FREELLM_URL || "http://localhost:3001"} target="_blank" rel="noopener noreferrer" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
         Open FreeLLM dashboard <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
       </a>
     </div>
@@ -759,17 +760,19 @@ interface AINewsData { newModels: ModelCard[]; freeModels: ModelCard[]; totalFre
 function AIModelNewsPanel() {
   const [news, setNews] = useState<AINewsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/ai-news").then(r => r.ok ? r.json() : null).then(d => {
       if (d) setNews(d);
       setLoading(false);
     }).catch(() => {
       setLoading(false);
+      setError("Failed to load AI models & news");
     });
     const iv = setInterval(() => {
       fetch("/api/ai-news").then(r => r.ok ? r.json() : null).then(d => {
         if (d) setNews(d);
-      }).catch(() => {});
+      }).catch(() => setError("Failed to refresh AI models & news"));
     }, 3600_000);
     return () => clearInterval(iv);
   }, []);
@@ -845,17 +848,22 @@ function AIModelNewsPanel() {
   };
 
   return (
-    <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
-        <span className="eyebrow">AI Models &amp; News</span>
-      </div>
-      {!news ? (
-        <PanelSkeleton />
-      ) : news.newModels.length === 0 && news.freeModels.length === 0 && news.news.length === 0 ? (
-        <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">No catalog or news data available right now.</div>
-      ) : (
+      <div className="panel flex flex-col p-6">
+        {loading && <PanelSkeleton />}
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
+          <span className="eyebrow">AI Models & News</span>
+        </div>
+        {error && (
+          <div className="text-[12px] text-[var(--down)] py-4" role="alert">
+            {error}
+          </div>
+        )}
+        {!news ? (
+          <PanelSkeleton />
+        ) : news.newModels.length === 0 && news.freeModels.length === 0 && news.news.length === 0 ? (
+          <Empty>No catalog or news data available right now.</Empty>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-x-8 gap-y-4">
           {/* Left: model lists */}
           <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
@@ -863,7 +871,7 @@ function AIModelNewsPanel() {
               <div className="eyebrow mb-1 !text-[11px]">NEW RELEASES · 30 DAYS</div>
               {news.newModels.length
                 ? news.newModels.map(m => <Row key={m.id} m={m} />)
-                : <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">None in the last 30 days.</div>}
+                : <Empty>None in the last 30 days.</Empty>}
             </div>
             <div>
               <div className="eyebrow mb-1 !text-[11px]">
@@ -872,7 +880,7 @@ function AIModelNewsPanel() {
             <div className="flex-1 overflow-y-auto max-h-[340px] pr-1 scrollbar-none" style={{ scrollbarWidth: "none" }}>
               {news.freeModels.length
                 ? news.freeModels.map(m => <Row key={m.id} m={m} />)
-                : <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">No free models listed.</div>}
+                : <Empty>No free models listed.</Empty>}
             </div>
             </div>
           </div>
@@ -891,7 +899,7 @@ function AIModelNewsPanel() {
                     <span className="shrink-0 text-[9px] uppercase tracking-wide text-[var(--hq-text-ghost)]">{n.source}</span>
                   </a>
                 ))
-              : <div className="text-[11px] text-[var(--hq-text-ghost)] py-1">No headlines fetched.</div>}
+              : <Empty>No headlines fetched.</Empty>}
           </div>
         </div>
       )}
@@ -1661,7 +1669,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
             const up = vals[vals.length-1] >= vals[0];
             return (
               <div className="mt-4">
-                <Sparkline data={vals} positive={up} color={up ? "#f0b90b" : "var(--down)"} />
+                <Sparkline data={vals} positive={up} color={up ? "#f0b90b" : "var(--down)"} aria-label="Wallet value trend over time" />
                 <div className="flex justify-between mt-1 text-[8.5px] num text-[var(--hq-text-ghost)]">
                   <span>{days[0].d.slice(5)}</span>
                   <span>{days[days.length-1].d.slice(5)}</span>
@@ -1746,17 +1754,19 @@ interface SageFinding {
 function SageFindingsPanel() {
   const [findings, setFindings] = useState<SageFinding[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/sage-findings").then(r => r.ok ? r.json() : null).then(d => {
       if (d) setFindings(d.findings ?? []);
       setLoading(false);
     }).catch(() => {
       setLoading(false);
+      setError("Failed to load Sage findings");
     });
     const iv = setInterval(() => {
       fetch("/api/sage-findings").then(r => r.ok ? r.json() : null).then(d => {
         if (d) setFindings(d.findings ?? []);
-      }).catch(() => {});
+      }).catch(() => setError("Failed to refresh Sage findings"));
     }, 300_000);
     return () => clearInterval(iv);
   }, []);
@@ -1779,6 +1789,11 @@ function SageFindingsPanel() {
         <span className="eyebrow">Sage · Research Findings</span>
         <a href="/agents" className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] hover:text-[var(--hq-text-dim)] transition-colors">via Agents Floor</a>
       </div>
+      {error && (
+        <div className="text-[12px] text-[var(--down)] py-4" role="alert">
+          {error}
+        </div>
+      )}
       {!findings ? (
         <PanelSkeleton />
       ) : findings.length === 0 ? (
@@ -1842,6 +1857,7 @@ export default function Dashboard() {
   const [loaded, setLoaded] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [score, setScore] = useState<ScoreData | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
@@ -1863,10 +1879,14 @@ export default function Dashboard() {
           setData(prev => ({ ...prev, ...home, freeLLM }));
           setTimeout(() => setLoaded(true), 100);
           fetchFailureCount.current = 0;
+          setGlobalError(null);
         }
       })
       .catch(() => {
         fetchFailureCount.current += 1;
+        if (fetchFailureCount.current >= 2) {
+          setGlobalError("Failed to load dashboard data. Retrying...");
+        }
       })
       .finally(() => setTimeout(() => setRefreshing(false), 500));
   };

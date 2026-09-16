@@ -8,9 +8,11 @@ interface SparklineProps {
   className?: string;
   /** A stable id seed so multiple sparklines don't share a gradient def. */
   idSeed?: string;
+  /** Accessible label for screen readers. */
+  "aria-label"?: string;
 }
 
-export function Sparkline({ data, positive = true, color, area = false, className = "", idSeed = "" }: SparklineProps) {
+export function Sparkline({ data, positive = true, color, area = false, className = "", idSeed = "", "aria-label": ariaLabel }: SparklineProps) {
   if (!data || data.length === 0) return null;
 
   const min = Math.min(...data);
@@ -35,8 +37,8 @@ export function Sparkline({ data, positive = true, color, area = false, classNam
   const last = coords[coords.length - 1];
 
   return (
-    <div className={`relative w-full h-10 ${className}`}>
-      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible">
+    <div className={`relative w-full h-10 ${className}`} role="img" aria-label={ariaLabel}>
+      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible" aria-hidden="true">
         {area && (
           <defs>
             <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">

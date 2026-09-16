@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
   // Next.js 16 uses Turbopack by default
@@ -34,7 +35,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-
 // ─── Sure Finance Dashboard ───
 // Expose server-side env vars to Next.js runtime
 const sureEnv = {
@@ -42,7 +42,32 @@ const sureEnv = {
   SURE_URL: process.env.SURE_URL || "https://sure.diptamahardhika.cloud",
 };
 
-export default nextConfig;
+// Sentry configuration
+const sentryConfig = {
+  // For all available options, see:
+  // https://github.com/getsentry/sentry-webpack-plugin#options
+  silent: !process.env.SENTRY_DEBUG,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Only print logs for uploading source maps in CI
+  widenClientFileUpload: true,
+
+  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers
+  tunnelRoute: "/monitoring",
+
+  // Hides source maps from generated client bundles
+  hideSourceMaps: true,
+
+  // Automatically tree-shake Sentry logger statements to reduce bundle size
+  disableLogger: true,
+
+  // Enables automatic instrumentation of Vercel Cron Jobs
+  automaticVercelMonitors: true,
+};
+
+export default withSentryConfig(nextConfig, sentryConfig);
 
 // Sure Finance Dashboard env vars
 // These are exposed to server-side code via runtime config

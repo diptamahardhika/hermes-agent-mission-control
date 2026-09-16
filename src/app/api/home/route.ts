@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import ideasJson from "@/data/ideas.json" assert { type: "json" };
+import { withCache, CACHE_TTL } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -125,7 +126,7 @@ async function hlPost(body: object) {
   return res.json();
 }
 
-export async function GET() {
+async function getHomeData() {
   const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "";
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
 
@@ -999,3 +1000,9 @@ let hlBalance = 0;
     hermesKanban,
   }, { headers: { "Cache-Control": "no-store, no-cache" } });
 }
+
+const cachedGet = withCache(async (request: Request) => {
+  return getHomeData();
+}, { ttl: CACHE_TTL.DYNAMIC });
+
+export { cachedGet as GET };

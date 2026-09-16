@@ -16,6 +16,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
     "@prisma/client": "^6.19.2",
+    "@sentry/nextjs": "^10.74.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/formidable": "^3.4.6",
     "better-sqlite3": "^12.11.1",
