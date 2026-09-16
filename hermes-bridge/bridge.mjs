@@ -1347,7 +1347,7 @@ async function main() {
           pid: bridgePid,
           scheduledAt: new Date().toISOString(),
           delayMs: 1000,
-          requestId: "watchdog-" + Date.now()
+          requestId: randomUUID()
         }));
         process.exit(0);
       }
