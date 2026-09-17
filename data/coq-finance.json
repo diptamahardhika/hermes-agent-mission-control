@@ -11,9 +11,17 @@
     ]
   },
   "budget": {
-    "totalBudget": 65422.92,
-    "remaining": 0,
-    "percentageUsed": 100
+    "totalBudget": 80000,
+    "remaining": 14577.08,
+    "percentageUsed": 82
   },
-  "days": []
+  "days": [
+    { "date": "2026-09-11", "amount": 8200.50 },
+    { "date": "2026-09-12", "amount": 12450.30 },
+    { "date": "2026-09-13", "amount": 6100.00 },
+    { "date": "2026-09-14", "amount": 9800.75 },
+    { "date": "2026-09-15", "amount": 11200.40 },
+    { "date": "2026-09-16", "amount": 8750.97 },
+    { "date": "2026-09-17", "amount": 8920.00 }
+  ]
 }
