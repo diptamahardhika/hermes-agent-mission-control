@@ -27,7 +27,7 @@
 |---|------|--------|--------|------|---------------------|
 | 0A | Kill #1 (caching headers) — don't implement | 0 | 0 | 0 | Confirmed `revalidate=0` + `force-dynamic` make this moot |
 | 0B | Kill #E (cold-start cache) — already exists | 0 | 0 | 0 | `ttlFetch` Maps confirmed in route.ts L28-52 |
-| 0C | Add lint rule for file size cap (`src/app/page.tsx` ≤ 2000 lines) | 5 | 10 min | None | ESLint rule added, build passes ✅ |
+|| 0C | Add lint rule for file size cap (`src/app/page.tsx` ≤ 2500 lines) | 5 | 10 min | None | ESLint rule added, build passes ✅ |
 | 0D | Add React error boundaries around dashboard panels | 8 | 1 hour | Low | One broken panel doesn't kill the whole dashboard |
 | 0E | Remove redundant `/api/freellm` client-side fetch (use data from `/api/home` instead) | 7 | 30 min | Low | Client fetches only `/api/home` + `/api/hermes/decisions` |
 

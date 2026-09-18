@@ -36,11 +36,8 @@ const nextConfig: NextConfig = {
 };
 
 // ─── Sure Finance Dashboard ───
-// Expose server-side env vars to Next.js runtime
-const sureEnv = {
-  SURE_API_TOKEN: process.env.SURE_API_TOKEN || "",
-  SURE_URL: process.env.SURE_URL || "https://sure.diptamahardhika.cloud",
-};
+// SURE_API_TOKEN and SURE_URL are defined in .env.example but not used in config
+// Removed unused sureEnv block
 
 // Sentry configuration
 const sentryConfig = {
@@ -55,7 +52,8 @@ const sentryConfig = {
   widenClientFileUpload: true,
 
   // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers
-  tunnelRoute: "/monitoring",
+  // tunnelRoute removed — no corresponding route exists, causes 404 in production
+  // tunnelRoute: "/monitoring",
 
   // Hides source maps from generated client bundles
   hideSourceMaps: true,

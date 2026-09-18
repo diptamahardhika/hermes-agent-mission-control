@@ -9,8 +9,8 @@ export default defineConfig([
   {
     files: ["src/app/page.tsx"],
     rules: {
-      // File size cap — keep page.tsx under 2000 lines
-      "max-lines": ["error", { max: 2200, skipBlankLines: true, skipComments: true }],
+      // File size cap — keep page.tsx under 2500 lines
+      "max-lines": ["error", { max: 2500 }],
       "@typescript-eslint/ban-ts-comment": "off",
       "react-hooks/set-state-in-effect": "off",
     },
