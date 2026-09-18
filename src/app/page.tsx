@@ -2100,7 +2100,7 @@ export default function Dashboard() {
         </div>
 
         {/* ── Crypto ──────────────────────────────────────── */}
-        <ErrorBoundary>
+        <ErrorBoundary name="Crypto">
         <div className="mt-14">
           <SectionLabel>Crypto</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -2113,7 +2113,7 @@ export default function Dashboard() {
 
         {/* ── Coq Finance Advisor ─────────────────────── */}
         {data.coq && (
-          <ErrorBoundary>
+          <ErrorBoundary name="CoqFinance">
           <div className="mt-14">
             <SectionLabel>Finance</SectionLabel>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -2185,7 +2185,7 @@ export default function Dashboard() {
         )}
 
         {/* ── AI model news ───────────────────────────────── */}
-        <ErrorBoundary>
+        <ErrorBoundary name="AIModels">
         <div className="mt-14">
           <SectionLabel>AI Models</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -2195,14 +2195,14 @@ export default function Dashboard() {
         </ErrorBoundary>
 
         {/* ── Diagnostics ──────────────────────────────────── */}
-        <ErrorBoundary>
+        <ErrorBoundary name="Diagnostics">
         <div className="mt-14">
           <DiagnosticsStrip />
         </div>
         </ErrorBoundary>
 
         {/* ── Signal ──────────────────────────────────────── */}
-        <ErrorBoundary>
+        <ErrorBoundary name="Signal">
         <div className="mt-14">
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -2213,7 +2213,7 @@ export default function Dashboard() {
         </ErrorBoundary>
 
         {/* ── Agents strip ────────────────────────────────── */}
-        <ErrorBoundary>
+        <ErrorBoundary name="Agents">
         <div className="mt-14">
           <AgentsStrip processes={data.processes} />
         </div>
