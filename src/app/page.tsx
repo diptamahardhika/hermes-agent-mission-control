@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Star, GitBranch, Server, Box, Cpu, MemoryStick, HardDrive, Sparkles, Waypoints, RefreshCw, Activity, CircleDot, Zap } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
-import { FunnelChart } from "@/components/funnel-chart";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
 import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget";
@@ -2117,7 +2116,7 @@ export default function Dashboard() {
           <ErrorBoundary>
           <div className="mt-14">
             <SectionLabel>Finance</SectionLabel>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <MetricCard
                 label="Coq · Spending · 7d"
                 value={data.coq.spending.total}
@@ -2127,7 +2126,27 @@ export default function Dashboard() {
                 goal={undefined} goalFormat={undefined}
                 icon={<Activity className="w-4 h-4" />} accent="#f59e0b" href="/coq" loaded={loaded}
               >
-                <FunnelChart categories={data.coq.spending.byCategory} />
+                <div className="space-y-2 mt-2">
+                  {data.coq.spending.byCategory.map((cat) => {
+                  const pct = cat.budget > 0 ? Math.round((cat.spent / cat.budget) * 100) : 0;
+                  return (
+                    <div key={cat.name} className="space-y-1">
+                      <div className="flex items-center justify-between text-[12px]">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cat.color }} />
+                          <span className="text-[var(--hq-text-dim)]">{cat.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 bg-[var(--surface-1)] rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: cat.color }} />
+                          </div>
+                          <span className="num text-[var(--hq-text)]">{fmtThb(cat.spent)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                </div>
               </MetricCard>
               <div className="panel flex flex-col p-6">
                 <div className="flex items-center gap-2 mb-4">
