@@ -781,6 +781,11 @@ let hlBalance = 0;
         disk_used_percent: sys.disk_used_percent ?? 0,
       } : null,
     };
+  } else if (d?.syncedAt) {
+    // Monitor was checked but overview unavailable (service down).
+    // Keep checkedAt fresh so badge shows OFFLINE accurately instead of
+    // frozen loading state.
+    homelab.checkedAt = d.syncedAt;
   }
 
   // ─── Agent compute spend (mirrored by the bridge from `hermes insights`) ─────
