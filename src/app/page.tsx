@@ -151,21 +151,24 @@ const EMPTY: HomeData = {
 };
 
 // ── Homelab status badge (pure helper + component) ─────────
+// States: !checkedAt = loading/pending (no data yet), connected = LIVE,
+// connected=false with checkedAt = OFFLINE, stale >10min = STALE.
 function getHomelabBadgeStyle(checkedAt: string | undefined, connected: boolean) {
-  if (!connected || !checkedAt) return { color: "var(--hq-down)", borderColor: "rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.07)" };
+  if (!checkedAt) return { color: "var(--hq-text-ghost)", borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)" };
+  if (!connected) return { color: "var(--hq-down)", borderColor: "rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.07)" };
   const age = Date.now() - new Date(checkedAt).getTime();
   if (age > 10 * 60 * 1000) return { color: "var(--hq-warn)", borderColor: "rgba(251,191,36,0.22)", background: "rgba(251,191,36,0.07)" };
   return { color: "var(--hq-up)", borderColor: "rgba(52,211,153,0.22)", background: "rgba(52,211,153,0.07)" };
 }
 function getHomelabDotColor(checkedAt: string | undefined, connected: boolean) {
+  if (!checkedAt) return "var(--hq-text-ghost)";
   if (!connected) return "var(--hq-down)";
-  if (!checkedAt) return "var(--hq-down)";
   const age = Date.now() - new Date(checkedAt).getTime();
   return age > 10 * 60 * 1000 ? "var(--hq-warn)" : "var(--hq-up)";
 }
 function getHomelabLabel(checkedAt: string | undefined, connected: boolean) {
+  if (!checkedAt) return "…";
   if (!connected) return "OFFLINE";
-  if (!checkedAt) return "STALE";
   const age = Date.now() - new Date(checkedAt).getTime();
   return age > 10 * 60 * 1000 ? "STALE" : "LIVE";
 }

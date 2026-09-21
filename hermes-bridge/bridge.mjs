@@ -17,11 +17,11 @@
  *               BRIDGE_MIRROR_MS (30000), HERMES_BIN (default "hermes").
  */
 import pg from "pg";
+import fs from "node:fs";
+import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -44,7 +44,7 @@ const MIRROR_MS = Number(process.env.BRIDGE_MIRROR_MS || 30000);
 // Hermes falls back to a free model). The original 240s default killed every
 // long brief with a bare "Command failed" — raise it and override via env.
 const RUN_TIMEOUT_MS = Number(process.env.BRIDGE_RUN_TIMEOUT_MS || 600000);
-const HOMELAB_URL = process.env.HOMELAB_MONITOR_URL || "";
+const HOMELAB_URL = "http://umbrel-7070.flamingo-justitia.ts.net:9876";
 const HOMELAB_TOKEN = process.env.HOMELAB_MONITOR_TOKEN || "";
 const WIKI_DIR = process.env.HERMES_WIKI || path.join(os.homedir(), ".hermes", "wiki");
 const BRIEFS_DIR = process.env.HERMES_BRIEFS_DIR || path.join(os.homedir(), ".hermes", "briefs");
