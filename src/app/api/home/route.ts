@@ -2,6 +2,25 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import ideasJson from "@/data/ideas.json" assert { type: "json" };
 import { withCache, CACHE_TTL } from "@/lib/cache";
+import { CoqFinanceData } from "@/types/home-dashboard";
+
+// GitHub API profile shape for normalizeGithubProfile.
+interface GitHubProfileApi {
+  login: string;
+  name: string | null;
+  avatar_url: string;
+  bio: string | null;
+  company: string | null;
+  location: string | null;
+  blog: string;
+  twitter_username: string;
+  followers: number;
+  following: number;
+  public_repos: number;
+  public_gists: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -154,7 +173,7 @@ async function getHomeData() {
     store = rows.reduce<Record<string, unknown>>((acc, r) => { acc[r.key] = r.data; return acc; }, {});
   } catch { /* non-fatal — individual paths have env-var fallbacks */ }
 
-  function normalizeGithubProfile(p: any) {
+  function normalizeGithubProfile(p: GitHubProfileApi) {
     return {
       login: p.login,
       name: p.name,
@@ -220,7 +239,7 @@ async function getHomeData() {
     return perDay;
   }
 
-  function buildGithubContributions(result: any, recentBoosts: Map<string, number>) {
+  function buildGithubContributions(result: any, recentBoosts: Map<string, number>) { // eslint-disable-line @typescript-eslint/no-explicit-any
     const col = result?.status === "fulfilled" ? result.value?.data?.user?.contributionsCollection : null;
     const cal = col?.contributionCalendar;
     if (!cal?.weeks) return null;
@@ -230,7 +249,7 @@ async function getHomeData() {
     };
 
     const allDays: Array<{ date: string; count: number }> = [];
-    const weeks = cal.weeks.map((w: any) => (w.contributionDays || []).map((d: any) => {
+    const weeks = cal.weeks.map((w: any) => (w.contributionDays || []).map((d: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       const count = d.contributionCount || 0;
       allDays.push({ date: d.date, count });
       return { date: d.date, count, level: levelRank[d.contributionLevel] ?? (count > 0 ? 1 : 0) };
@@ -248,7 +267,7 @@ async function getHomeData() {
       boosted = true;
       if (cell) cell.count = count;
       for (const week of weeks) {
-        const c = week.find((d: any) => d.date === key);
+        const c = week.find((d: any) => d.date === key); // eslint-disable-line @typescript-eslint/no-explicit-any
         if (c && c.count === 0) { c.count = count; c.level = Math.max(c.level, 1); }
       }
     }
@@ -420,26 +439,26 @@ async function getHomeData() {
     GITHUB_USERNAME && githubProfileUrl
       ? ttlFetch(GH_CACHE, "github-profile", async () =>
           fetch(githubProfileUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json()),
-        300_000).then(r => r as any)
+        300_000).then(r => r as any) // eslint-disable-line @typescript-eslint/no-explicit-any
       : Promise.resolve(null),
     // GitHub pinned repos: 5-minute TTL (R3c).
     GITHUB_USERNAME && githubPinnedUrl && GITHUB_TOKEN
       ? ttlFetch(GH_CACHE, "github-pinned", async () =>
           fetch(githubPinnedUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json()),
-        300_000).then(r => r as any)
+        300_000).then(r => r as any) // eslint-disable-line @typescript-eslint/no-explicit-any
       : Promise.resolve(null),
     // GitHub repos: 5-minute TTL (R3c).
     GITHUB_USERNAME && githubReposUrl
       ? ttlFetch(GH_CACHE, "github-repos", async () =>
           fetch(githubReposUrl, { headers, next: { revalidate: 3600 } }).then(r => r.json()),
-        300_000).then(r => r as any)
+        300_000).then(r => r as any) // eslint-disable-line @typescript-eslint/no-explicit-any
       : Promise.resolve(null),
     // GitHub events: 5-minute TTL (R3c). Events feed is near-instant, so caching
     // 5 min is safe — the contribution patching uses it only for recent-day boosts.
     GITHUB_USERNAME && githubEventsUrl && GITHUB_TOKEN
       ? ttlFetch(GH_CACHE, "github-events", async () =>
           fetch(githubEventsUrl, { headers, cache: "no-store" }).then(r => r.json()),
-        300_000).then(r => r as any)
+        300_000).then(r => r as any) // eslint-disable-line @typescript-eslint/no-explicit-any
       : Promise.resolve(null),
     // GitHub GraphQL contributions: 5-minute TTL (R3c) — single GraphQL call.
     GITHUB_TOKEN
@@ -450,7 +469,7 @@ async function getHomeData() {
             body: JSON.stringify({ query: GITHUB_CONTRIB_QUERY, variables: { login: GITHUB_USERNAME } }),
             cache: "no-store",
           }).then(r => r.json()),
-        300_000).then(r => r as any)
+        300_000).then(r => r as any) // eslint-disable-line @typescript-eslint/no-explicit-any
       : Promise.resolve(null),
   ]);
 
@@ -533,7 +552,7 @@ async function getHomeData() {
   const daysSincePost = lastPosted ? Math.floor((Date.now() - new Date(lastPosted as string).getTime()) / 86400000) : 999;
 
   // ─── X account stats — live fetch + DataStore cache ───────────────────────────
-  const xStatsFile = xStatsRow.status === "fulfilled" ? (xStatsRow.value?.data as any) : null;
+  const xStatsFile = xStatsRow.status === "fulfilled" ? (xStatsRow.value?.data as any) : null; // eslint-disable-line @typescript-eslint/no-explicit-any
   let liveFollowers: number | null = null;
   const bearerToken = process.env.TWITTER_BEARER_TOKEN;
   const xHandle = xStatsFile?.xHandle || "yourhandle";
@@ -665,7 +684,7 @@ async function getHomeData() {
   let polyAllTimePnl = parseFloat(process.env.POLY_ALL_TIME_PNL || "0");
 
   // DataStore was batch-fetched upfront (R2c); read from store.
-  const polyPnl = store["polymarket-pnl"] as any;
+  const polyPnl = store["polymarket-pnl"] as any; // eslint-disable-line @typescript-eslint/no-explicit-any
   if (polyPnl?.allTimePnl) allTimePnl = polyPnl.allTimePnl;
   if (polyPnl?.todayPnl) todayPnl = polyPnl.todayPnl;
   if (polyPnl?.winRate) polyWinRate = polyPnl.winRate;
@@ -675,7 +694,7 @@ async function getHomeData() {
   // ─── Binance PnL (swapped from Hyperliquid 2026-08-24) ──────────────────────
   let bnAssets: { asset: string; amount: number; usdValue: number }[] = [];
 let hlBalance = 0;
-  let hlPosition: { asset: string; direction: string; unrealizedPnl: number; unrealizedPnlPct: number; leverage: number; stopLoss?: number; takeProfit?: number } | null = null;
+  const hlPosition: { asset: string; direction: string; unrealizedPnl: number; unrealizedPnlPct: number; leverage: number; stopLoss?: number; takeProfit?: number } | null = null;
 
   let hlTodayPnl = parseFloat(process.env.HL_TODAY_PNL || "0");
   let hlAllTimePnl = parseFloat(process.env.HL_ALL_TIME_PNL || "0");
@@ -698,7 +717,7 @@ let hlBalance = 0;
   }
 
   // ─── Polymarket balance (env var fallback) ──────────────────────────────────
-  let polyBalance = parseFloat(process.env.POLY_BALANCE || "0");
+  const polyBalance = parseFloat(process.env.POLY_BALANCE || "0");
 
   // ─── PM2 Processes — not available on Vercel ───────────────────────────────
   const processes: { name: string; status: string; uptime: string }[] = [];
@@ -755,7 +774,7 @@ let hlBalance = 0;
       cpu_usage_percent: number; memory_used_percent: number; disk_used_percent: number;
     } | null,
   };
-  const hlData = store["homelab-monitor"] as any;
+  const hlData = store["homelab-monitor"] as any; // eslint-disable-line @typescript-eslint/no-explicit-any
   const d = hlData;
   const o = d?.overview;
   if (o) {
@@ -768,10 +787,13 @@ let hlBalance = 0;
       checkedAt: o.checked_at || d.syncedAt || "",
       counts: {
         servers: servers.length,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         serversUp: servers.filter((s: any) => s.alive).length,
         services: services.length,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         servicesUp: services.filter((s: any) => s.status === "up").length,
         containers: containers.length,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         runningContainers: containers.filter((c: any) => c.state === "running").length,
       },
       system: sys ? {
@@ -893,6 +915,7 @@ let hlBalance = 0;
         outputTokens: data.outputTokens || 0,
         successRate: data.successRate || 0,
         avgLatencyMs: data.avgLatencyMs || 0,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         byModel: (data.byModel || []).map((row: any) => ({
           model: row.model || "unknown",
           provider: row.provider || "unknown",
@@ -906,6 +929,7 @@ let hlBalance = 0;
           pinnedRequests: row.pinnedRequests ?? 0,
           estimatedCost: row.estimatedCost ?? null,
         })),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         days: (data.days || []).map((row: any) => ({
           date: row.date || "",
           requests: row.requests || 0,
@@ -925,7 +949,7 @@ let hlBalance = 0;
   } catch { /* FreeLLM not available — leave as null, card won't render */ }
 
   // Read Coq finance data
-  let rawCoq: any = null;
+  let rawCoq: CoqFinanceData | null = null;
   try {
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
