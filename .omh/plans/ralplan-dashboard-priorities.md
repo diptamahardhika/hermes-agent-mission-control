@@ -35,9 +35,9 @@
 
 | # | Task | Impact | Effort | Risk | Acceptance Criteria |
 |---|------|--------|--------|------|---------------------|
-| 1A | Add stale-data warning when `/api/home` fetch fails 2+ consecutive times | 6 | 2 hours | Low | Sticky banner appears on consecutive failures, disappears on success |
-| 1B | Fix `timeAgo()` staleness if still broken (verify current behavior) | 4 | 30 min | Low | Timestamps update correctly in 30s poll cycle |
-| 1C | Add diagnostics panel to dashboard (surface `/api/hermes/tasks/diagnostics`) | 6 | 3 hours | Low | Failing tasks visible on main dashboard without navigating to `/hermes` |
+|| 1A | Add stale-data warning when `/api/home` fetch fails 2+ consecutive times ✅ DONE | 6 | 2 hours | Low | Sticky banner appears on consecutive failures, disappears on success |
+|| 1B | Fix `timeAgo()` staleness if still broken (verify current behavior) | 4 | 30 min | Low | Timestamps update correctly in 30s poll cycle |
+|| 1C | Add diagnostics panel to dashboard (surface `/api/hermes/tasks/diagnostics`) | 6 | 3 hours | Low | Failing tasks visible on main dashboard without navigating to `/hermes` |
 
 ### Tier 2 — Structural (requires care, > 2 hours)
 
@@ -59,18 +59,18 @@
 ## Dependency Map (Revised)
 
 ```
-0A (kill caching) ──┐
-0B (kill cold-cache)├─→ All independent, do first
-0C (lint rule) ─────┤
-0D (error boundaries)├──→ No dependencies
-0E (consolidate fetches)┤
-1A (stale warning) ──┤
-1B (timeAgo fix) ────┤
-1C (diagnostics) ────┤
-2A (lint + extract) ─┤
-2B (shared components)├──→ Triggered when adding new panels
-2C (per-panel skeletons)┤
-3A-3D (nice-to-have) ─┘
+| 0A (kill caching) ──┐
+| 0B (kill cold-cache)├─→ All independent, do first
+| 0C (lint rule) ─────┤
+| 0D (error boundaries)├──→ No dependencies
+| 0E (consolidate fetches)┤
+| 1A (stale warning) ✅─┤
+| 1B (timeAgo fix) ────┤
+| 1C (diagnostics) ────┤
+| 2A (lint + extract) ─┤
+| 2B (shared components)├──→ Triggered when adding new panels
+| 2C (per-panel skeletons) ✅─┤
+| 3A-3D (nice-to-have) ──┘
 ```
 
 ## Key Design Decisions
@@ -94,8 +94,8 @@
 
 ## Consensus: YES ✅
 
-All Tier 0 items implemented and verified (commit pending). ESLint config fixed, all purity errors resolved.
+Tier 0 ✅ + Per-panel skeletons (2C/P1) ✅ + 1A (stale-data warning) ✅ — all implemented and committed.
 
-**Tier 2 ralplan complete.** Consensus: APPROVE_WITH_RESERVATIONS. P1 (per-panel loading skeletons) is the highest-value next step — delivers UX win + eliminates brittle monolithic skeleton. Effort revised to 3-4 hours.
+**Next: 1C — Wire DiagnosticsStrip into Dashboard grid.** Component exists at `src/components/diagnostics-strip.tsx`, needs `<DiagnosticsStrip />` added to the Dashboard layout. 3 hours. Least-breaking change — existing component, just needs wiring.
 
-**Next action: Implement P1 — per-panel loading skeletons.**
+**Then: 1B (timeAgo fix, 30 min) and 2A (lint cap at 2000 lines — page.tsx is already 2239).**
