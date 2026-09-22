@@ -94,7 +94,9 @@
 
 ## Consensus: YES ✅
 
-All Tier 0 items implemented and verified (commit pending). ESLint config fixed, all purity errors resolved.
+**Tier 2A (lint cap) done ✅** — Changed `max-lines` from 2500 → 2000 in `eslint.config.mjs`. Extracted `AIModelNewsPanel`, `GitHubHomeCard`, `HomelabHomeCard` into `src/app/dashboard/`. `page.tsx` now 1783 lines. `tsc` and `eslint` both clean.
+
+**All Tier 0 items implemented and verified (commit pending). ESLint config fixed, all purity errors resolved.**
 
 **Tier 2 ralplan complete.** Consensus: APPROVE_WITH_RESERVATIONS. P1 (per-panel loading skeletons) is the highest-value next step — delivers UX win + eliminates brittle monolithic skeleton. Effort revised to 3-4 hours.
 
