@@ -1859,7 +1859,6 @@ export default function Dashboard() {
   const [loaded, setLoaded] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [score, setScore] = useState<ScoreData | null>(null);
-  const [globalError, setGlobalError] = useState<string | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
@@ -1881,14 +1880,10 @@ export default function Dashboard() {
           setData(prev => ({ ...prev, ...home, freeLLM }));
           setTimeout(() => setLoaded(true), 100);
           fetchFailureCount.current = 0;
-          setGlobalError(null);
         }
       })
       .catch(() => {
         fetchFailureCount.current += 1;
-        if (fetchFailureCount.current >= 2) {
-          setGlobalError("Failed to load dashboard data. Retrying...");
-        }
       })
       .finally(() => setTimeout(() => setRefreshing(false), 500));
   };
