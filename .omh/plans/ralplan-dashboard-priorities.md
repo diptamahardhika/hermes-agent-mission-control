@@ -35,9 +35,9 @@
 
 | # | Task | Impact | Effort | Risk | Acceptance Criteria |
 |---|------|--------|--------|------|---------------------|
-| 1A | Add stale-data warning when `/api/home` fetch fails 2+ consecutive times | 6 | 2 hours | Low | Sticky banner appears on consecutive failures, disappears on success |
-| 1B | Fix `timeAgo()` staleness if still broken (verify current behavior) | 4 | 30 min | Low | Timestamps update correctly in 30s poll cycle |
-| 1C | Add diagnostics panel to dashboard (surface `/api/hermes/tasks/diagnostics`) | 6 | 3 hours | Low | Failing tasks visible on main dashboard without navigating to `/hermes` |
+|| 1A | Add stale-data warning when `/api/home` fetch fails 2+ consecutive times ✅ DONE | 6 | 2 hours | Low | Sticky banner appears on consecutive failures, disappears on success |
+|| 1B | Fix `timeAgo()` staleness ✅ VERIFIED — calls `Date.now()` at render time, updates on each 30s poll re-render | 4 | 30 min | Low | Timestamps accurate within 30s poll cycle ✅ |
+|| 1C | Add diagnostics panel to dashboard ✅ DONE — `DiagnosticsStrip` wired in page.tsx L2198 inside `<ErrorBoundary>` | 6 | 3 hours | Low | Failing tasks visible on main dashboard without navigating to `/hermes` ✅ |
 
 ### Tier 2 — Structural (requires care, > 2 hours)
 
@@ -64,12 +64,12 @@
 0C (lint rule) ─────┤
 0D (error boundaries)├──→ No dependencies
 0E (consolidate fetches)┤
-1A (stale warning) ──┤
-1B (timeAgo fix) ────┤
-1C (diagnostics) ────┤
+| 1A (stale warning) ✅─┤
+| 1B (timeAgo fix) ✅───┤
+| 1C (diagnostics) ✅───┤
 2A (lint + extract) ─┤
 2B (shared components)├──→ Triggered when adding new panels
-2C (per-panel skeletons)┤
+2C (per-panel skeletons) ✅─┤
 3A-3D (nice-to-have) ─┘
 ```
 
@@ -87,15 +87,15 @@
 
 ## Risks and Open Questions
 
-1. **Is the lint rule enough?** If `page.tsx` keeps growing past 2000 lines, the team needs to actually extract panels. The lint rule is a guardrail, not a solution.
+1. **Is the lint rule enough?** If `page.tsx` keeps growing past 2000 lines, the team needs to actually extract panels. The lint rule is a guardrail, not a solution. page.tsx is currently 2239 lines — over the proposed 2000-line cap.
 2. **What about WebSocket/SSE for real-time updates?** The critic raised this — the current 30s polling might not be optimal. This is a separate architectural discussion.
 3. **Are error boundaries the right abstraction?** An alternative is per-panel try/catch with graceful degradation. Error boundaries catch render errors but not async failures.
-4. **Should the diagnostics panel be a separate section or inline?** The architect noted it's "45% built" but the component itself doesn't exist yet on the dashboard.
+4. **Should the diagnostics panel be a separate section or inline?** The architect noted it's "45% built" — verified as fully wired at page.tsx L2198. The component exists and works.
 
 ## Consensus: YES ✅
 
-All Tier 0 items implemented and verified (commit pending). ESLint config fixed, all purity errors resolved.
+Tier 0 ✅ | 1A ✅ | 1B ✅ (verified) | 1C ✅ (wired) | Per-panel skeletons ✅
 
-**Tier 2 ralplan complete.** Consensus: APPROVE_WITH_RESERVATIONS. P1 (per-panel loading skeletons) is the highest-value next step — delivers UX win + eliminates brittle monolithic skeleton. Effort revised to 3-4 hours.
+All quick wins done. **Next: 2A — Lint cap at 2000 lines.** page.tsx at 2239 lines is already over the proposed cap. Requires changing `eslint.config.mjs` `max-lines` from 2500→2000 AND trimming page.tsx below 2000 lines.
 
-**Next action: Implement P1 — per-panel loading skeletons.**
+**Then: 2B (shared components).**
