@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import ideasJson from "@/data/ideas.json" assert { type: "json" };
 import { withCache, CACHE_TTL } from "@/lib/cache";
-import { CoqFinanceData } from "@/types/home-dashboard";
+import { CoqFinanceData, FreeLLMData } from "@/types/home-dashboard";
 
 // GitHub API profile shape for normalizeGithubProfile.
 interface GitHubProfileApi {
@@ -872,36 +872,7 @@ let hlBalance = 0;
     days: Array.isArray(omniRaw.days) ? omniRaw.days : [],
   } : null;
 
-  let freeLLM: {
-    configured: boolean;
-    syncedAt: string | null;
-    totalTokens: number;
-    inputTokens: number;
-    outputTokens: number;
-    successRate: number;
-    avgLatencyMs: number;
-    byModel: Array<{
-      model: string;
-      provider: string;
-      requests: number;
-      inputTokens: number;
-      outputTokens: number;
-      cacheReadTokens: number;
-      tokens: number;
-      successRate: number | null;
-      avgLatencyMs: number | null;
-      pinnedRequests: number;
-      estimatedCost: number | null;
-    }>;
-    days: Array<{ date: string; requests: number; tokens: number; successCount: number; failureCount: number }>;
-    totalRequests: number;
-    lifetimeTotalRequests: number | null;
-    estimatedCostSavings: number | null;
-    pinnedRequests: number | null;
-    pinHonoredRequests: number | null;
-    requestTypeCounts: Record<string, number> | null;
-    firstRequestAt: string | null;
-  } | null = null;
+  let freeLLM: FreeLLMData | null = null;
 
   try {
     const freellmRes = await fetch("http://localhost:3000/api/freellm", { cache: "no-store" });
@@ -909,6 +880,7 @@ let hlBalance = 0;
       const data = await freellmRes.json();
       freeLLM = {
         configured: true,
+        baseUrl: process.env.FREELLM_API_BASE_URL || null,
         syncedAt: new Date().toISOString(),
         totalTokens: data.totalTokens || 0,
         inputTokens: data.inputTokens || 0,

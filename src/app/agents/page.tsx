@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { SortAsc, SortDesc } from "lucide-react";
+import { SortAsc, SortDesc, Activity } from "lucide-react";
 import OfficeView from "@/components/OfficeView";
 import { ProposalCard } from "./proposal-card";
 
@@ -97,7 +97,7 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
             <div className="flex items-center gap-2">
               <span className="relative flex w-2 h-2 shrink-0">
                 {status.pulse && <span className="absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping" style={{ background: status.dot }} />}
-                <span className="relative inline-flex w-2 h-2 rounded-full" style={{ background: status.dot }} />
+                <Activity className="relative inline-flex w-2 h-2" style={{ color: status.dot }} aria-hidden="true" />
               </span>
               <h3 className="text-[14px] font-semibold text-[var(--text)]">{agent.name}</h3>
               <span className="text-[10px] font-medium" style={{ color: status.color }}>{status.label}</span>
@@ -487,7 +487,7 @@ export default function AgentsPage() {
           <div className="flex rounded-full p-1 gap-1" style={{ border: "1px solid var(--line)" }}>
             <button
               onClick={() => setView("office")}
-              className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-colors ${
+              className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                 view === "office"
                   ? "bg-white/[0.08] text-[var(--text)]"
                   : "text-[var(--text-3)] hover:text-[var(--text-2)]"
@@ -497,7 +497,7 @@ export default function AgentsPage() {
             </button>
             <button
               onClick={() => setView("cards")}
-              className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-colors ${
+              className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                 view === "cards"
                   ? "bg-white/[0.08] text-[var(--text)]"
                   : "text-[var(--text-3)] hover:text-[var(--text-2)]"
@@ -547,7 +547,7 @@ export default function AgentsPage() {
                 <div className="flex rounded-full p-0.5 gap-0.5" style={{ border: "1px solid var(--line)" }}>
                   <button
                     onClick={() => setSortBy("newest")}
-                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       sortBy === "newest" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                     }`}
                     title="Sort by newest first"
@@ -556,7 +556,7 @@ export default function AgentsPage() {
                   </button>
                   <button
                     onClick={() => setSortBy("oldest")}
-                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       sortBy === "oldest" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                     }`}
                     title="Sort by oldest first"
@@ -565,7 +565,7 @@ export default function AgentsPage() {
                   </button>
                   <button
                     onClick={() => setSortBy("agent")}
-                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       sortBy === "agent" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                     }`}
                     title="Sort by title (A-Z)"
@@ -576,7 +576,7 @@ export default function AgentsPage() {
                 <div className="flex rounded-full p-0.5 gap-0.5 ml-auto" style={{ border: "1px solid var(--line)" }}>
                   <button
                     onClick={() => setFilter("all")}
-                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       filter === "all" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                     }`}
                   >
@@ -584,7 +584,7 @@ export default function AgentsPage() {
                   </button>
                   <button
                     onClick={() => setFilter("pending")}
-                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                    className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       filter === "pending" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                     }`}
                   >

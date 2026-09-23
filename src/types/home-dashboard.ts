@@ -82,6 +82,7 @@ export interface OmniSpendData {
  */
 export interface FreeLLMData {
   configured: boolean;
+  baseUrl?: string | null;
   syncedAt: string | null;
   totalRequests: number;
   totalTokens: number;
@@ -92,6 +93,11 @@ export interface FreeLLMData {
   firstRequestAt: string | null;
   byModel: FreeLLMByModel[];
   days: { date: string; requests: number; tokens: number; avgLatencyMs: number | null }[];
+  lifetimeTotalRequests: number | null;
+  estimatedCostSavings: number | null;
+  pinnedRequests: number | null;
+  pinHonoredRequests: number | null;
+  requestTypeCounts: Record<string, number> | null;
 }
 
 /**

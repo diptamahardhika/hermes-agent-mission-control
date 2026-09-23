@@ -185,7 +185,7 @@ function HomelabStatusBadge({ data }: { data: HomelabHomeData | undefined }) {
     <div className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium" style={getHomelabBadgeStyle(checkedAt, connected ?? false)}>
       <span className="relative flex w-1.5 h-1.5">
         {showPing && <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--hq-up) 60%, transparent)" }} />}
-        <Activity className="relative inline-flex w-1.5 h-1.5" style={{ color: getHomelabDotColor(checkedAt, connected ?? false) }} />
+        <Activity className="relative inline-flex w-1.5 h-1.5" style={{ color: getHomelabDotColor(checkedAt, connected ?? false) }} aria-hidden="true" />
       </span>
       <span className="eyebrow !text-[9.5px] font-semibold">{getHomelabLabel(checkedAt, connected ?? false)}</span>
       {checkedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] font-normal">{timeAgo(checkedAt)}</span>}
@@ -738,7 +738,7 @@ function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
           </div>
         )}
       </div>
-      <a href={process.env.NEXT_PUBLIC_FREELLM_URL || "http://localhost:3001"} target="_blank" rel="noopener noreferrer" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
+      <a href={data.baseUrl || process.env.NEXT_PUBLIC_FREELLM_URL || "/freellm"} target="_blank" rel="noopener noreferrer" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
         Open FreeLLM dashboard <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
       </a>
     </div>

@@ -202,7 +202,7 @@ export function DecisionDashboardWidget({
                     <button
                       type="button"
                       onClick={() => onAction("view", decision.id)}
-                      className="ml-auto text-[11px] text-[var(--text-3)] hover:text-[var(--text)] transition-colors duration-150 ease-out decision-btn"
+                      className="ml-auto text-[11px] text-[var(--text-3)] hover:text-[var(--text)] transition-colors duration-150 ease-out decision-btn focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
                       View all
                     </button>
