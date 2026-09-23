@@ -199,7 +199,7 @@ async function hermesSessionLiveMap(): Promise<Record<string, Live>> {
 }
 
 
-async function getAgentsData() {
+export async function getAgentsData() {
   try {
     const [states, sessionLiveMap, kanbanLive, kanbanActivity, healthRow] = await Promise.all([
       prisma.agentState.findMany(),

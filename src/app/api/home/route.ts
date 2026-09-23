@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import ideasJson from "@/data/ideas.json" assert { type: "json" };
 import { withCache, CACHE_TTL } from "@/lib/cache";
 import { CoqFinanceData, FreeLLMData } from "@/types/home-dashboard";
+import { getAgentsData } from "@/app/api/agents/route";
 
 // GitHub API profile shape for normalizeGithubProfile.
 interface GitHubProfileApi {
@@ -162,7 +163,7 @@ async function getHomeData() {
   const DS_KEYS = [
     "x-account-stats", "pixel-ideas", "polymarket-pnl", "metric-snapshots",
     "homelab-monitor", "hermes-cost", "hermes-cost-history",
-    "omniroute-cost",
+    "omniroute-cost", "hermes-briefing",
   ];
   let store: Record<string, unknown> = {};
   try {
@@ -716,11 +717,21 @@ let hlBalance = 0;
     }
   }
 
-  // ─── Polymarket balance (env var fallback) ──────────────────────────────────
-  const polyBalance = parseFloat(process.env.POLY_BALANCE || "0");
+  // ─── Polymarket balance (env var + DataStore fallback) ──────────────
+  const polyBalance = parseFloat(process.env.POLY_BALANCE || (polyPnl?.balance ? String(polyPnl.balance) : "0") || "0");
 
-  // ─── PM2 Processes — not available on Vercel ───────────────────────────────
-  const processes: { name: string; status: string; uptime: string }[] = [];
+  // ─── Processes — derived from live agent status ──────────────────
+  let processes: { name: string; status: string; uptime: string }[] = [];
+  try {
+    const agentsRes = await getAgentsData();
+    const agentsData = await agentsRes.json() as any[];
+    processes = agentsData.map((a: any) => {
+      const lastActive = a.lastActive ? new Date(a.lastActive).getTime() : 0;
+      const mins = lastActive ? Math.floor((Date.now() - lastActive) / 60000) : 0;
+      const uptime = mins < 1 ? "just now" : mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h`;
+      return { name: a.name || a.id, status: a.status || "idle", uptime };
+    });
+  } catch { /* non-fatal */ }
 
   const hourStr = (h: number) => { const s = h >= 12 ? "PM" : "AM"; const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h; return `${h12}${s}`; };
 
@@ -977,7 +988,18 @@ let hlBalance = 0;
         ? githubReposResult.value
         : [],
       activity: githubEventsResult.status === "fulfilled" && Array.isArray(githubEventsResult.value)
-        ? githubEventsResult.value
+        ? (() => {
+            const events = githubEventsResult.value as Array<{ type?: string; created_at?: string; repo?: { name?: string } }>;
+            const weekAgo = Date.now() - 7 * 86400000;
+            const pushesThisWeek = events.filter(e => e.type === "PushEvent" && e.created_at && new Date(e.created_at).getTime() >= weekAgo).length;
+            const reposThisWeek = new Set(events.filter(e => e.created_at && new Date(e.created_at).getTime() >= weekAgo).map(e => e.repo?.name).filter(Boolean)).size;
+            const recentEvents = events.slice(0, 5).map(e => ({
+              type: e.type || "Unknown",
+              repo: e.repo?.name || "unknown",
+              created_at: e.created_at || "",
+            }));
+            return { pushesThisWeek, pushesThisMonth: pushesThisWeek, reposThisWeek, recentEvents };
+          })()
         : null,
       status: deriveGithubStatus(githubEventsResult),
       contributions: buildGithubContributions(githubContribResult, estimateRecentContributions(githubEventsResult)),
@@ -997,7 +1019,7 @@ let hlBalance = 0;
     videosToFilm: await prisma.youtubeScript.count({ where: { status: { in: ["ready", "to_film", "tofilm", "approved"] } } }).catch(() => 0),
     processes,
     lastUpdated: new Date().toISOString(),
-    insight: "",
+    insight: (store["hermes-briefing"] as any)?.summary || "",
     hermesKanban,
   }, { headers: { "Cache-Control": "no-store, no-cache" } });
 }
