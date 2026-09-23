@@ -550,7 +550,7 @@ export default function AgentsPage() {
                     className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       sortBy === "newest" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                     }`}
-                    title="Sort by newest first"
+                    aria-label="Sort by newest first"
                   >
                     <SortDesc className="w-3 h-3" />
                   </button>
@@ -559,7 +559,7 @@ export default function AgentsPage() {
                     className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       sortBy === "oldest" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                     }`}
-                    title="Sort by oldest first"
+                    aria-label="Sort by oldest first"
                   >
                     <SortAsc className="w-3 h-3" />
                   </button>
@@ -568,7 +568,7 @@ export default function AgentsPage() {
                     className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                       sortBy === "agent" ? "bg-white/[0.08] text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                     }`}
-                    title="Sort by title (A-Z)"
+                    aria-label="Sort alphabetically by title"
                   >
                     A-Z
                   </button>
@@ -662,7 +662,8 @@ export default function AgentsPage() {
                     );
                     loadAgents();
                   }}
-                  className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium text-red-300 border border-red-500/30 hover:bg-red-500/15 transition-colors panel-interactive"
+                  className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium text-red-300 border border-red-500/30 hover:bg-red-500/15 transition-colors panel-interactive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                  aria-label="Unblock all tasks"
                 >
                   Unblock all
                 </button>
