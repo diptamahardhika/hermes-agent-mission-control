@@ -1454,8 +1454,8 @@ export default function Dashboard() {
               {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
               {data.lastUpdated && <span>· updated {timeAgo(data.lastUpdated)}</span>}
               <button onClick={loadHome} disabled={refreshing}
-                className="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-white/[0.06] transition-colors"
-                title="Refresh data">
+              className="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-white/[0.06] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] min-w-[28px] min-h-[28px]"
+              aria-label="Refresh data">
                 <RefreshCw className={`w-3 h-3 text-[var(--hq-text-ghost)] ${refreshing ? "animate-spin" : ""}`} />
               </button>
             </p>

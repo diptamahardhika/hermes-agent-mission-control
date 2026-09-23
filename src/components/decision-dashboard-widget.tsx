@@ -123,6 +123,8 @@ export function DecisionDashboardWidget({
                 type="button"
                 onClick={() => toggleExpand(decision.id)}
                 className="w-full flex items-center gap-2.5 py-2.5 px-3 text-left decision-row transition-[background,border-color,transform] duration-150 ease-out"
+                aria-expanded={isExpanded}
+                aria-controls={`decision-detail-${decision.id}`}
               >
                 <CircleDot
                   className="w-1.5 h-1.5 shrink-0"
@@ -149,7 +151,7 @@ export function DecisionDashboardWidget({
               </button>
 
               {isExpanded && (
-                <div className="px-3 pb-3 space-y-2 border-t border-[var(--line)]">
+                <div className="px-3 pb-3 space-y-2 border-t border-[var(--line)]" id={`decision-detail-${decision.id}`}>
                   <p className="text-[12px] text-[var(--text-2)] leading-relaxed whitespace-pre-wrap pt-2">
                     {decision.body.length > 120
                       ? `${decision.body.slice(0, 117)}...`
