@@ -107,32 +107,20 @@ export interface HomelabHomeData {
   connected: boolean;
   checkedAt: string;
   counts: {
-    servers: number;
-    serversUp: number;
-    services: number;
-    servicesUp: number;
-    containers: number;
-    runningContainers: number;
-  };
-  system: HomelabSystem | null;
-}
-
-/**
- * Interface for GitHub home data
- */
-export interface GitHubHomeData {
-  profile: any | null;
-  pinnedRepos: any[];
-  recentRepos: any[];
-  activity: any | null;
-  status: any | null;
-  contributions: any | null;
-}
-
-/**
- * Coq Finance data — spending, budget, and category breakdowns.
- */
-export interface CoqFinanceData {
+servers: number;
+     serversUp: number;
+     services: number;
+     servicesUp: number;
+     containers: number;
+     runningContainers: number;
+   };
+   system: HomelabSystem | null;
+ }
+ 
+ /**
+  * Coq Finance data — spending, budget, and category breakdowns.
+  */
+ export interface CoqFinanceData {
   spending: { total: number; byCategory: { name: string; spent: number; budget: number; color: string }[] };
   budget: { totalBudget: number; remaining: number; percentageUsed: number };
   days: { date: string; amount: number }[];
@@ -146,4 +134,257 @@ export interface Snapshot {
   xf: number;
   yt: number;
   pnl: number;
+}
+
+/**
+ * Tweet data structure
+ */
+export interface Tweet {
+  id: string;
+  text: string;
+  views: number;
+  engRate: number;
+  postedAt: string | null;
+  tweetUrl: string | null;
+}
+
+/**
+ * Draft data structure
+ */
+export interface Draft {
+  id: string;
+  text: string;
+}
+
+/**
+ * YouTube idea data structure
+ */
+export interface YTIdea {
+  title: string;
+  hook: string;
+}
+
+/**
+ * Build idea data structure
+ */
+export interface BuildIdea {
+  title: string;
+  description: string;
+  effort: string;
+}
+
+/**
+ * Board idea data structure
+ */
+export interface BoardIdea {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  source: string | null;
+  estimatedTime: string | null;
+  agent: string | null;
+}
+
+/**
+ * Video data structure
+ */
+export interface Video {
+  title: string;
+  thumbnail: string;
+  url: string;
+  publishedAt: string;
+}
+
+/**
+ * HL Position data structure
+ */
+export interface HLPosition {
+  asset: string;
+  direction: string;
+  unrealizedPnl: number;
+  unrealizedPnlPct: number;
+  leverage: number;
+  stopLoss?: number;
+  takeProfit?: number;
+}
+
+/**
+ * Process data structure
+ */
+export interface Process {
+  name: string;
+  status: string;
+  uptime: string;
+}
+
+/**
+ * Hermes Kanban data structure
+ */
+export interface HermesKanban {
+  board: string;
+  slug: string;
+  total: number;
+  counts: Record<string, number>;
+  tasks: KanbanTask[];
+}
+
+/**
+ * Kanban task data structure
+ */
+export interface KanbanTask {
+  id: string;
+  title: string;
+  assignee: string;
+  status: string;
+  priority: number;
+  result?: string | null;
+}
+
+/**
+ * GitHub profile data structure
+ */
+export interface GitHubProfile {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  bio: string | null;
+  company: string | null;
+  location: string | null;
+  followers: number;
+  following: number;
+  publicRepos: number;
+  createdAt: string;
+}
+
+/**
+ * GitHub repository data structure
+ */
+export interface GitHubRepo {
+  id: string;
+  name: string;
+  fullName: string;
+  description: string | null;
+  htmlUrl: string;
+  stars: number;
+  forks: number;
+  language: string | null;
+  updatedAt: string;
+  isPrivate: boolean;
+}
+
+/**
+ * GitHub activity data structure
+ */
+export interface GitHubActivity {
+  pushesThisWeek: number;
+  pushesThisMonth: number;
+  reposThisWeek: number;
+  recentEvents: Array<{
+    type: string;
+    repo: string;
+    created_at: string;
+    description?: string;
+  }>;
+}
+
+/**
+ * GitHub contribution day data structure
+ */
+export interface GitHubContribDay {
+  date: string;
+  count: number;
+  level: number;
+}
+
+/**
+ * GitHub contributions data structure
+ */
+export interface GitHubContributions {
+  totalContributions: number;
+  currentStreak: number;
+  longestStreak: number;
+  weeks: GitHubContribDay[][];
+}
+
+/**
+ * GitHub home data structure
+ */
+export interface GitHubHomeData {
+  profile: GitHubProfile | null;
+  pinnedRepos: GitHubRepo[];
+  recentRepos: GitHubRepo[];
+  activity: GitHubActivity | null;
+  status: string | null;
+  contributions: GitHubContributions | null;
+}
+
+/**
+ * Score component data structure
+ */
+export interface ScoreComponent {
+  score: number;
+  weight?: number;
+  label: string;
+  detail?: string;
+}
+
+/**
+ * Score data structure
+ */
+export interface ScoreData {
+  score: number;
+  grade: string;
+  label: string;
+  color: string;
+  period?: string;
+  components: Record<string, ScoreComponent>;
+}
+
+/**
+ * Complete home dashboard data structure
+ */
+export interface HomeData {
+   xFollowers: number;
+   xGoal: number;
+   xHandle: string;
+   topTweets: Tweet[];
+   topTweet: Tweet | null;
+   xViewsThisWeek: number;
+   totalTweets: number;
+   daysSincePost: number;
+   bestPostingDay: string;
+   bestPostingHourStr: string;
+   topSageDrafts: Draft[];
+   topYoutubeIdeas: YTIdea[];
+   topBuildIdeas: BuildIdea[];
+   topIdeas: BoardIdea[];
+   topVideo: Video | null;
+   latestVideo: Video | null;
+   ytSubscribers: number;
+   ytGoal: number;
+   polyBalance: number;
+   polyWinRate: number;
+   polyTodayPnl: number;
+   polyAllTimePnl: number;
+   hlBalance: number;
+   hlPosition: HLPosition | null;
+   hlTodayPnl: number;
+   hlAllTimePnl: number;
+   hlAssets?: { asset: string; amount: number; usdValue: number; wallet?: string }[];
+   hlLastSync?: string | null;
+   lastUpdated?: string | null;
+   allTimePnl: number;
+   todayPnl: number;
+   processes: Process[];
+   hermesKanban: HermesKanban;
+   xViewsTrend: number[];
+   snapshots: Snapshot[];
+   github: GitHubHomeData;
+   homelab: HomelabHomeData;
+   spend: SpendData;
+   omniSpend?: OmniSpendData | null;
+   freeLLM?: FreeLLMData | null;
+   coq?: CoqFinanceData | null;
 }
