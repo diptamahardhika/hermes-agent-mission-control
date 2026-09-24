@@ -886,7 +886,7 @@ let hlBalance = 0;
   let freeLLM: FreeLLMData | null = null;
 
   try {
-    const freellmRes = await fetch("http://localhost:3000/api/freellm", { cache: "no-store" });
+    const freellmRes = await fetch("http://localhost:8888/api/freellm", { cache: "no-store" });
     if (freellmRes.ok) {
       const data = await freellmRes.json();
       freeLLM = {

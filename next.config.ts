@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
+import bundleAnalyzer from "@next/bundle-analyzer";
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 const nextConfig: NextConfig = {
   // Next.js 16 uses Turbopack by default
@@ -65,7 +70,7 @@ const sentryConfig = {
   automaticVercelMonitors: true,
 };
 
-export default withSentryConfig(nextConfig, sentryConfig);
+export default withSentryConfig(withBundleAnalyzer(nextConfig), sentryConfig);
 
 // Sure Finance Dashboard env vars
 // These are exposed to server-side code via runtime config

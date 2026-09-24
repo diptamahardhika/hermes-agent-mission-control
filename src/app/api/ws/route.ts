@@ -9,8 +9,7 @@ export async function GET(request: Request) {
   headers.set("Content-Type", "text/event-stream");
   headers.set("Cache-Control", "no-cache");
   headers.set("Connection", "keep-alive");
-  headers.set("Access-Control-Allow-Origin", "*");
-  headers.set("Access-Control-Allow-Headers", "Cache-Control");
+  // No CORS headers — same-origin only (consumed by dashboard-ws.ts EventSource)
 
   // Create a readable stream
   const stream = new ReadableStream({
