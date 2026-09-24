@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Server, Cpu, Waypoints, RefreshCw, Activity, CircleDot, Zap } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
@@ -11,121 +11,13 @@ import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 import { Panel } from "@/components/ui/kit";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { DiagnosticsStrip } from "@/components/diagnostics-strip";
-import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData, CoqFinanceData } from "@/types/home-dashboard";
+import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData, CoqFinanceData, HomeData, HLPosition, Tweet, Video, Draft, YTIdea, BuildIdea, BoardIdea, Process, GitHubProfile, GitHubRepo, GitHubActivity, GitHubContribDay, GitHubContributions, GitHubHomeData, KanbanTask, HermesKanban, ScoreComponent, ScoreData } from "@/types/home-dashboard";
+import { useDashboardWS } from "@/lib/dashboard-ws";
 import { AIModelNewsPanel } from "@/app/dashboard/aimodel-news-panel";
 import { GitHubHomeCard } from "@/app/dashboard/github-home-card";
 import { HomelabHomeCard } from "@/app/dashboard/homelab-home-card";
 
-// ── Types ─────────────────────────────────────────────────
-interface HLPosition {
-  asset: string; direction: string; unrealizedPnl: number;
-  unrealizedPnlPct: number; leverage: number; stopLoss?: number; takeProfit?: number;
-}
-interface Tweet { id: string; text: string; views: number; engRate: number; postedAt: string | null; tweetUrl: string | null }
-interface Video  { title: string; thumbnail: string; url: string; publishedAt: string }
-interface Draft  { id: string; text: string }
-interface YTIdea { title: string; hook: string }
-interface BuildIdea { title: string; description: string; effort: string }
-interface BoardIdea {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  status: string;
-  source: string | null;
-  estimatedTime: string | null;
-  agent: string | null;
-}
-interface Process { name: string; status: string; uptime: string }
-// ── GitHub types ───────────────────────────────────────────────
-interface GitHubProfile {
-  login: string;
-  name: string | null;
-  avatarUrl: string;
-  bio: string | null;
-  company: string | null;
-  location: string | null;
-  followers: number;
-  following: number;
-  publicRepos: number;
-  createdAt: string;
-}
-interface GitHubRepo {
-  id: string;
-  name: string;
-  fullName: string;
-  description: string | null;
-  htmlUrl: string;
-  stars: number;
-  forks: number;
-  language: string | null;
-  updatedAt: string;
-  isPrivate: boolean;
-}
-interface GitHubActivity {
-  pushesThisWeek: number;
-  pushesThisMonth: number;
-  reposThisWeek: number;
-  recentEvents: Array<{
-    type: string;
-    repo: string;
-    created_at: string;
-    description?: string;
-  }>;
-}
-interface GitHubContribDay { date: string; count: number; level: number }
-interface GitHubContributions {
-  totalContributions: number;
-  currentStreak: number;
-  longestStreak: number;
-  weeks: GitHubContribDay[][];
-}
-interface GitHubHomeData {
-  profile: GitHubProfile | null;
-  pinnedRepos: GitHubRepo[];
-  recentRepos: GitHubRepo[];
-  activity: GitHubActivity | null;
-  status: string | null;
-  contributions: GitHubContributions | null;
-}
-interface KanbanTask { id: string; title: string; assignee: string; status: string; priority: number; result?: string | null }
-interface HermesKanban { board: string; slug: string; total: number; counts: Record<string, number>; tasks: KanbanTask[] }
-interface ScoreComponent { score: number; weight?: number; label: string; detail?: string }
-interface ScoreData { score: number; grade: string; label: string; color: string; period?: string; components: Record<string, ScoreComponent> }
-
-interface HomeData {
-  xFollowers: number; xGoal: number; xHandle: string;
-  topTweets: Tweet[]; topTweet: Tweet | null; xViewsThisWeek: number;
-  totalTweets: number; daysSincePost: number;
-  bestPostingDay: string; bestPostingHourStr: string;
-  topSageDrafts: Draft[];
-  topYoutubeIdeas: YTIdea[];
-  topBuildIdeas: BuildIdea[];
-  topIdeas: BoardIdea[];
-  topVideo: Video | null; latestVideo: Video | null;
-  ytSubscribers: number; ytGoal: number;
-  polyBalance: number; polyWinRate: number; polyTodayPnl: number; polyAllTimePnl: number;
-  hlBalance: number; hlPosition: HLPosition | null; hlTodayPnl: number; hlAllTimePnl: number;
-   hlAssets?: { asset: string; amount: number; usdValue: number; wallet?: string }[];
-   hlLastSync?: string | null;
-   lastUpdated?: string | null;
-   allTimePnl: number; todayPnl: number;
-  processes: Process[];
-  hermesKanban: HermesKanban;
-  xViewsTrend: number[];
-  snapshots: { d: string; xf: number; yt: number; pnl: number }[];
-  github: GitHubHomeData;
-  homelab: {
-    connected: boolean;
-    checkedAt: string;
-    counts: { servers: number; serversUp: number; services: number; servicesUp: number; containers: number; runningContainers: number };
-    system: { hostname: string; os: string; uptime: string; cpu_usage_percent: number; memory_used_percent: number; disk_used_percent: number } | null;
-  };
-  spend: SpendData;
-  omniSpend?: OmniSpendData | null;
-  freeLLM?: FreeLLMData | null;
-  coq?: CoqFinanceData | null;
-}
+// Types now imported from @/types/home-dashboard
 
 const EMPTY: HomeData = {
   xFollowers: 0, xGoal: 100000, xHandle: "yourhandle",
@@ -1360,12 +1252,21 @@ function SageFindingsPanel() {
 }
 
 export default function Dashboard() {
-  const [data, setData] = useState<HomeData>(EMPTY);
   const [decisions, setDecisions] = useState<{ decisions: Decision[]; pendingCount: number; total: number } | null>(null);
   const [time, setTime] = useState(new Date());
   const [loaded, setLoaded] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [score, setScore] = useState<ScoreData | null>(null);
+
+  // Real-time data via WebSocket/SSE with polling fallback
+  const { data: wsData, loading: wsLoading, error: wsError } = useDashboardWS({
+    fallbackToPolling: true,
+    retryInterval: 3000,
+    maxRetries: 5,
+  });
+
+  // Merge WebSocket data with EMPTY defaults to ensure all fields exist
+  const data = wsData || EMPTY;
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
@@ -1375,32 +1276,8 @@ export default function Dashboard() {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  const [refreshing, setRefreshing] = useState(false);
-  const fetchFailureCount = useRef<number>(0);
-  const loadHome = () => {
-    setRefreshing(true);
-    fetch("/api/home")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d) {
-          const { freeLLM, ...home } = d;
-          setData(prev => ({ ...prev, ...home, freeLLM }));
-          setTimeout(() => setLoaded(true), 100);
-          fetchFailureCount.current = 0;
-        }
-      })
-      .catch(() => {
-        fetchFailureCount.current += 1;
-      })
-      .finally(() => setTimeout(() => setRefreshing(false), 500));
-  };
-  useEffect(() => {
-    loadHome();
-    const iv = setInterval(loadHome, 30_000);
-    return () => clearInterval(iv);
-  }, []);
 
-  // Decisions fetch — independent fetch, no polling needed (refreshes with loadHome)
+  // Decisions fetch — independent fetch
   useEffect(() => {
     fetch("/api/hermes/decisions")
       .then(r => r.ok ? r.json() : null)
@@ -1413,7 +1290,22 @@ export default function Dashboard() {
       .catch(() => {});
   }, []);
 
-  if (!mounted) return null;
+// Track connection state for UI feedback
+const fetchFailureCount = useRef<number>(wsError ? 2 : 0);
+const refreshing = wsLoading;
+
+// Manual refresh function (triggers re-fetch of score and decisions)
+const refreshData = useCallback(() => {
+  fetch("/api/score").then(r => r.ok ? r.json() : null).then(d => { if (d) setScore(d); }).catch(() => {});
+  fetch("/api/hermes/decisions")
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (d) setDecisions(d);
+    })
+    .catch(() => {});
+}, []);
+
+if (!mounted) return null;
 
   const xd = withDevPreview(snapDelta(data.snapshots, "xf"), data.xFollowers);
   const ytd = withDevPreview(snapDelta(data.snapshots, "yt"), data.ytSubscribers);
@@ -1453,7 +1345,7 @@ export default function Dashboard() {
               {"  ·  "}
               {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
               {data.lastUpdated && <span>· updated {timeAgo(data.lastUpdated)}</span>}
-              <button onClick={loadHome} disabled={refreshing}
+              <button onClick={refreshData} disabled={refreshing}
               className="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-white/[0.06] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] min-w-[28px] min-h-[28px]"
               aria-label="Refresh data">
                 <RefreshCw className={`w-3 h-3 text-[var(--hq-text-ghost)] ${refreshing ? "animate-spin" : ""}`} />
@@ -1489,15 +1381,15 @@ export default function Dashboard() {
               icon={<Github className="w-4 h-4" />} accent="#f0b132" href="/github" loaded={loaded} fill={false}
             />
             {data.github?.profile && (
-              <GitHubHomeCard
-                profile={data.github.profile}
-                pinnedRepos={data.github.pinnedRepos}
-                activity={data.github.activity}
-                status={data.github.status}
-                contributions={data.github.contributions}
-                onRefresh={loadHome}
-                refreshing={refreshing}
-              />
+<GitHubHomeCard
+                  profile={data.github.profile}
+                  pinnedRepos={data.github.pinnedRepos}
+                  activity={data.github.activity}
+                  status={data.github.status}
+                  contributions={data.github.contributions}
+                  onRefresh={refreshData}
+                  refreshing={refreshing}
+                />
             )}
           </div>
           {/* Homelab */}
