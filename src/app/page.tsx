@@ -11,6 +11,14 @@ import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 import { Panel } from "@/components/ui/kit";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { DiagnosticsStrip } from "@/components/diagnostics-strip";
+import {
+  IdeasSkeleton, TweetsSkeleton, XAnalyticsSkeleton,
+  SpendSkeleton, OmniSkeleton, FreeLLMSkeleton,
+  YouTubeSkeleton, AgentsSkeleton, KanbanSkeleton,
+  CryptoSkeleton, SageSkeleton,
+  FreeLLMShareBarsSkeleton, ModelShareBarsSkeleton, OmniShareBarsSkeleton,
+  TokenIOSplitSkeleton,
+} from "@/components/dashboard/panel-skeletons";
 import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData, CoqFinanceData, HomeData, HLPosition, Tweet, Video, Draft, YTIdea, BuildIdea, BoardIdea, Process, GitHubProfile, GitHubRepo, GitHubActivity, GitHubContribDay, GitHubContributions, GitHubHomeData, KanbanTask, HermesKanban, ScoreComponent, ScoreData } from "@/types/home-dashboard";
 import { useDashboardWS } from "@/lib/dashboard-ws";
 import { AIModelNewsPanel } from "@/app/dashboard/aimodel-news-panel";
@@ -81,22 +89,6 @@ function HomelabStatusBadge({ data }: { data: HomelabHomeData | undefined }) {
       </span>
       <span className="eyebrow !text-[9.5px] font-semibold">{getHomelabLabel(checkedAt, connected ?? false)}</span>
       {checkedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] font-normal">{timeAgo(checkedAt)}</span>}
-    </div>
-  );
-}
-
-// ── Panel skeleton loader ─────────────────────────────────
-function PanelSkeleton({ className = "" }: { className?: string }) {
-  return (
-    <div className={`panel flex flex-col p-6 ${className}`} role="status" aria-busy="true" aria-label="Loading">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="sk h-3 w-20 rounded" />
-      </div>
-      <div className="space-y-3">
-        <div className="sk h-10 w-3/4 rounded" />
-        <div className="sk h-4 w-full rounded" />
-        <div className="sk h-4 w-5/6 rounded" />
-      </div>
     </div>
   );
 }
@@ -218,7 +210,7 @@ function IdeasPanel({ boardIdeas, sageDrafts, ytIdeas, buildIdeas }: {
   ];
   return (
     <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
+      {loading && <IdeasSkeleton />}
       <div className="flex items-center justify-between mb-4">
         <span className="eyebrow">Top Ideas</span>
         <div className="flex gap-1 rounded-lg border border-[var(--hq-hairline)] p-0.5">
@@ -333,7 +325,7 @@ function TopTweetsPanel({ tweets }: { tweets: Tweet[] }) {
   useEffect(() => { setLoading(false); }, []);
   return (
     <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
+      {loading && <TweetsSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Twitter className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
         <span className="eyebrow">Top Tweets · 7d</span>
@@ -371,7 +363,7 @@ function XAnalyticsPanel({ views, trend, totalTweets, bestDay, bestHour }: {
   useEffect(() => { setLoading(false); }, []);
   return (
     <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
+      {loading && <XAnalyticsSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Twitter className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
         <span className="eyebrow">X Analytics</span>
@@ -408,7 +400,7 @@ function SpendPanel({ spend }: { spend: SpendData }) {
   const topModel = [...spend.byModel].sort((a, b) => b.tokens - a.tokens)[0];
   return (
     <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
+      {loading && <SpendSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Cpu className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
         <span className="eyebrow">Agent Compute · 7d</span>
@@ -473,7 +465,7 @@ function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
   const topCachePct = topModel && topModel.tokens ? Math.round((topCache / topModel.tokens) * 100) : 0;
   return (
     <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
+      {loading && <OmniSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Waypoints className="w-3.5 h-3.5" style={{ color: "#2dd4bf" }} />
         <span className="eyebrow">OmniRoute Compute · 7d</span>
@@ -524,7 +516,7 @@ const FREELLM_TOK_COLORS = { input: "#f59e0b", cache: "#fcd34d", output: "#fbbf2
 function FreeLLMShareBars({ byModel, total }: { byModel: FreeLLMData["byModel"]; total: number }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => { setLoading(false); }, []);
-  if (loading) return <PanelSkeleton />;
+  if (loading) return <FreeLLMShareBarsSkeleton />;
   const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   if (!top.length || !total) return null;
 
@@ -587,7 +579,7 @@ function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
   const series = data.days.map(d => d.tokens);
   return (
     <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
+      {loading && <FreeLLMSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <Cpu className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} />
         <span className="eyebrow">FreeLLM Compute · 7d</span>
@@ -654,7 +646,7 @@ function modelProvider(model: string): string {
 function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; total: number | null }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => { setLoading(false); }, []);
-  if (loading) return <PanelSkeleton />;
+  if (loading) return <ModelShareBarsSkeleton />;
   const top = [...byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   if (!top.length || !total) return null;
 
@@ -720,7 +712,7 @@ const OMNI_TOK_COLORS = { input: "#22d3ee", cache: "#5eead4", output: "#a5f3fc" 
 function OmniShareBars({ omni }: { omni: OmniSpendData }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => { setLoading(false); }, []);
-  if (loading) return <PanelSkeleton />;
+  if (loading) return <OmniShareBarsSkeleton />;
   const top = [...omni.byModel].sort((a, b) => b.tokens - a.tokens).slice(0, 7);
   const total = omni.totalTokens;
   if (!top.length || !total) return null;
@@ -782,7 +774,7 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
 function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | null; output: number | null; cache?: number; colors?: { input: string; cache: string; output: string } }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => { setLoading(false); }, []);
-  if (loading) return <PanelSkeleton />;
+  if (loading) return <TokenIOSplitSkeleton />;
   if (input == null || output == null) return null;
   // Default legend = the Hermes purple/pink/blue; the OmniRoute card passes its
   // cyan triad so each card keeps one coherent color story.
@@ -823,7 +815,7 @@ function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | nu
 function HistoryBuilding({ days }: { days: SpendData["days"] }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => { setLoading(false); }, []);
-  if (loading) return <PanelSkeleton />;
+  if (loading) return <SpendSkeleton />;
   const live = days.filter(d => d.tokens > 0).length;
   if (live >= 2) return null;
   const n = Math.min(days.length, 7);
@@ -864,7 +856,7 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
   if (!video) return null;
   return (
     <div className="panel flex flex-col overflow-hidden">
-      {loading && <PanelSkeleton />}
+      {loading && <YouTubeSkeleton />}
       <div className="flex items-center gap-1 p-2 border-b border-[var(--hq-hairline)]">
         <span className="eyebrow ml-2 mr-1" style={{ color: "#f87171" }}>YouTube</span>
         <button
@@ -898,7 +890,7 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
 function AgentsStrip({ processes }: { processes: Process[] }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => { setLoading(false); }, []);
-  if (loading) return <PanelSkeleton />;
+  if (loading) return <AgentsSkeleton />;
   if (processes.length === 0) return null;
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -931,7 +923,7 @@ function HermesKanbanPanel({ kanban }: { kanban: HermesKanban }) {
   const entries = Object.entries(kanban.counts || {});
   return (
     <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
+      {loading && <KanbanSkeleton />}
       <div className="flex items-center justify-between mb-4">
         <div className="min-w-0">
           <span className="eyebrow">Hermes Board</span>
@@ -1024,7 +1016,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
   const allColor = allTimePnl > 0 ? "var(--up)" : allTimePnl < 0 ? "var(--down)" : "var(--hq-text-ghost)";
   return (
     <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
+      {loading && <CryptoSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-base leading-none">🪙</span>
         <span className="eyebrow">Binance / Crypto</span>
@@ -1184,7 +1176,7 @@ function SageFindingsPanel() {
 
   return (
     <div className="panel flex flex-col p-6">
-      {loading && <PanelSkeleton />}
+      {loading && <SageSkeleton />}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-base leading-none">🌿</span>
         <span className="eyebrow">Sage · Research Findings</span>
@@ -1196,7 +1188,7 @@ function SageFindingsPanel() {
         </div>
       )}
       {!findings ? (
-        <PanelSkeleton />
+        <SageSkeleton />
       ) : findings.length === 0 ? (
         <div className="text-[12px] text-[var(--hq-text-ghost)] py-4">
           No completed research yet. Sage&apos;s digests will appear here after his daily run.
