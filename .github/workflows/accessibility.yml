@@ -149,3 +149,4 @@ jobs:
           path: .a11y/
           if-no-files-found: error
           retention-days: 7
+          include-hidden-files: true
