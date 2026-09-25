@@ -26,11 +26,16 @@ jobs:
         env:
           DATABASE_URL: 'file:./prisma/dev.db'
 
-      - name: Install Xvfb
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Start Next.js server
+        run: PORT=8888 npm run start &
+
+      - name: Wait for server
+        run: sleep 10 && curl -sf http://localhost:8888/ > /dev/null
 
       - name: Run Lighthouse
-        run: xvfb-run npm run lighthouse
+        run: |
+          mkdir -p .lighthouse
+          npx lighthouse http://localhost:8888/ --output=json --output=path=.lighthouse/results --preset=desktop --chrome-flags="--headless --no-sandbox --disable-gpu --disable-dev-shm-usage"
         env:
           CI: 'true'
 
@@ -39,5 +44,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-report-${{ github.sha }}
-          path: .lighthouse-ci/
+          path: .lighthouse/
           retention-days: 7

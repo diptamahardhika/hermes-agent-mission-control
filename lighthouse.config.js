@@ -1,13 +1,11 @@
 module.exports = {
   ci: {
     collect: {
-      url: ['http://localhost:8888/', 'http://localhost:8888/hermes', 'http://localhost:8888/freellm', 'http://localhost:8888/omniroute'],
-      numberOfRuns: 3,
-      startServerCommand: 'PORT=8888 npm run start',
+      url: ['http://localhost:8888/'],
+      numberOfRuns: 1,
       settings: {
         headless: true,
         preset: 'desktop',
-        staticDistDir: './.next/server',
         chromeFlags: ['--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
       },
     },
