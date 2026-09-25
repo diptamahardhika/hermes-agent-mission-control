@@ -7,7 +7,7 @@ module.exports = {
       settings: {
         headless: true,
         preset: 'desktop',
-        staticDistDir: './.next/server',
+        chromeFlags: ['--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
       },
     },
     assert: {

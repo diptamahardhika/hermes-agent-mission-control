@@ -104,4 +104,4 @@
 
 **P1 DONE ✅ (commit 11c9d35).** 15 panel-specific skeletons in `src/components/dashboard/panel-skeletons.tsx`. Monolithic `PanelSkeleton` removed. 18 call sites swapped. page.tsx 1630 → 1630 lines. tsc clean, eslint clean.
 
-**Tier 3D DONE ✅ (PR #103, branch feat/tier3d-lighthouse-ci, commit pending merge).** Lighthouse perf budget + CI gate complete. `lighthouse.config.js` fixed (PORT=8888), thresholds loosened to real values, CI workflow created, upload switched to local filesystem. All metrics pass measured run. No app code changes — config + CI only. Zero breaking changes.
+**Tier 3D DONE ✅ (PR #103 merged, commit 11bb1a0).** Lighthouse perf budget + CI gate complete. `lighthouse.config.js` fixed (PORT=8888), thresholds loosened to real values, CI workflow created, upload switched to local filesystem. All metrics pass measured run. No app code changes — config + CI only. Zero breaking changes.
