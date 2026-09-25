@@ -30,6 +30,7 @@ jobs:
         run: npm run lighthouse
         env:
           CI: 'true'
+          CHROME_FLAGS: '--headless --no-sandbox --disable-gpu --disable-dev-shm-usage'
 
       - name: Upload Lighthouse report
         if: always()

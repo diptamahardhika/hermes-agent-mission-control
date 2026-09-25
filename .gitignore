@@ -116,3 +116,4 @@ graphify-out/GRAPH_REPORT.md
 .restart-requested
 .lighthouse-ci/
 .lighthouse-results.json
+.codex/
