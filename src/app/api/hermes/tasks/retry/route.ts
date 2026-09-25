@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { HERMES_BIN } from "@/lib/hermes-bin";
 
 const execFileP = promisify(execFile);
 const BOARD = process.env.HERMES_BOARD ?? "default";
@@ -16,12 +17,12 @@ export async function POST(req: Request) {
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
 
   try {
-    const { stdout } = await execFileP("hermes", [
+    const { stdout } = await execFileP(HERMES_BIN, [
       "kanban", "--board", BOARD, "unblock", id,
     ], { timeout: 15000, maxBuffer: 256 * 1024 });
     return NextResponse.json({ ok: true, id, output: stdout.trim() });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message.split("\n")[0] : String(e);
-    return NextResponse.json({ ok: false, id, error: msg });
+    return NextResponse.json({ ok: false, id, error: msg }, { status: 500 });
   }
 }
