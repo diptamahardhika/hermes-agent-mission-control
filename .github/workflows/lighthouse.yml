@@ -26,11 +26,13 @@ jobs:
         env:
           DATABASE_URL: 'file:./prisma/dev.db'
 
+      - name: Install Xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Run Lighthouse
-        run: npm run lighthouse
+        run: xvfb-run npm run lighthouse
         env:
           CI: 'true'
-          CHROME_FLAGS: '--headless --no-sandbox --disable-gpu --disable-dev-shm-usage'
 
       - name: Upload Lighthouse report
         if: always()
