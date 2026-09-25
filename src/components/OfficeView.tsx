@@ -398,7 +398,7 @@ function ActivityTicker({ agents }: { agents: Agent[] }) {
         <span className="text-[10px] text-neutral-500 font-mono shrink-0">{ev.name}</span>
         <span className="text-[10px] text-neutral-400">{ev.action.slice(0, 80)}{ev.action.length > 80 ? "…" : ""}</span>
       </div>
-      <div className="sr-only" aria-label="Recent agent activity" aria-live="polite" aria-atomic="true">
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {announce}
       </div>
     </>

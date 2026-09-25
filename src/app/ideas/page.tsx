@@ -195,6 +195,7 @@ function IdeaCard({ idea, onUpdate }: { idea: Idea; onUpdate: () => void }) {
       {isPickingAgent && !isDead && (
         <div className="flex flex-wrap items-center gap-2">
           <select
+            aria-label="Assign agent"
             value={chosenAgent}
             onChange={(e) => setChosenAgent(e.target.value)}
             className="bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text)] px-2.5 py-1.5 rounded-full text-[12px] focus:outline-none focus:border-[var(--line-strong)] whitespace-nowrap"
@@ -464,6 +465,7 @@ export default function IdeasPage() {
             />
             <div className="flex gap-3">
               <select
+                aria-label="Idea category"
                 value={newIdea.category}
                 onChange={(e) => setNewIdea({ ...newIdea, category: e.target.value })}
                 className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] px-3 py-2.5 rounded-[var(--r-sm)] text-[13px] focus:outline-none focus:border-[var(--line-strong)]"
@@ -475,6 +477,7 @@ export default function IdeasPage() {
                 <option value="experiment">Experiment</option>
               </select>
               <select
+                aria-label="Estimated implementation time"
                 value={newIdea.estimatedTime}
                 onChange={(e) => setNewIdea({ ...newIdea, estimatedTime: e.target.value })}
                 className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] px-3 py-2.5 rounded-[var(--r-sm)] text-[13px] focus:outline-none focus:border-[var(--line-strong)]"
@@ -521,6 +524,7 @@ export default function IdeasPage() {
           <>
             <div className="w-px h-4 bg-[var(--line)] mx-1" />
             <select
+              aria-label="Filter ideas by category"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="bg-transparent border border-[var(--line)] text-[var(--text-2)] px-3 py-1.5 rounded-full text-[12px] focus:outline-none focus:border-[var(--line-strong)]"

@@ -253,11 +253,11 @@ export default function TasksPage() {
 
         {error && (
           <div className="hq-rise elevated mb-8 p-4 border border-red-500/40 bg-red-500/10 rounded-[var(--r-md)] flex items-center justify-between gap-4">
-            <p className="text-[13px] text-red-400">{error}</p>
+            <p className="text-[13px] text-red-300">{error}</p>
             <button
               type="button"
               onClick={() => setError(null)}
-              className="text-[12px] text-red-300 hover:text-red-200 shrink-0"
+              className="text-[12px] text-red-200 hover:text-red-100 shrink-0"
             >
               Dismiss
             </button>
@@ -383,11 +383,7 @@ function TaskCard({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onEdit}
-      onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) onEdit(); }}
-      className="relative rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-1)] p-3.5 pl-4 transition-colors hover:border-[var(--line-strong)] hover:bg-[var(--surface-2)] cursor-pointer group overflow-hidden"
+      className="relative rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-1)] p-3.5 pl-4 transition-colors hover:border-[var(--line-strong)] hover:bg-[var(--surface-2)] group overflow-hidden"
     >
       <span
         aria-hidden
@@ -401,9 +397,10 @@ function TaskCard({
       </p>
       {task.details && (
         <div
+          role="region"
+          aria-label={`Task details for ${task.name}`}
+          tabIndex={0}
           className="mb-3 max-h-[120px] overflow-y-auto overflow-x-hidden text-[12px] leading-relaxed text-[var(--text-3)] whitespace-pre-line"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
         >
           {task.details}
         </div>
@@ -431,6 +428,7 @@ function TaskCard({
       </div>
       <div className="mt-3 pt-3 border-t border-[var(--line)] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-2">
         <select
+          aria-label={`Status for ${task.name}`}
           className="flex-1 min-w-0 text-[12px] bg-[var(--surface-1)] text-[var(--text-2)] rounded-[var(--r-sm)] px-3 py-2 border border-[var(--line)] focus:outline-none focus:border-[var(--line-strong)]"
           value={task.status}
           onChange={(e) => {

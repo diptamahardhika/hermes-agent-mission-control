@@ -218,16 +218,16 @@ textarea, input {
 
   /* text ramp (contrast-checked against surfaces) */
   --text:   #e7e8ea;   /* primary  ~15:1 */
-  --text-2: #a0a3a8;   /* secondary ~7:1 */
-  --text-3: #6b6e74;   /* tertiary — labels/decorative */
-  --text-4: #4b4e54;   /* ghost — hairline captions */
+  --text-2: #b6bac2;   /* secondary */
+  --text-3: #9297a1;   /* tertiary — WCAG AA on all dashboard surfaces */
+  --text-4: #858a94;   /* ghost — WCAG AA on all dashboard surfaces */
 
   /* ONE brand accent (desaturated for dark) + semantic-only status */
   --accent: #6ea8fe;
   --up:     #5fd0a0;
   --down:   #f28b82;
   --warn:   #f5c451;
-  --purple-500: #a855f7;
+  --purple-500: #bd7cff;
 
   /* radius — calm & precise, never toy-soft */
   --r-sm: 8px;

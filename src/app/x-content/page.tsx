@@ -552,7 +552,7 @@ const DroppableDay = memo(function DroppableDay({
         if (draftId && !day.isPast) onDrop(draftId, day.date);
       }}
       className={`rounded-[var(--r-md)] p-3 space-y-2 border min-h-[100px] transition-all ${
-        day.isToday ? "" : day.isPast ? "opacity-60" : ""
+        day.isToday ? "" : day.isPast ? "opacity-90" : ""
       } ${dragOverDate === day.date && !day.isPast ? "ring-2 ring-[var(--accent)]/50" : ""}`}
       style={day.isToday
         ? { background: "color-mix(in srgb, var(--accent) 8%, transparent)", borderColor: "color-mix(in srgb, var(--accent) 26%, transparent)" }
@@ -838,8 +838,12 @@ export default function XContentPage() {
               <span className="num text-[10px] px-1.5 py-0.5 rounded-full text-[var(--text-3)] bg-[var(--surface-2)]">{rejected.length}</span>
             </button>
           </div>
-          <select value={contentFilter} onChange={(e) => setContentFilter(e.target.value as typeof contentFilter)}
-            className="shrink-0 ml-auto bg-[var(--surface-2)] text-[var(--text-2)] px-2.5 py-1.5 rounded-[var(--r-sm)] text-[13px] border border-[var(--line)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]">
+          <select
+            aria-label="Filter content type"
+            value={contentFilter}
+            onChange={(e) => setContentFilter(e.target.value as typeof contentFilter)}
+            className="shrink-0 ml-auto bg-[var(--surface-2)] text-[var(--text-2)] px-2.5 py-1.5 rounded-[var(--r-sm)] text-[13px] border border-[var(--line)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+          >
             <option value="all">All</option>
             <option value="tweet">Tweets</option>
             <option value="article">Articles</option>

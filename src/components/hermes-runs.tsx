@@ -433,7 +433,7 @@ function UsageStrip({ cost }: { cost: Cost | null }) {
                   <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "#f472b6" }} />
                   cached
                 </span>
-                <span className="opacity-60">· √ scale</span>
+                <span className="text-[var(--text-3)]">· √ scale</span>
               </span>
             )}
           </div>
@@ -664,7 +664,7 @@ function OmniUsageStrip({ omni }: { omni: OmniCost | null }) {
                 <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: OMNI_C.cache }} />
                 cached
               </span>
-              <span className="opacity-60">· √ scale</span>
+              <span className="text-[var(--text-3)]">· √ scale</span>
             </span>
           </div>
           {sorted.map((m) => {
