@@ -37,7 +37,11 @@ export function Sparkline({ data, positive = true, color, area = false, classNam
   const last = coords[coords.length - 1];
 
   return (
-    <div className={`relative w-full h-10 ${className}`} role="img" aria-label={ariaLabel}>
+    <div
+      className={`relative w-full h-10 ${className}`}
+      role="img"
+      aria-label={ariaLabel ?? "Data trend"}
+    >
       <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible" aria-hidden="true">
         {area && (
           <defs>

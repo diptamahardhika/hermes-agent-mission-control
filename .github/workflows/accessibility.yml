@@ -1,0 +1,151 @@
+name: Accessibility CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  accessibility:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: hermy_hq
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hermy_hq"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres@localhost:5432/hermy_hq?schema=public
+      REDIS_URL: redis://localhost:6379
+      GITHUB_USERNAME: diptamahardhika
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CI report
+        run: |
+          mkdir -p .a11y
+          printf '{"status":"not-run","error":"Accessibility job did not complete"}\n' > .a11y/a11y-report.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare test services
+        run: |
+          echo "OBSIDIAN_VAULT_PATH=$RUNNER_TEMP/obsidian-vault" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/obsidian-vault/Hermes/Tasks"
+          printf '%s\n' \
+            '---' \
+            'name: Accessibility fixture task' \
+            'status: Not started' \
+            'priority: High' \
+            'category: quality' \
+            'tags:' \
+            '  - accessibility' \
+            '---' \
+            'Representative task content for CI accessibility auditing. This paragraph intentionally repeats so the details region scrolls and exercises keyboard focus behavior. Representative task content for CI accessibility auditing. This paragraph intentionally repeats so the details region scrolls and exercises keyboard focus behavior. Representative task content for CI accessibility auditing. This paragraph intentionally repeats so the details region scrolls and exercises keyboard focus behavior.' \
+            > "$RUNNER_TEMP/obsidian-vault/Hermes/Tasks/Accessibility fixture task.md"
+          npx prisma db push --skip-generate
+
+      - name: Build
+        run: npm run build
+
+      - name: Run runtime API and accessibility checks
+        run: |
+          server_log="$RUNNER_TEMP/hermy-hq-next.log"
+          PORT=8888 npm run start >"$server_log" 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          ready=false
+          for _ in {1..30}; do
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              echo "Next.js server exited before readiness"
+              cat "$server_log"
+              exit 1
+            fi
+            if curl -sf http://localhost:8888/ >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != true ]; then
+            echo "Dashboard did not become ready"
+            cat "$server_log"
+            exit 1
+          fi
+
+          failed=false
+          for endpoint in \
+            /api/home \
+            /api/hermes/health \
+            /api/agents \
+            /api/tasks \
+            /api/ideas \
+            /api/github \
+            /api/homelab \
+            /api/x-content \
+            /api/youtube/performance \
+            /api/youtube/ideas \
+            /api/youtube/scripts \
+            /api/articles \
+            /api/articles/saved-titles
+          do
+            status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "http://localhost:8888$endpoint")" || {
+              echo "API request failed: $endpoint"
+              failed=true
+              continue
+            }
+            printf '%-36s HTTP %s\n' "$endpoint" "$status"
+            case "$status" in
+              2??) ;;
+              *) failed=true ;;
+            esac
+          done
+
+          if [ "$failed" = true ]; then
+            cat "$server_log"
+            exit 1
+          fi
+
+          BASE_URL=http://localhost:8888 npm run a11y
+
+      - name: Upload accessibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-report-${{ github.sha }}
+          path: .a11y/
+          if-no-files-found: error
+          retention-days: 7

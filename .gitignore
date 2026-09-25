@@ -114,6 +114,8 @@ GEMINI.md
 graphify-out/
 graphify-out/GRAPH_REPORT.md
 .restart-requested
+# local audit artifacts
+.a11y/
 .lighthouse-ci/
 .lighthouse-results.json
 .codex/
