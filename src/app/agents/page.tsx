@@ -409,15 +409,29 @@ export default function AgentsPage() {
 
   async function handleUnblock(taskId: string, message: string) {
     try {
-      await fetch("/api/agent-proposals", {
+      const response = await fetch("/api/agent-proposals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "unblock", taskId, message }),
       });
+      if (!response.ok) throw new Error("Unblock request failed");
     } finally {
       loadProposals();
       loadAgents?.();
     }
+  }
+
+  async function handleRetry(taskId: string) {
+    const response = await fetch("/api/hermes/tasks/retry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: taskId }),
+    });
+    const data = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.error || "Retry request failed");
+    }
+    await Promise.all([loadProposals(), loadAgents()]);
   }
 
   async function handleReply(taskId: string, agent: string, message: string) {
@@ -604,6 +618,7 @@ export default function AgentsPage() {
                     onComplete={handleComplete}
                     onReply={handleReply}
                     onUnblock={handleUnblock}
+                    onRetry={handleRetry}
                   />
                 ))}
               </div>

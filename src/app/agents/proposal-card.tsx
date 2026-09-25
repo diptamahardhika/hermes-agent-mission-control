@@ -48,6 +48,7 @@ function ProposalCard({
   onComplete,
   onReply,
   onUnblock,
+  onRetry,
 }: {
   proposal: Proposal;
   onReject: (id: string) => void;
@@ -56,12 +57,15 @@ function ProposalCard({
   onComplete: (id: string) => void;
   onReply?: (id: string, agent: string, message: string) => Promise<void>;
   onUnblock?: (taskId: string, message: string) => Promise<void>;
+  onRetry?: (taskId: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replying, setReplying] = useState(false);
   const [showReply, setShowReply] = useState(false);
   const [sentNote, setSentNote] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   async function sendReply() {
     const text = replyText.trim();
@@ -86,6 +90,20 @@ function ProposalCard({
       setSentNote("Send failed — try again.");
     } finally {
       setReplying(false);
+    }
+  }
+
+  async function retryTask() {
+    const taskId = proposal.followUpTaskId;
+    if (!taskId || !onRetry || retrying) return;
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      await onRetry(taskId);
+    } catch (error) {
+      setRetryError(error instanceof Error ? error.message : "Retry failed — try again.");
+    } finally {
+      setRetrying(false);
     }
   }
   // Detect actual clamping instead of guessing by character count: a body that
@@ -187,6 +205,24 @@ function ProposalCard({
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {proposal.followUpStatus === "blocked" && proposal.followUpBlockKind !== "needs_input" && (
+          <div className="space-y-2 rounded-[var(--r-sm)] px-3 py-2.5" style={{ background: "color-mix(in srgb, var(--down) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--down) 25%, transparent)" }}>
+            <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-2)" }}>
+              <span style={{ color: "var(--down)", fontWeight: 500 }}>⚠ {proposal.agent}&apos;s task is blocked.</span>{" "}
+              Retry it after resolving the reported failure.
+            </p>
+            <button
+              onClick={retryTask}
+              disabled={retrying || !proposal.followUpTaskId}
+              className="text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+              style={{ color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" }}
+            >
+              {retrying ? "Retrying…" : `↻ Retry ${proposal.agent} task`}
+            </button>
+            {retryError && <p className="text-[11px]" style={{ color: "var(--down)" }}>{retryError}</p>}
           </div>
         )}
 
