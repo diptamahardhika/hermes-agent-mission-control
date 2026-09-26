@@ -263,6 +263,22 @@ function parseDecisionPrompt(prompt) {
   }
 }
 
+// Schema validation for decision data — ensures critical fields are present
+// and typed correctly before the decision handler acts on them.
+// Returns the data with a `valid` flag and any sanitization applied.
+function validateDecisionData(data) {
+  if (!data || typeof data !== "object") {
+    return { ...data, valid: false, _error: "decision data is not an object" };
+  }
+  const valid = typeof data.decisionKey === "string" && data.decisionKey.length > 0;
+  const sanitized = {
+    ...data,
+    valid,
+    decisionKey: valid ? String(data.decisionKey).slice(0, 200) : null,
+  };
+  return sanitized;
+}
+
 async function linkDecisionToHermesTask(decisionKey, hermesTaskId) {
   try {
     await q(
@@ -1139,7 +1155,8 @@ async function runRequest(r) {
     } else if (r.kind.startsWith("decision.")) {
       const op = r.kind.split(".")[1]; // archive | confirm | pin | resolve
       const { decisionData, operatorNote } = parseDecisionPrompt(r.prompt);
-      const decisionKey = decisionData.decisionKey || decisionData.key || null;
+      const validated = validateDecisionData(decisionData);
+      const decisionKey = validated.decisionKey || null;
 
       if (op === "archive") {
         // Create a kanban task to archive the referenced items

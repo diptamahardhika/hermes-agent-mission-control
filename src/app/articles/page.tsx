@@ -786,7 +786,7 @@ function ComposeTab({
               value={inspirationUrls}
               onChange={(e) => onSetInspirationUrls(e.target.value)}
               placeholder="https://x.com/yourhandle/status/...&#10;https://example.com/great-article"
-              className="w-full h-24 bg-[var(--surface-1)] border border-[var(--line)] rounded-[var(--r-md)] p-4 text-[13px] text-[var(--text)] placeholder:text-[var(--text-3)] focus:outline-none focus-visible:outline-none focus:border-[var(--line-strong)] resize-none"
+              className="w-full h-24 bg-[var(--surface-1)] border border-[var(--line)] rounded-[var(--r-md)] p-4 text-[13px] text-[var(--text)] placeholder:text-[var(--text-3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] focus:border-[var(--line-strong)] resize-none"
             />
           </div>
 

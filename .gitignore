@@ -65,6 +65,8 @@ infra/postgres/userlist.txt
 # local agent tooling state
 .omc/
 .worktrees/
+# salvaged patches from pruned worktrees — kept locally, never source
+.worktree-salvage/
 
 # Bridge logs
 hermes-bridge/*.log
