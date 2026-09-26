@@ -133,5 +133,9 @@ export function MetricCard({
     : "";
   const ariaLabel = `${label}: ${format(counted)}${hasDelta ? `, ${up ? "up" : "down"} ${deltaPctStr}` : ""}`;
 
-  return href ? <a href={href} className={`block ${fill ? "h-full" : ""}`} tabIndex={0} role="link" aria-label={ariaLabel}>{inner}</a> : inner;
+  // No `panel-interactive` here: the inner div (L72) already owns it. Adding it
+  // to the anchor too would fire the CSS hover transform twice, compounding the
+  // translateY(-2px) lift and stacking two box-shadows. The anchor only needs its
+  // own visible focus ring, since focus lands on the anchor, not the inner div.
+  return href ? <a href={href} className={`block ${fill ? "h-full" : ""} rounded-[8px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]`} aria-label={ariaLabel}>{inner}</a> : inner;
 }
