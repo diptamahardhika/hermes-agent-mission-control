@@ -231,7 +231,7 @@ export function AgentProposalsWidget() {
           )}
           <a
             href="/agents"
-            className="inline-flex items-center gap-1 self-start mt-3 text-[12.5px] font-medium transition-colors"
+            className="inline-flex items-center gap-1 self-start mt-3 text-[12.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             style={{ color: "var(--accent)" }}
           >
             Review all on Agents floor

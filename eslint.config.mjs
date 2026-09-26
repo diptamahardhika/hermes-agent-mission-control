@@ -3,7 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTypescript from "eslint-config-next/typescript";
 
 export default defineConfig([
-  globalIgnores(["**/*.mdx", "**/*.md", "next.config.*", ".next/**", "dist/**"]),
+  globalIgnores(["**/*.mdx", "**/*.md", "next.config.*", ".next/**", "dist/**", ".worktrees/**", ".worktree-salvage/**"]),
   ...nextVitals,
   ...nextTypescript,
   {

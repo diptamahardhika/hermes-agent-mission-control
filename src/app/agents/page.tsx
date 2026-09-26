@@ -76,7 +76,7 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
   }
 
   return (
-    <div className="panel panel-interactive overflow-hidden"
+    <div className="panel panel-interactive overflow-hidden focus-visible:outline-2 focus-visible:outline-[var(--accent)] focus-visible:outline-offset-[-2px]"
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="button"
