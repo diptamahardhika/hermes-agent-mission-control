@@ -220,7 +220,8 @@ textarea, input {
   --text:   #e7e8ea;   /* primary  ~15:1 */
   --text-2: #b6bac2;   /* secondary */
   --text-3: #9297a1;   /* tertiary — WCAG AA on all dashboard surfaces */
-  --text-4: #858a94;   /* ghost — WCAG AA on all dashboard surfaces */
+  /* 5.45:1 on surface-1, 5.13:1 on surface-2, 4.71:1 on surface-3. */
+  --text-4: #858a94;
 
   /* ONE brand accent (desaturated for dark) + semantic-only status */
   --accent: #6ea8fe;

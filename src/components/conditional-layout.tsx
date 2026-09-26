@@ -31,9 +31,15 @@ export function ConditionalLayout({ children, sidebarOpen }: { children: React.R
 
   return (
     <div className="flex h-screen">
+      <a
+        href="#main-content"
+        className="sr-only z-[100] rounded-md bg-[var(--surface-3)] px-4 py-2 text-[13px] font-medium text-[var(--text)] focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-2 focus:outline-offset-2 focus:outline-[var(--accent)]"
+      >
+        Skip to main content
+      </a>
       <div className="hq-ambient" aria-hidden />
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-      <main className="relative flex-1 overflow-auto pt-16 lg:pt-0 pb-20 lg:pb-0 px-4 sm:px-6 md:px-10 lg:px-12 py-4 md:py-8 page-enter transition-all duration-300 ease-in-out">
+      <main id="main-content" tabIndex={-1} className="relative flex-1 overflow-auto pt-16 lg:pt-0 pb-20 lg:pb-0 px-4 sm:px-6 md:px-10 lg:px-12 py-4 md:py-8 page-enter transition-all duration-300 ease-in-out focus:outline-none">
         <div className="pb-safe relative">
           {children}
         </div>
