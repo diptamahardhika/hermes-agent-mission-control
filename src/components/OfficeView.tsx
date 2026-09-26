@@ -412,7 +412,10 @@ export default function OfficeView({ agents }: { agents: Agent[] }) {
   const teamDesks = DESK_LAYOUT.filter(d => d.agentId !== "max");
 
   return (
-    <div className="relative rounded-3xl overflow-hidden border border-neutral-800/60 bg-neutral-950/80" role="img" aria-label={`Agent floor overview: ${agents.length} agents at their desks`}>
+    <section
+      className="relative rounded-3xl overflow-hidden border border-neutral-800/60 bg-neutral-950/80"
+      aria-label={`Agent floor overview: ${agents.length} agents at their desks`}
+    >
       {/* Floor */}
       <div
         className="relative p-8"
@@ -477,6 +480,6 @@ export default function OfficeView({ agents }: { agents: Agent[] }) {
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

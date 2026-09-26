@@ -122,14 +122,6 @@ function ProposalCard({
     max: "\uD83D\uDC3A",
     pixel: "\uD83C\uDFA8",
   };
-  const agentColor: Record<string, string> = {
-    nova: "var(--purple-500)",
-    sage: "var(--sky-500)",
-    knox: "var(--emerald-500)",
-    max: "var(--amber-500)",
-    pixel: "var(--blue-500)",
-  };
-
   const stampColor = proposal.status === "approved"
     ? "var(--up)"
     : proposal.status === "rejected"
@@ -141,8 +133,7 @@ function ProposalCard({
     : "var(--text-4)";
 
   const liveBadge = followUpBadge(proposal);
-
-  const accent = agentColor[proposal.agent] || "var(--line)";
+  const bodyRegionId = `proposal-body-${proposal.taskId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
   return (
     <div className="panel relative flex gap-4 p-4 pl-5 items-start overflow-hidden">
@@ -226,10 +217,19 @@ function ProposalCard({
           </div>
         )}
 
-        <p ref={bodyRef} className={`text-[12px] text-[var(--text-2)] leading-relaxed whitespace-pre-line ${expanded ? "" : "line-clamp-4"}`}>{proposal.body}</p>
+        <p
+          id={bodyRegionId}
+          ref={bodyRef}
+          className={`text-[12px] text-[var(--text-2)] leading-relaxed whitespace-pre-line ${expanded ? "" : "line-clamp-4"}`}
+        >
+          {proposal.body}
+        </p>
         {overflows && (
           <button
+            type="button"
             onClick={() => setExpanded(e => !e)}
+            aria-expanded={expanded}
+            aria-controls={bodyRegionId}
             className="self-start text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             style={{ color: "var(--accent)" }}
           >

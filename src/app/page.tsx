@@ -9,6 +9,7 @@ import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget"
 import type { Decision } from "@/types/decision";
 import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 import { Panel } from "@/components/ui/kit";
+import { AccessibleTabList, AccessibleTabPanel } from "@/components/accessible-tabs";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { DiagnosticsStrip } from "@/components/diagnostics-strip";
 import {
@@ -208,26 +209,28 @@ function IdeasPanel({ boardIdeas, sageDrafts, ytIdeas, buildIdeas }: {
     { key: "youtube", label: "YouTube", count: ytIdeas.length },
     { key: "builds", label: "Builds", count: buildIdeas.length },
   ];
+
   return (
     <div className="panel flex flex-col p-6">
       {loading && <IdeasSkeleton />}
       <div className="flex items-center justify-between mb-4">
         <span className="eyebrow">Top Ideas</span>
-        <div className="flex gap-1 rounded-lg border border-[var(--hq-hairline)] p-0.5">
-          {tabs.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${tab === t.key ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"}`}
-            >
-              {t.label}
-              {t.count > 0 && <span className="ml-1 num text-[var(--hq-text-ghost)]">{t.count}</span>}
-            </button>
-          ))}
-        </div>
+        <AccessibleTabList
+          idPrefix="ideas"
+          panelId="ideas-tabpanel"
+          ariaLabel="Idea sources"
+          tabs={tabs.map((t) => ({
+            key: t.key,
+            label: <>{t.label}{t.count > 0 && <span className="ml-1 num text-[var(--hq-text-ghost)]">{t.count}</span>}</>,
+          }))}
+          activeTab={tab}
+          onChange={setTab}
+          className="flex gap-1 rounded-lg border border-[var(--hq-hairline)] p-0.5"
+          buttonClassName={(active) => `px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${active ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"}`}
+        />
       </div>
 
-      <div className="space-y-1 min-h-[172px]">
+      <AccessibleTabPanel id="ideas-tabpanel" labelledBy={`ideas-tab-${tab}`} className="space-y-1 min-h-[172px]">
         {tab === "board" && (boardIdeas.length > 0 ? (
           <div>
             <div className="space-y-0">
@@ -294,7 +297,7 @@ function IdeasPanel({ boardIdeas, sageDrafts, ytIdeas, buildIdeas }: {
             </span>
           </div>
         )) : <Empty>No build ideas yet.</Empty>)}
-      </div>
+      </AccessibleTabPanel>
     </div>
   );
 }

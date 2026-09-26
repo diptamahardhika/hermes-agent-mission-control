@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Panel, Button, Skeleton, EmptyState, Pill } from "@/components/ui/kit";
+import { AccessibleTabList, AccessibleTabPanel } from "@/components/accessible-tabs";
 
 function TabSkeleton() {
   return (
@@ -78,7 +79,7 @@ export default function YouTubePage() {
   const [selectedIdeas, setSelectedIdeas] = useState<Set<string>>(new Set());
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [ideaTab, setIdeaTab] = useState<"pending" | "rejected">("pending");
-  const [scriptTab, setScriptTab] = useState<"draft" | "approved" | "rejected">("draft");
+  const [scriptTab, setScriptTab] = useState<"draft" | "rejected">("draft");
   const [rejectModal, setRejectModal] = useState<{ type: "idea" | "script"; id: string; title: string } | null>(null);
   const rejectRef = React.useRef<HTMLTextAreaElement>(null);
 
@@ -462,24 +463,23 @@ export default function YouTubePage() {
       <RejectModal />
 
       {/* Main Tabs */}
-      <div className="flex items-center gap-0 border-b border-[var(--line)] overflow-x-auto">
-        {([
-          { key: "longform" as const, label: "📹 Long Form" },
-          { key: "shorts" as const, label: "🎬 Shorts" },
-          { key: "performance" as const, label: "📊 Performance" },
-          { key: "outliers" as const, label: "🔥 Outliers" },
-        ]).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveView(tab.key)}
-            className={`text-sm px-5 py-2.5 font-medium transition-colors relative whitespace-nowrap ${activeView === tab.key ? "text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"}`}
-          >
-            {tab.label}
-            {activeView === tab.key && <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style={{ background: "var(--accent)" }} />}
-          </button>
-        ))}
-      </div>
-
+      <AccessibleTabList
+        idPrefix="youtube-main"
+        panelId="youtube-main-panel"
+        ariaLabel="YouTube views"
+        tabs={[
+          { key: "longform", label: "📹 Long Form" },
+          { key: "shorts", label: "🎬 Shorts" },
+          { key: "performance", label: "📊 Performance" },
+          { key: "outliers", label: "🔥 Outliers" },
+        ]}
+        activeTab={activeView}
+        onChange={setActiveView}
+        className="flex items-center gap-0 border-b border-[var(--line)] overflow-x-auto"
+        buttonClassName={(active) => `text-sm px-5 py-2.5 font-medium transition-colors relative whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${active ? "text-[var(--text)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"}`}
+        activeIndicator={<span aria-hidden="true" className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-[var(--accent)]" />}
+      />
+      <AccessibleTabPanel id="youtube-main-panel" labelledBy={`youtube-main-tab-${activeView}`} className="space-y-6">
       {/* LONGFORM VIEW */}
       {activeView === "longform" && (
         <div className="[&>div]:min-h-0 [&>div]:pt-0 [&>div]:md\:pt-0 [&>div]:px-0 [&>div]:md\:px-0 [&>div]:p-0 [&>div]:md\:p-0">
@@ -489,40 +489,47 @@ export default function YouTubePage() {
 
       {/* SHORTS SUB-NAV */}
       {activeView === "shorts" && (
-        <div className="flex gap-2 mt-4 mb-2">
-          {([
-            { key: "ideas" as const, label: "💡 Ideas", count: ideas.length },
-            { key: "scripts" as const, label: "📜 Scripts", count: draftScripts.length },
-            { key: "tofilm" as const, label: "🎬 To Film", count: tofilmScripts.length },
-            { key: "filmed" as const, label: "✅ Filmed", count: filmedScripts.length },
-          ]).map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setShortsView(tab.key)}
-              className={subPill(shortsView === tab.key)}
-              style={shortsView === tab.key ? subActiveStyle : undefined}
-            >
-              {tab.label} (<span className="num">{tab.count}</span>)
-            </button>
-          ))}
-        </div>
+        <AccessibleTabList
+          idPrefix="youtube-shorts"
+          panelId="youtube-shorts-panel"
+          ariaLabel="Shorts views"
+          tabs={[
+            { key: "ideas", label: <>💡 Ideas (<span className="num">{ideas.length}</span>)</> },
+            { key: "scripts", label: <>📜 Scripts (<span className="num">{draftScripts.length}</span>)</> },
+            { key: "tofilm", label: <>🎬 To Film (<span className="num">{tofilmScripts.length}</span>)</> },
+            { key: "filmed", label: <>✅ Filmed (<span className="num">{filmedScripts.length}</span>)</> },
+          ]}
+          activeTab={shortsView}
+          onChange={setShortsView}
+          className="flex gap-2 mt-4 mb-2"
+          buttonClassName={(active) => subPill(active)}
+          buttonStyle={(active) => active ? subActiveStyle : undefined}
+        />
       )}
 
+      {activeView === "shorts" && (
+        <AccessibleTabPanel id="youtube-shorts-panel" labelledBy={`youtube-shorts-tab-${shortsView}`}>
       {/* IDEAS VIEW */}
       {activeView === "shorts" && shortsView === "ideas" && (
         <div>
           {/* Sub-tabs */}
-          <div className="flex gap-2 mb-4">
-            <button onClick={() => setIdeaTab("pending")} className={subPill(ideaTab === "pending")} style={ideaTab === "pending" ? subActiveStyle : undefined}>
-              Pending (<span className="num">{ideas.length}</span>)
-            </button>
-            <button onClick={() => setIdeaTab("rejected")} className={subPill(ideaTab === "rejected")} style={ideaTab === "rejected" ? subActiveStyle : undefined}>
-              Rejected (<span className="num">{rejectedIdeas.length}</span>)
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:p-6">
-            <div className="lg:col-span-3 space-y-3">
+          <AccessibleTabList
+            idPrefix="youtube-ideas"
+            panelId="youtube-ideas-panel"
+            ariaLabel="Idea status"
+            tabs={[
+              { key: "pending", label: <>Pending (<span className="num">{ideas.length}</span>)</> },
+              { key: "rejected", label: <>Rejected (<span className="num">{rejectedIdeas.length}</span>)</> },
+            ]}
+            activeTab={ideaTab}
+            onChange={setIdeaTab}
+            className="flex gap-2 mb-4"
+            buttonClassName={(active) => subPill(active)}
+            buttonStyle={(active) => active ? subActiveStyle : undefined}
+          />
+          <AccessibleTabPanel id="youtube-ideas-panel" labelledBy={`youtube-ideas-tab-${ideaTab}`}>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:p-6">
+              <div className="lg:col-span-3 space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <p className="text-xs text-[var(--text-3)]">{ideaTab === "pending" ? "Tap to select · hover for ✕ reject" : "Rejected ideas with your feedback"}</p>
                 {ideaTab === "pending" && (
@@ -640,29 +647,38 @@ export default function YouTubePage() {
               )}
             </div>
           </div>
+          </AccessibleTabPanel>
         </div>
       )}
 
       {/* SCRIPTS VIEW */}
       {activeView === "shorts" && shortsView === "scripts" && (
         <div>
-          <div className="flex gap-2 mb-4">
-            <button onClick={() => setScriptTab("draft")} className={subPill(scriptTab === "draft")} style={scriptTab === "draft" ? subActiveStyle : undefined}>
-              Pending (<span className="num">{draftScripts.length}</span>)
-            </button>
-            <button onClick={() => setScriptTab("rejected")} className={subPill(scriptTab === "rejected")} style={scriptTab === "rejected" ? subActiveStyle : undefined}>
-              Rejected (<span className="num">{rejectedScripts.length}</span>)
-            </button>
-          </div>
-          <div className="space-y-3">
-            {(scriptTab === "draft" ? draftScripts : rejectedScripts).length === 0 ? (
-              <Panel>
-                <EmptyState title={`No ${scriptTab} scripts`} />
-              </Panel>
-            ) : (
-              (scriptTab === "draft" ? draftScripts : rejectedScripts).map(s => <ScriptCard key={s.id} script={s} compact />)
-            )}
-          </div>
+          <AccessibleTabList
+            idPrefix="youtube-scripts"
+            panelId="youtube-scripts-panel"
+            ariaLabel="Script status"
+            tabs={[
+              { key: "draft", label: <>Pending (<span className="num">{draftScripts.length}</span>)</> },
+              { key: "rejected", label: <>Rejected (<span className="num">{rejectedScripts.length}</span>)</> },
+            ]}
+            activeTab={scriptTab}
+            onChange={(tab) => setScriptTab(tab)}
+            className="flex gap-2 mb-4"
+            buttonClassName={(active) => subPill(active)}
+            buttonStyle={(active) => active ? subActiveStyle : undefined}
+          />
+          <AccessibleTabPanel id="youtube-scripts-panel" labelledBy={`youtube-scripts-tab-${scriptTab}`}>
+            <div className="space-y-3">
+              {(scriptTab === "draft" ? draftScripts : rejectedScripts).length === 0 ? (
+                <Panel>
+                  <EmptyState title={`No ${scriptTab} scripts`} />
+                </Panel>
+              ) : (
+                (scriptTab === "draft" ? draftScripts : rejectedScripts).map(s => <ScriptCard key={s.id} script={s} compact />)
+              )}
+            </div>
+          </AccessibleTabPanel>
         </div>
       )}
 
@@ -716,8 +732,9 @@ export default function YouTubePage() {
           )}
         </div>
       )}
+      </AccessibleTabPanel>
+      )}
 
-      {/* OUTLIERS VIEW */}
       {activeView === "outliers" && <OutlierFeed />}
 
       {/* PERFORMANCE VIEW */}
@@ -874,6 +891,7 @@ export default function YouTubePage() {
           )}
         </div>
       )}
+      </AccessibleTabPanel>
     </div>
   );
 }
