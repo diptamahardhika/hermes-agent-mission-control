@@ -145,7 +145,9 @@ export async function POST(req: NextRequest) {
   delete script.factClaims;
 
   // ── STEP 3: Fact-check via web search (safety net) ──
-  let factCheck: { status: string; issues: string[]; verified: string[]; sourceUrls: string[] } = {
+  // Properties are mutated in place below (.status, .issues.push), but the binding
+  // itself is never reassigned, so const is correct here.
+  const factCheck: { status: string; issues: string[]; verified: string[]; sourceUrls: string[] } = {
     status: '✅', issues: [], verified: [], sourceUrls: [...new Set(sourceUrls)]
   };
 

@@ -392,7 +392,7 @@ export function HermesBriefing() {
                           setTimeout(() => el.remove(), 2000);
                           expandItem(key, false);
                         } else if (action === "open") {
-                          window.location.href = '/hermes#inbox';
+                          router.push('/hermes#inbox');
                         } else if (action === "approve" && typeof item === "object" && item.id) {
                           // Call API for structured decisions
                           try {
