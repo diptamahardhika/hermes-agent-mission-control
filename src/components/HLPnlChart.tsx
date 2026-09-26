@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 
 interface ChartPoint {
   label: string;
@@ -66,7 +66,11 @@ export default function HLPnlChart({
   const showRef = refY >= PAD.top && refY <= PAD.top + innerH;
 
   // Hover handling
-  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+  // Plain function, not useCallback: this sits below the early `return null` above,
+  // so a useCallback here would be called conditionally and break the Rules of
+  // Hooks whenever chartData drops below 2 points. It only feeds an inline
+  // onMouseMove, so it gains nothing from memoization.
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
@@ -76,7 +80,7 @@ export default function HLPnlChart({
     const ratio = Math.max(0, Math.min(1, chartX / innerW));
     const idx = Math.round(ratio * (chartData.length - 1));
     setHoverIdx(idx);
-  }, [chartData.length]);
+  };
 
   const hovered = hoverIdx !== null ? chartData[hoverIdx] : null;
   const hoveredDelta = hovered ? hovered.balance - 50 : 0;

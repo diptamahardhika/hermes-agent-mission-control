@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Server, Cpu, Waypoints, RefreshCw, Activity, CircleDot, Zap } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
@@ -1247,6 +1248,7 @@ function SageFindingsPanel() {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [decisions, setDecisions] = useState<{ decisions: Decision[]; pendingCount: number; total: number } | null>(null);
   const [time, setTime] = useState(new Date());
   const [loaded, setLoaded] = useState(false);
@@ -1285,8 +1287,23 @@ export default function Dashboard() {
       .catch(() => {});
   }, []);
 
-// Track connection state for UI feedback
-const fetchFailureCount = useRef<number>(wsError ? 2 : 0);
+// Consecutive-failure counter for the stale-data banner.
+//
+// This was a useRef seeded once from `wsError` and never incremented. A ref
+// mutation never re-renders, so the banner could never actually appear — it was
+// dead code. It has to be state.
+//
+// Adjusted during render rather than in an effect (React's documented
+// "adjusting state when a prop changes" pattern): setError is called with a fresh
+// Error per failed poll, so each new failure is a new identity, and setError(null)
+// on success resets the count. Doing it here avoids a second render pass and a
+// cascading-render warning that an effect would introduce.
+const [lastFeedError, setLastFeedError] = useState(wsError);
+const [fetchFailureCount, setFetchFailureCount] = useState(0);
+if (wsError !== lastFeedError) {
+  setLastFeedError(wsError);
+  setFetchFailureCount((count) => (wsError ? count + 1 : 0));
+}
 const refreshing = wsLoading;
 
 // Manual refresh function (triggers re-fetch of score and decisions)
@@ -1316,8 +1333,7 @@ if (!mounted) return null;
       <div className="relative z-10 w-full mx-auto pb-16">
 
         {/* ── Stale-data warning banner ─────────────── */}
-        {/* eslint-disable-next-line react-hooks/refs */}
-        {fetchFailureCount.current >= 2 && (
+        {fetchFailureCount >= 2 && (
           <div className="sticky top-0 z-50 mx-auto mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-[13px] font-medium"
             style={{
               color: "var(--hq-warn)",
@@ -1475,8 +1491,7 @@ if (!mounted) return null;
             loading={!decisions}
             onAction={(action, decisionId) => {
               console.log("Dashboard decision action:", action, decisionId);
-              // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-              window.location.href = `/admin/decisions?highlight=${decisionId}`;
+              router.push(`/admin/decisions?highlight=${decisionId}`);
             }}
           />
         </Panel>
