@@ -2,6 +2,19 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { errorMessage, errorName } from "@/lib/errors";
+
+/**
+ * Response body assembled in POST(). Each key is only present when the
+ * corresponding scrape succeeded, so every field is optional.
+ */
+type ScrapeMetricsResult = {
+  youtube?: Exclude<Awaited<ReturnType<typeof getYouTubeMetrics>>, null>;
+  twitter?: Exclude<Awaited<ReturnType<typeof getTwitterMetrics>>, null>;
+  saved?: boolean;
+  updatedScript?: unknown;
+  saveError?: string;
+};
 
 async function getYouTubeMetrics(url: string) {
   try {
@@ -116,16 +129,16 @@ async function getTwitterMetrics(tweetUrl: string) {
     if (!jsonMatch) { return null; }
     const parsed = JSON.parse(jsonMatch[0]);
     return parsed;
-  } catch (e: any) {
+  } catch (e) {
     clearTimeout(timeout);
-    console.error("[scrape-metrics] xAI fetch error:", e?.name, e?.message);
+    console.error("[scrape-metrics] xAI fetch error:", errorName(e), errorMessage(e));
     return null;
   }
 }
 
 export async function POST(req: NextRequest) {
   const { youtubeUrl, tweetUrl, scriptId } = await req.json();
-  const result: any = {};
+  const result: ScrapeMetricsResult = {};
 
   // Run both in parallel
   const [yt, twitter] = await Promise.all([

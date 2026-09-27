@@ -321,7 +321,7 @@ export function HermesBriefing() {
                   {(["archive", "pin", "resolve", "confirm"] as const).map(kind => {
                     const count = (data!.sections ?? []).reduce(
                       (acc, s) => acc + s.items.filter(item =>
-                        typeof item === "object" && item !== null && (item as any).kind === kind
+                        typeof item === "object" && item !== null && item.kind === kind
                       ).length,
                       0
                     );

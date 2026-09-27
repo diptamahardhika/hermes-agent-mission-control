@@ -2,6 +2,13 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
+
+/** One result from the Brave web-search API. */
+type BraveResult = { title?: string; url?: string; description?: string };
+
+/** The slice of Brave's search response this route reads. */
+type BraveSearchResponse = { web?: { results?: BraveResult[] } };
 
 async function braveSearch(query: string, braveKey: string, count = 5): Promise<{ title: string; url: string; description: string }[]> {
   try {
@@ -10,8 +17,8 @@ async function braveSearch(query: string, braveKey: string, count = 5): Promise<
       { headers: { "Accept": "application/json", "X-Subscription-Token": braveKey } }
     );
     if (!res.ok) return [];
-    const data = await res.json();
-    return (data.web?.results || []).map((r: any) => ({
+    const data = (await res.json()) as BraveSearchResponse;
+    return (data.web?.results || []).map((r) => ({
       title: r.title || "",
       url: r.url || "",
       description: r.description || "",
@@ -164,8 +171,8 @@ When revising, maintain the article's voice and energy. Only change what was ask
       message: content,
       searchUsed: searchEnabled && searchContext.length > 0,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("POST /api/articles/revise error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }

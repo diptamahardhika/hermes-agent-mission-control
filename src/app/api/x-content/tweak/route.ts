@@ -8,6 +8,9 @@ import { prisma } from "@/lib/prisma";
 // TODO: This path won't exist on Vercel — consider bundling voice-rules or storing in DB
 const VOICE_RULES = path.join("./data/tweet-library", "voice-rules.md");
 
+// Draft.editHistory is JSON in Prisma; every writer pushes this shape.
+type DraftEditEntry = { original: string; edited: string; editedAt: string };
+
 export async function POST(req: NextRequest) {
   const { draftId, comment } = await req.json();
   if (!draftId || !comment) {
@@ -29,7 +32,7 @@ export async function POST(req: NextRequest) {
       // Re-read after visual gen
       const updatedDraft = await prisma.draft.findUnique({ where: { id: draftId } });
       if (updatedDraft) {
-        const { feedbackRating, feedbackReason, updatedAt, ...rest } = updatedDraft as any;
+        const { feedbackRating, feedbackReason, updatedAt, ...rest } = updatedDraft;
         return NextResponse.json({
           ok: true,
           draft: {
@@ -101,7 +104,7 @@ Rewrite the tweet applying this feedback. Output ONLY the new tweet text.`;
       // Re-read to avoid race conditions
       const freshDraft = await prisma.draft.findUnique({ where: { id: draftId } });
       if (freshDraft) {
-        const currentHistory = (freshDraft.editHistory as any[]) || [];
+        const currentHistory = (freshDraft.editHistory as DraftEditEntry[] | null) || [];
         const updated = await prisma.draft.update({
           where: { id: draftId },
           data: {
@@ -117,7 +120,7 @@ Rewrite the tweet applying this feedback. Output ONLY the new tweet text.`;
           },
         });
 
-        const { feedbackRating, feedbackReason, updatedAt, ...rest } = updated as any;
+        const { feedbackRating, feedbackReason, updatedAt, ...rest } = updated;
         return NextResponse.json({
           ok: true,
           draft: {

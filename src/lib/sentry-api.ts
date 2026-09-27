@@ -64,7 +64,7 @@ export function withSentryAPI(
  * Lightweight wrapper for API routes that don't need full Sentry transaction.
  * Use this for simple routes where you just want error capture.
  */
-export function withErrorLogging<T extends any[]>(
+export function withErrorLogging<T extends unknown[]>(
   routeName: string,
   handler: (...args: T) => Promise<NextResponse>
 ) {

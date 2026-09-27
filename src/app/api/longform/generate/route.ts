@@ -15,6 +15,34 @@ async function callLLM(apiKey: string, apiBase: string, payload: object): Promis
   return res.json().then(d => JSON.stringify(d));
 }
 
+interface BraveResult {
+  title: string;
+  url: string;
+  description: string;
+}
+
+interface BraveResponse {
+  web?: { results?: BraveResult[] };
+}
+
+interface Draft {
+  title?: string;
+  status?: string;
+  // non-optional: the filter/render paths below always guard on it first
+  feedback: { rating?: string; reason?: string };
+}
+
+interface Transcript {
+  title?: string;
+  views?: number;
+}
+
+interface LongformScript {
+  title?: string;
+  status?: string;
+  rejectedReason?: string;
+}
+
 async function braveSearch(query: string, braveKey: string, count = 5): Promise<{ title: string; url: string; description: string }[]> {
   try {
     const res = await fetch(
@@ -22,8 +50,8 @@ async function braveSearch(query: string, braveKey: string, count = 5): Promise<
       { headers: { "Accept": "application/json", "X-Subscription-Token": braveKey } }
     );
     if (!res.ok) return [];
-    const data = await res.json();
-    return (data.web?.results || []).map((r: any) => ({ title: r.title, url: r.url, description: r.description }));
+    const data = (await res.json()) as BraveResponse;
+    return (data.web?.results || []).map((r) => ({ title: r.title, url: r.url, description: r.description }));
   } catch {
     return [];
   }
@@ -82,9 +110,9 @@ export async function POST(req: NextRequest) {
   // Step 2b: Load feedback history (what the user likes/hates)
   let feedbackContext = "";
   try {
-    const drafts = JSON.parse(fs.readFileSync("./data/drafts.json", "utf-8"));
-    const rejected = drafts.filter((d: any) => d.feedback?.rating === "down" && d.feedback?.reason);
-    const approved = drafts.filter((d: any) => d.status === "approved" || d.feedback?.rating === "up");
+    const drafts = JSON.parse(fs.readFileSync("./data/drafts.json", "utf-8")) as Draft[];
+    const rejected = drafts.filter((d) => d.feedback?.rating === "down" && d.feedback?.reason);
+    const approved = drafts.filter((d) => d.status === "approved" || d.feedback?.rating === "up");
     
     if (rejected.length > 0) {
       feedbackContext += "\n## THINGS THE USER HATES (from rejected drafts):\n";
@@ -103,8 +131,8 @@ export async function POST(req: NextRequest) {
   // Step 2c: Load YouTube performance data
   let performanceContext = "";
   try {
-    const transcripts = JSON.parse(fs.readFileSync("./data/youtube-transcripts.json", "utf-8"));
-    const sorted = transcripts.sort((a: any, b: any) => (b.views || 0) - (a.views || 0));
+    const transcripts = JSON.parse(fs.readFileSync("./data/youtube-transcripts.json", "utf-8")) as Transcript[];
+    const sorted = transcripts.sort((a, b) => (b.views || 0) - (a.views || 0));
     performanceContext = "\n## TOP PERFORMING YOUTUBE VIDEOS:\n";
     for (const v of sorted.slice(0, 5)) {
       performanceContext += `- "${v.title}" — ${v.views} views\n`;
@@ -115,8 +143,8 @@ export async function POST(req: NextRequest) {
   // Step 2d: Load rejected longform scripts for learning
   let longformFeedback = "";
   try {
-    const lfScripts = JSON.parse(fs.readFileSync("./data/longform-scripts.json", "utf-8"));
-    const rejectedLf = lfScripts.filter((s: any) => s.status === "rejected" && s.rejectedReason);
+    const lfScripts = JSON.parse(fs.readFileSync("./data/longform-scripts.json", "utf-8")) as LongformScript[];
+    const rejectedLf = lfScripts.filter((s) => s.status === "rejected" && s.rejectedReason);
     if (rejectedLf.length > 0) {
       longformFeedback = "\n## REJECTED LONGFORM SCRIPTS:\n";
       for (const r of rejectedLf) {

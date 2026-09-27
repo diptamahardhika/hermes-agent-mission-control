@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
+import type { Decision, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+
+/**
+ * Shape stored in `Decision.actionTarget` JSON.
+ * Declared as a `type` (not an interface) so it keeps the implicit index
+ * signature Prisma's `InputJsonObject` needs.
+ */
+type ActionTarget = { type?: string; id?: string; hash?: string; path?: string };
+
 
 /**
  * PATCH /api/hermes/decisions/:id
@@ -38,7 +47,7 @@ export async function PATCH(
 
     // Find the decision
     // First try by ID, then by key field
-    let decision: any = await prisma.decision.findUnique({
+    let decision: Decision | null = await prisma.decision.findUnique({
       where: { id }
     });
 
@@ -51,10 +60,10 @@ export async function PATCH(
 
     if (!decision) {
       // Decision doesn't exist yet - create it for future tracking
-      
+
       // Parse actionTarget from body if provided
-      const actionTarget = body.actionTarget as { type?: string; id?: string; hash?: string } | null;
-      
+      const actionTarget = (body.actionTarget as ActionTarget | null) ?? null;
+
       decision = await prisma.decision.create({
         data: {
           key: id,
@@ -62,7 +71,7 @@ export async function PATCH(
           body: JSON.stringify({ action, decisionLayer, ...body }),
           kind: "confirm",
           status: "pending",
-          actionTarget: actionTarget as any || undefined,
+          actionTarget: (actionTarget ?? undefined) as Prisma.InputJsonValue | undefined,
           actions: ["approve", "dismiss", "open"],
           metadata: { decisionLayer, origin: "web" }
         }
@@ -137,10 +146,10 @@ export async function DELETE(
  * Handle the specific decision action
  */
 async function handleDecisionAction(
-  decision: any,
+  decision: Decision,
   action: string,
   body: Record<string, unknown>
-): Promise<any> {
+): Promise<Decision> {
   const now = new Date();
 
   switch (action) {
@@ -172,7 +181,7 @@ async function handleDecisionAction(
  * Approve decision: Route to Hermes as an agent request
  */
 async function approveDecision(
-  decision: any,
+  decision: Decision,
   body: Record<string, unknown>
 ) {
   // Determine the kind of work to create
@@ -210,7 +219,7 @@ async function approveDecision(
       status: "approved",
       decidedAt: new Date(),
       metadata: {
-        ...decision.metadata,
+        ...(decision.metadata as Prisma.InputJsonObject),
         agentRequestId: request.id,
         approvalKind: kind,
         approvedVia: "web"
@@ -225,7 +234,7 @@ async function approveDecision(
 /**
  * Dismiss decision: Mark as suppressed
  */
-async function dismissDecision(decision: any) {
+async function dismissDecision(decision: Decision) {
   const updated = await prisma.decision.update({
     where: { id: decision.id },
     data: {
@@ -242,7 +251,7 @@ async function dismissDecision(decision: any) {
  * Archive decision: Create task to archive related items
  */
 async function archiveDecision(
-  decision: any,
+  decision: Decision,
   body: Record<string, unknown>
 ) {
   const title = `Archive: ${decision.title}`;
@@ -274,7 +283,7 @@ async function archiveDecision(
       status: "approved",
       decidedAt: new Date(),
       metadata: {
-        ...decision.metadata,
+        ...(decision.metadata as Prisma.InputJsonObject),
         agentRequestId: request.id,
         action: "archive"
       }
@@ -289,7 +298,7 @@ async function archiveDecision(
  * Pin decision: Store in memory/config
  */
 async function pinDecision(
-  decision: any,
+  decision: Decision,
   body: Record<string, unknown>
 ) {
   const title = `Pin: ${decision.title}`;
@@ -322,7 +331,7 @@ async function pinDecision(
       status: "approved",
       decidedAt: new Date(),
       metadata: {
-        ...decision.metadata,
+        ...(decision.metadata as Prisma.InputJsonObject),
         agentRequestId: request.id,
         action: "pin"
       }
@@ -337,7 +346,7 @@ async function pinDecision(
  * Resolve decision: Mark as resolved in kanban/memory
  */
 async function resolveDecision(
-  decision: any,
+  decision: Decision,
   body: Record<string, unknown>
 ) {
   // Update decision to resolved

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export async function GET(req: Request) {
   const agent = searchParams.get("agent");
   const unreadOnly = searchParams.get("unread") === "true";
 
-  const where: any = {};
+  const where: Prisma.AgentBusMessageWhereInput = {};
 
   if (agent) {
     where.OR = [{ toAgent: agent }, { toAgent: "all" }];
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
   });
 
   // Reverse to return in chronological order (oldest first, like the original .slice(-50))
-  const formatted = messages.reverse().map((m: any) => ({
+  const formatted = messages.reverse().map((m) => ({
     id: m.id,
     from: m.fromAgent,
     to: m.toAgent,

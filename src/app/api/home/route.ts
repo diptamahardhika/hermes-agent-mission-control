@@ -23,6 +23,20 @@ interface GitHubProfileApi {
   updated_at: string;
 }
 
+// Fields of getAgentsData()'s payload that /api/home actually reads.
+type AgentSummary = {
+  id: string;
+  name?: string;
+  status?: string;
+  lastActive?: string;
+};
+
+// DataStore "hermes-briefing" row, mirrored by HermesBriefing in the UI.
+type HermesBriefing = {
+  generatedAt?: string | null;
+  summary?: string | null;
+};
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -724,8 +738,8 @@ let hlBalance = 0;
   let processes: { name: string; status: string; uptime: string }[] = [];
   try {
     const agentsRes = await getAgentsData();
-    const agentsData = await agentsRes.json() as any[];
-    processes = agentsData.map((a: any) => {
+    const agentsData = await agentsRes.json() as AgentSummary[];
+    processes = agentsData.map((a) => {
       const lastActive = a.lastActive ? new Date(a.lastActive).getTime() : 0;
       const mins = lastActive ? Math.floor((Date.now() - lastActive) / 60000) : 0;
       const uptime = mins < 1 ? "just now" : mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h`;
@@ -1019,7 +1033,7 @@ let hlBalance = 0;
     videosToFilm: await prisma.youtubeScript.count({ where: { status: { in: ["ready", "to_film", "tofilm", "approved"] } } }).catch(() => 0),
     processes,
     lastUpdated: new Date().toISOString(),
-    insight: (store["hermes-briefing"] as any)?.summary || "",
+    insight: (store["hermes-briefing"] as HermesBriefing | null)?.summary || "",
     hermesKanban,
   }, { headers: { "Cache-Control": "no-store, no-cache" } });
 }

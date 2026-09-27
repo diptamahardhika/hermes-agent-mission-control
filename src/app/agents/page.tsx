@@ -26,6 +26,13 @@ interface Agent {
   blockedTasks?: { count: number; firstTitle?: string };
 }
 
+/** Task shape returned by GET /api/hermes/tasks, used to count blocked work. */
+interface HermesTaskRow {
+  status?: string;
+  assignee?: string;
+  title?: string;
+}
+
 interface AgentProposal {
   id: string;
   taskId: string;
@@ -329,7 +336,7 @@ export default function AgentsPage() {
       const tasksData = await tasksRes.json();
       const blockedMap: Record<string, { count: number; firstTitle?: string }> = {};
       if (Array.isArray(tasksData?.tasks)) {
-        for (const t of tasksData.tasks as any[]) {
+        for (const t of tasksData.tasks as HermesTaskRow[]) {
           if (t.status === "blocked" && t.assignee) {
             blockedMap[t.assignee] ||= { count: 0 };
             blockedMap[t.assignee].count!++;
@@ -338,7 +345,7 @@ export default function AgentsPage() {
         }
       }
       setAgents(
-        (Array.isArray(agentsData) ? agentsData : []).map((a: any) => ({
+        (Array.isArray(agentsData) ? agentsData : []).map((a: Agent) => ({
           ...a,
           blockedTasks: blockedMap[a.id] || undefined,
         }))

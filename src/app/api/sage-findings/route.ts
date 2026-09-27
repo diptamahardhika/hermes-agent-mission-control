@@ -20,16 +20,28 @@ type Finding = {
   category: SageCategory;
 };
 
+/**
+ * Row shape returned by the task_runs/tasks query below. sqlite3 -json emits
+ * column values as JSON scalars, so a nullable TEXT column can come back as
+ * either a string or null depending on the row.
+ */
+type SageRunRow = {
+  task_id: string;
+  title: string | null;
+  summary: string | null;
+  ended_at: number | null;
+};
+
 async function sageFindings(): Promise<Finding[]> {
   try {
-    const rows = await shJson<any>(`
+    const rows = await shJson<SageRunRow>(`
       SELECT r.task_id, t.title, r.summary, r.ended_at
       FROM task_runs r JOIN tasks t ON t.id = r.task_id
       WHERE t.assignee = 'sage' AND r.status = 'done' AND length(coalesce(r.summary,'')) > 50
       ORDER BY coalesce(r.ended_at, r.started_at) DESC LIMIT 10;
     `);
     if (!rows.length) return [];
-    const findings = await Promise.all(rows.map(async (r: any) => {
+    const findings = await Promise.all(rows.map(async (r) => {
       let summary = String(r.summary || "");
       const title = String(r.title || "");
       // Prefer the durable digest file (full markdown with source links) over

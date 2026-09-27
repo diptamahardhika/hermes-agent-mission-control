@@ -23,8 +23,8 @@ function braveSearch(query: string, braveKey: string, count = 5): { title: strin
       `curl -s "${searchUrl}" -H "Accept: application/json" -H "X-Subscription-Token: ${braveKey}"`,
       { timeout: 10000, encoding: 'utf-8' }
     );
-    const data = JSON.parse(res);
-    return (data.web?.results || []).map((r: any) => ({ title: r.title, url: r.url, description: r.description }));
+    const data = JSON.parse(res) as { web?: { results?: { title: string; url: string; description: string }[] } };
+    return (data.web?.results || []).map((r) => ({ title: r.title, url: r.url, description: r.description }));
   } catch {
     return [];
   }

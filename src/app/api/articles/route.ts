@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { errorMessage } from "@/lib/errors";
 
 // GET /api/articles?status=X — list articles, filter by status
 export async function GET(req: NextRequest) {
@@ -8,7 +10,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const statusFilter = searchParams.get("status");
 
-    const where: any = {};
+    const where: Prisma.ArticleWhereInput = {};
     if (statusFilter) {
       where.status = statusFilter;
     }
@@ -21,9 +23,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(articles, {
       headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("GET /api/articles error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
 
@@ -55,9 +57,9 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(article);
-  } catch (err: any) {
+  } catch (err) {
     console.error("POST /api/articles error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
 
@@ -76,7 +78,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Article not found" }, { status: 404 });
     }
 
-    const updateData: any = {};
+    const updateData: Prisma.ArticleUpdateInput = {};
 
     if (fields.title !== undefined) updateData.title = fields.title;
     if (fields.body !== undefined) updateData.body = fields.body;
@@ -101,9 +103,9 @@ export async function PATCH(req: NextRequest) {
     });
 
     return NextResponse.json(updated);
-  } catch (err: any) {
+  } catch (err) {
     console.error("PATCH /api/articles error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
 
@@ -124,8 +126,8 @@ export async function DELETE(req: NextRequest) {
     await prisma.article.delete({ where: { id } });
 
     return NextResponse.json({ success: true, message: "Article deleted" });
-  } catch (err: any) {
+  } catch (err) {
     console.error("DELETE /api/articles error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }

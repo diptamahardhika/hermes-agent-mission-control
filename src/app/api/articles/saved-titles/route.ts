@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { errorMessage } from "@/lib/errors";
 
 // GET /api/articles/saved-titles — list saved titles
 export async function GET() {
@@ -9,9 +10,9 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(titles);
-  } catch (err: any) {
+  } catch (err) {
     console.error("GET /api/articles/saved-titles error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
 
@@ -34,9 +35,9 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(saved);
-  } catch (err: any) {
+  } catch (err) {
     console.error("POST /api/articles/saved-titles error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
 
@@ -52,8 +53,8 @@ export async function DELETE(req: NextRequest) {
     await prisma.savedTitle.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
+  } catch (err) {
     console.error("DELETE /api/articles/saved-titles error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }

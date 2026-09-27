@@ -46,7 +46,7 @@ export async function sh(
  * Run a sqlite3 query that returns JSON rows.
  * Returns an empty array on failure (locked DB, parse error, etc.).
  */
-export async function shJson<T = any>(sql: string): Promise<T[]> {
+export async function shJson<T = unknown>(sql: string): Promise<T[]> {
   const out = await sh("sqlite3", ["-json", KANBAN_DB, sql]);
   if (!out) return [];
   try {

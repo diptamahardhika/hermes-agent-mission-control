@@ -13,6 +13,22 @@ const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET || "";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+// ── GitHub webhook payload shapes (only the fields we read) ────────────────
+interface GithubPullRequest {
+  number: number;
+  title?: string;
+  html_url?: string;
+  merged?: boolean;
+  head?: { ref?: string; sha?: string };
+}
+
+interface GithubWebhookPayload {
+  action?: string;
+  pull_request?: GithubPullRequest;
+  repository?: { full_name?: string };
+  review?: { state?: string };
+}
+
 // ── Signature verification ────────────────────────────────────────────────────
 function verifySignature(payload: string, signature: string): boolean {
   if (!WEBHOOK_SECRET || !signature) return false;
@@ -126,9 +142,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let payload: any;
+  let payload: GithubWebhookPayload;
   try {
-    payload = JSON.parse(raw);
+    payload = JSON.parse(raw) as GithubWebhookPayload;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

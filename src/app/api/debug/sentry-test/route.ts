@@ -10,7 +10,7 @@ import { withErrorLogging, createErrorResponse } from "@/lib/sentry-api";
  * GET /api/debug/sentry-test?type=validation - Tests validation error (400)
  * GET /api/debug/sentry-test?type=manual - Tests manual error capture
  */
-export const GET = withErrorLogging("/api/debug/sentry-test", async (req) => {
+export const GET = withErrorLogging<[Request]>("/api/debug/sentry-test", async (req) => {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type") || "sync";
 

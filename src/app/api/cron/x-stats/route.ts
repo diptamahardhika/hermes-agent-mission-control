@@ -3,6 +3,14 @@ import { prisma } from "@/lib/prisma";
 
 export const maxDuration = 30;
 
+/** Shape of the `x-account-stats` DataStore blob. */
+interface XAccountStats {
+  xHandle?: string;
+  xFollowers?: number;
+  xGoal?: number;
+  updatedAt?: string;
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -16,7 +24,7 @@ export async function GET(request: Request) {
 
   try {
     const existing = await prisma.dataStore.findUnique({ where: { key: "x-account-stats" } });
-    const current = (existing?.data as any) || {};
+    const current = (existing?.data as XAccountStats | null) || {};
     const handle = current.xHandle || "yourhandle";
 
     const res = await fetch(

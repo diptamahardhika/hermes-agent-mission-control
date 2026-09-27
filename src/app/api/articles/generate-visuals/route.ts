@@ -3,6 +3,7 @@ export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { errorMessage } from "@/lib/errors";
 
 const DESIGN_SYSTEM = `You generate standalone HTML visual graphics for viral X (Twitter) articles.
 
@@ -202,8 +203,8 @@ Return ONLY the complete HTML document. No explanation, no markdown code blocks,
     return NextResponse.json({
       visuals: [{ type: visualType || "hero", html }],
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("POST /api/articles/generate-visuals error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
