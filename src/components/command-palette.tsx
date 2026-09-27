@@ -58,13 +58,31 @@ export function CommandPalette() {
   const [dispatched, setDispatched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Mirror of `open` for the stable Cmd+K listener, so the toggle can read the
+  // current value without re-subscribing on every open/close.
+  const openRef = useRef(false);
+
+  // ── open via hotkey / mobile button / swipe ───────────────
+  // Opening resets query + highlight here, in the event handler that caused it,
+  // rather than in an effect reacting to `open` (which cascaded a render).
+  const openPalette = useCallback(() => {
+    setQuery("");
+    setActive(0);
+    setDispatched(false);
+    setOpen(true);
+    // focus after paint so the trap works reliably
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
 
   // ── global open/close hotkey ──────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
-        setOpen((o) => !o);
+        // Toggle, but reset through openPalette on the open leg so the
+        // query/highlight reset is not a setState-in-effect.
+        if (openRef.current) setOpen(false);
+        else openPalette();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -73,10 +91,10 @@ export function CommandPalette() {
 
   // ── mobile header search button support ────────────────────
   useEffect(() => {
-    const openFromMobile = () => setOpen(true);
+    const openFromMobile = () => openPalette();
     window.addEventListener("open-command-palette", openFromMobile);
     return () => window.removeEventListener("open-command-palette", openFromMobile);
-  }, []);
+  }, [openPalette]);
 
   // ── gesture support: swipe down from top edge ──────────────
   useEffect(() => {
@@ -91,7 +109,7 @@ export function CommandPalette() {
       const dy = e.touches[0].clientY - startY;
       const dx = e.touches[0].clientX - startX;
       if (Math.abs(dy) > Math.abs(dx) && dy > 0 && startY < 40) {
-        setOpen(true);
+        openPalette();
       }
     };
     window.addEventListener("touchstart", onStart, { passive: true });
@@ -102,15 +120,9 @@ export function CommandPalette() {
     };
   }, []);
 
-  // ── reset + focus when opening ────────────────────────────
+  // Keep the toggle ref in sync after render (ref write, not setState).
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setActive(0);
-      setDispatched(false);
-      // focus after paint so the trap works reliably
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
+    openRef.current = open;
   }, [open]);
 
   // ── lock scroll while open ────────────────────────────────
@@ -140,10 +152,9 @@ export function CommandPalette() {
     return out;
   }, [navMatches, query]);
 
-  // keep highlight in range as rows shrink/grow
-  useEffect(() => {
-    setActive((a) => (rows.length === 0 ? 0 : Math.min(a, rows.length - 1)));
-  }, [rows.length]);
+  // Highlight is clamped at read time rather than corrected in an effect, so a
+  // shrinking result list can never leave `active` pointing past the end.
+  const activeIdx = rows.length === 0 ? 0 : Math.min(active, rows.length - 1);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -205,16 +216,16 @@ export function CommandPalette() {
     }
     if (e.key === "Enter") {
       e.preventDefault();
-      run(rows[active]);
+      run(rows[activeIdx]);
     }
   };
 
   // scroll the active row into view
   useEffect(() => {
     if (!open || !listRef.current) return;
-    const el = listRef.current.querySelector<HTMLElement>(`[data-idx="${active}"]`);
+    const el = listRef.current.querySelector<HTMLElement>(`[data-idx="${activeIdx}"]`);
     el?.scrollIntoView({ block: "nearest" });
-  }, [active, open]);
+  }, [activeIdx, open]);
 
   if (!open) return null;
 
@@ -224,7 +235,7 @@ export function CommandPalette() {
     | undefined;
 
   const listId = "command-palette-results";
-  const activeId = rows.length > 0 ? `command-palette-option-${active}` : undefined;
+  const activeId = rows.length > 0 ? `command-palette-option-${activeIdx}` : undefined;
 
   return (
     <div
@@ -279,7 +290,7 @@ export function CommandPalette() {
                   <PaletteRow
                     key={r.item.href}
                     idx={idx}
-                    active={active === idx}
+                    active={activeIdx === idx}
                     onHover={() => setActive(idx)}
                     onSelect={() => run(r)}
                     icon={<r.item.icon className="w-4 h-4" aria-hidden="true" />}
@@ -303,7 +314,7 @@ export function CommandPalette() {
                 return (
                   <PaletteRow
                     idx={idx}
-                    active={active === idx}
+                    active={activeIdx === idx}
                     onHover={() => setActive(idx)}
                     onSelect={() => run(dispatchRow)}
                     optionId={`command-palette-option-${idx}`}

@@ -1,5 +1,7 @@
 "use client";
 
+import { usePolling } from "@/lib/use-polling";
+
 import {
   useCallback,
   useEffect,
@@ -674,11 +676,7 @@ export default function MemoryWikiPage() {
   }, [q, typeFilter, statusAll]);
 
   // Reload on filter change + poll every 10s
-  useEffect(() => {
-    load();
-    const iv = setInterval(load, 10000);
-    return () => clearInterval(iv);
-  }, [load]);
+  usePolling(load, 10000);
 
   const chips = useMemo(() => {
     // Canonical types first (declared order), then any extra types the wiki

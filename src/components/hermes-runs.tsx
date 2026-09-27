@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePolling } from "@/lib/use-polling";
 import { Activity, ChevronRight, Gauge, Waypoints } from "lucide-react";
 import { Panel, SectionHeader, Pill, EmptyState, Eyebrow } from "@/components/ui/kit";
 
@@ -887,13 +888,12 @@ export function HermesRuns() {
 
   useEffect(() => {
     mounted.current = true;
-    load();
-    const iv = setInterval(load, 8000);
     return () => {
       mounted.current = false;
-      clearInterval(iv);
     };
-  }, [load]);
+  }, []);
+
+  usePolling(load, 8000);
 
   return (
     <div className="flex flex-col gap-8">

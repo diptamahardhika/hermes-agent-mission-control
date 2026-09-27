@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import {
+  dismissSearchHint as dismissSearchHintStore,
+  searchHintServerSnapshot,
+  searchHintSnapshot,
+  subscribeSearchHint,
+} from "@/lib/search-hint";
 import {
   Home,
   Twitter,
@@ -82,14 +88,15 @@ const mobileTabsRaw = [
 
 export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (open: boolean) => void }) {
   const pathname = usePathname();
-  const [showSearchHint, setShowSearchHint] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const dismissed = localStorage.getItem("hermy_search_hint_dismissed");
-      setShowSearchHint(!dismissed);
-    }
-  }, []);
+  // localStorage-backed, read through useSyncExternalStore so the server
+  // snapshot (no localStorage) and the client snapshot can differ without a
+  // hydration mismatch — and without a setState-in-effect.
+  const hintDismissed = useSyncExternalStore(
+    subscribeSearchHint,
+    searchHintSnapshot,
+    searchHintServerSnapshot,
+  );
+  const showSearchHint = !hintDismissed;
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -99,10 +106,7 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
   }, [pathname, setIsOpen]);
 
   const dismissSearchHint = () => {
-    setShowSearchHint(false);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("hermy_search_hint_dismissed", "1");
-    }
+    dismissSearchHintStore();
   };
 
   return (

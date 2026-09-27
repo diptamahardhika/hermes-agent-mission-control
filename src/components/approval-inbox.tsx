@@ -16,6 +16,7 @@ import {
   Eyebrow,
 } from "@/components/ui/kit";
 import { useToast } from "@/components/ui/toast/toast-context";
+import { usePolling } from "@/lib/use-polling";
 
 // ── Types ─────────────────────────────────────────────────
 interface Req {
@@ -223,11 +224,7 @@ export function ApprovalInbox({ compact = false }: { compact?: boolean }) {
     setLoaded(true);
   }, []);
 
-  useEffect(() => {
-    load();
-    const iv = setInterval(load, 6000);
-    return () => clearInterval(iv);
-  }, [load]);
+  usePolling(load, 6000);
 
   // optimistic removal, then refetch to reconcile
   const handleAction = useCallback(

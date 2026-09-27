@@ -6,7 +6,8 @@
    "needs you" chip, and a Generate-now button (POST → bridge runs it).
    ─────────────────────────────────────────────────────────── */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePolling } from "@/lib/use-polling";
 import { useRouter } from "next/navigation";
 import { Sunrise, RefreshCw, ArrowUpRight, CircleDot } from "lucide-react";
 import { Panel, Eyebrow, Button } from "@/components/ui/kit";
@@ -194,7 +195,6 @@ export function HermesBriefing() {
   const [generating, setGenerating] = useState(false);
   const [genFailed, setGenFailed] = useState(false);
   const [genSuccess, setGenSuccess] = useState(false);
-  const [decisionLayer, setDecisionLayer] = useState<"legacy" | "structured">("legacy");
   // Decision filtering state
   const [filterKind, setFilterKind] = useState<string | null>(null);
   const [showDecisionsOnly, setShowDecisionsOnly] = useState(false);
@@ -234,19 +234,13 @@ export function HermesBriefing() {
     setLoaded(true);
   }, [generating]);
 
-  useEffect(() => {
-    load();
-    const iv = setInterval(load, generating ? 6000 : 20000);
-    return () => clearInterval(iv);
-  }, [load, generating]);
+  usePolling(load, generating ? 6000 : 20000);
 
-  // Update decision layer based on feature flag and briefing data
-  useEffect(() => {
-    if (data) {
-      const layer = getDecisionLayerFromBriefing(data);
-      setDecisionLayer(layer);
-    }
-  }, [data]);
+  // Derived from the briefing payload — no effect needed, no extra render.
+  const decisionLayer = useMemo<"legacy" | "structured">(
+    () => (data ? getDecisionLayerFromBriefing(data) : "legacy"),
+    [data],
+  );
 
   const generate = async () => {
     genAt.current = data?.generatedAt ?? null;
