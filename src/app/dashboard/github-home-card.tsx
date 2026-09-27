@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { Github, Star, GitBranch, ArrowUpRight, Sparkles } from "lucide-react";
 
-const GH_LEVEL_COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
+// Level 0 (no contributions) must stay clearly lighter than the panel surface
+// (--surface-1 #101113). GitHub's own #161b22 reads as a void here — 1.09:1 —
+// so use its border color instead; the ring alone is not enough at 10px cells.
+const GH_LEVEL_COLORS = ["#21262d", "#0e4429", "#006d32", "#26a641", "#39d353"];
 
 function PanelSkeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse space-y-3 ${className}`}><div className="h-4 bg-[var(--hq-card)] rounded w-3/4" /><div className="h-4 bg-[var(--hq-card)] rounded w-1/2" /><div className="h-4 bg-[var(--hq-card)] rounded w-5/6" /></div>;
@@ -76,7 +79,7 @@ function GitHubContributionMatrix({ weeks }: { weeks: GitHubContribDay[][] }) {
             <div
               key={day.date || `${ri}-${ci}`}
               title={day.date ? `${day.date}: ${day.count} contribution${day.count === 1 ? "" : "s"}` : ""}
-              className="flex-1 aspect-square rounded-[3px] min-h-[3px] min-w-0"
+              className="flex-1 aspect-square rounded-[3px] min-h-[3px] min-w-0 ring-1 ring-inset ring-white/[0.06]"
               style={{ background: GH_LEVEL_COLORS[day.level] ?? GH_LEVEL_COLORS[0] }}
             />
           ))}
