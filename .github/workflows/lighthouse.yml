@@ -32,11 +32,19 @@ jobs:
       - name: Wait for server
         run: sleep 10 && curl -sf http://localhost:8888/ > /dev/null
 
+      # Run LHCI, not raw `lighthouse`. The previous step shelled out to the
+      # lighthouse CLI and only uploaded a JSON report — lighthouse.config.js was
+      # never read, so every assertion in it (including the 0.5 performance
+      # floor) was dead code and a score of 0.1 would still have passed.
+      #
+      # Uses `npx @lhci/cli` explicitly, NOT the repo's `npm run lighthouse`
+      # script: that script calls a bare `lighthouse ci`, and @lhci/cli is not
+      # a devDependency, so it only resolves if lhci happens to be installed
+      # globally. It never was, so the script cannot run on a clean runner.
       - name: Run Lighthouse
         run: |
           sudo apt-get install -y xvfb
-          mkdir -p .lighthouse
-          xvfb-run npx lighthouse http://localhost:8888/ --output=json --output-path=.lighthouse/report.json --preset=desktop --chrome-flags="--headless --no-sandbox --disable-gpu --disable-dev-shm-usage"
+          xvfb-run npx --yes @lhci/cli@0.14.0 autorun --config=lighthouse.config.js
         env:
           CI: 'true'
 
@@ -45,5 +53,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-report-${{ github.sha }}
-          path: .lighthouse/
+          path: .lighthouse-ci/
           retention-days: 7

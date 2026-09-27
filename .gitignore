@@ -119,5 +119,6 @@ graphify-out/GRAPH_REPORT.md
 # local audit artifacts
 .a11y/
 .lighthouse-ci/
+.lighthouseci/
 .lighthouse-results.json
 .codex/
