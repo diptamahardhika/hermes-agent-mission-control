@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, memo } from "react";
 import { EmptyState } from "@/components/ui/kit";
+import { usePolling } from "@/lib/use-polling";
 
 // ── shared calm-luxury chip styling ─────────────────────────────────────────
 const CHIP = "text-[11px] px-2.5 py-1 rounded-[var(--r-sm)] font-medium transition-colors inline-flex items-center gap-1";
@@ -615,7 +616,7 @@ export default function XContentPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadDrafts(); }, [loadDrafts]);
+  usePolling(loadDrafts, null);
 
   const filterByType = useCallback((list: Draft[]) => {
     if (contentFilter === "all") return list;

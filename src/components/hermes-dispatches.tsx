@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { SectionHeader, Panel, Pill, EmptyState } from "@/components/ui/kit";
+import { usePolling } from "@/lib/use-polling";
 import { Send } from "lucide-react";
 
 type Req = {
@@ -58,11 +59,7 @@ export function HermesDispatches() {
     setLoaded(true);
   }, []);
 
-  useEffect(() => {
-    load();
-    const iv = setInterval(load, 5000);
-    return () => clearInterval(iv);
-  }, [load]);
+  usePolling(load, 5000);
 
   return (
     <div>
