@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -94,9 +95,9 @@ export async function POST(req: Request) {
         title,
         body: bodyText,
         kind: (body.kind || "confirm") as "archive" | "pin" | "resolve" | "confirm",
-        actionTarget: body.actionTarget as any,
+        actionTarget: body.actionTarget as Prisma.InputJsonValue,
         actions: (body.actions || ["approve", "dismiss", "open"]) as string[],
-        metadata: body.metadata as any
+        metadata: body.metadata as Prisma.InputJsonValue
       }
     });
 

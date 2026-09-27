@@ -1,7 +1,28 @@
 import { NextResponse } from "next/server";
+import type { AgentProposal } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { shJson, KANBAN_DB } from "@/lib/kanban-db";
 import { execFile } from "child_process";
+
+/** A joined kanban comment/run row, as returned by COMMENT_SQL / RUN_SQL. */
+interface ProposalRow {
+  id: string | number;
+  task_id: string;
+  author: string;
+  body: string;
+  created_at: string | number;
+  task_title: string;
+  task_status: string;
+}
+
+/** Live status of a follow-up kanban task. */
+interface FollowUpRow {
+  id: string | number;
+  status: string;
+  result: string | null;
+  block_kind: string | null;
+}
+
 
 const COMMENT_SQL = `
   SELECT c.id, c.task_id, c.author, c.body, c.created_at, t.title AS task_title, t.status AS task_status
@@ -61,7 +82,7 @@ function firstLine(body: string): string {
   return (flat.split(/\.(?=\s)/)[0] || flat).trim();
 }
 
-function toProposal(row: any, persisted?: any, followUp?: { status: string; result: string | null; blockKind?: string | null } | null) {
+function toProposal(row: ProposalRow, persisted?: AgentProposal | null, followUp?: { status: string; result: string | null; blockKind?: string | null } | null) {
   const createdAt = epochToIso(row.created_at);
   return {
     id: String(row.id),
@@ -89,32 +110,32 @@ export async function GET(request: Request) {
 
     const [persisted, commentRows, runRows] = await Promise.all([
       prisma.agentProposal.findMany(),
-      shJson(`
+      shJson<ProposalRow>(`
         SELECT c.id, c.task_id, c.author, c.body, c.created_at, t.title AS task_title, t.status AS task_status
         FROM task_comments c
         JOIN tasks t ON t.id = c.task_id
         WHERE c.author IN ('nova','sage','knox','max','pixel')
           AND length(c.body) > 100
         ORDER BY c.created_at DESC;`),
-      shJson(RUN_SQL),
+      shJson<ProposalRow>(RUN_SQL),
     ]);
 
     // Merge: comments first (explicit proposals), then run summaries, deduped
     // by taskId (a task contributes at most one proposal — newest wins).
-    const byTask = new Map<string, any>();
+    const byTask = new Map<string, ProposalRow>();
     for (const row of [...commentRows, ...runRows]) {
       const prev = byTask.get(row.task_id);
       if (!prev || Number(row.created_at) > Number(prev.created_at)) byTask.set(row.task_id, row);
     }
     const rows = [...byTask.values()];
 
-    const stateByTask = new Map(persisted.map((p: any) => [p.taskId, p]));
+    const stateByTask = new Map<string, AgentProposal>(persisted.map((p) => [p.taskId, p]));
 
     // Self-heal: proposals turned into tasks get their follow-up kanban id
     // backfilled from the bridge's AgentRequest result (task JSON from
     // `hermes kanban create --json`).
     const unlinked = persisted.filter(
-      (p: any) => p.status === "turned-into-task" && !p.followUpTaskId
+      (p) => p.status === "turned-into-task" && !p.followUpTaskId
     );
     if (unlinked.length) {
       for (const p of unlinked.slice(0, 10)) {
@@ -139,12 +160,12 @@ export async function GET(request: Request) {
 
     // Live status of follow-up tasks created from proposals (single sqlite query)
     const followUpIds = persisted
-      .map((p: any) => p.followUpTaskId)   // includes ids just backfilled above
-      .filter((id: string): id is string => Boolean(id));
+      .map((p) => p.followUpTaskId)   // includes ids just backfilled above
+      .filter((id): id is string => Boolean(id));
     const followUpMap = new Map<string, { status: string; result: string | null; blockKind?: string | null }>();
     if (followUpIds.length) {
       const list = followUpIds.map((id) => `'${id.replace(/'/g, "")}'`).join(",");
-      const liveRows = await shJson(
+      const liveRows = await shJson<FollowUpRow>(
         `SELECT id, status, result, block_kind FROM tasks WHERE id IN (${list});`
       );
       for (const r of liveRows) {
@@ -152,7 +173,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const proposals = rows.map((row: any) => {
+    const proposals = rows.map((row) => {
       const p = stateByTask.get(row.task_id);
       const result = toProposal(row, p, p?.followUpTaskId ? followUpMap.get(p.followUpTaskId) : null);
       // Normalize id to taskId so POST lookups work regardless of source
@@ -171,14 +192,14 @@ export async function GET(request: Request) {
     //   are legitimate findings, not status notifications
     const NOT_A_PROPOSAL =
           /\b(already (implemented|completed|shipped|done)|duplicate of|no remaining work|nothing to (do|decide)|no further action|system healthy|no action (required|needed)|review complete|reading (complete|inspection)|verified all|applied patch|implemented all|wrote.*(ai|cyber|security).*(digest|md)|mapped both|audit-only hygiene)\b/i;
-    const actionable = proposals.filter((p: any) => {
+    const actionable = proposals.filter((p) => {
       if (p.status !== "pending") return true;           // reviewed items stay visible
       if (p.taskStatus === "done" && NOT_A_PROPOSAL.test(p.body || "")) return false;
       return true;
     });
 
     // Sort: pending first always, then by requested sort key
-    const sorted = actionable.sort((a: any, b: any) => {
+    const sorted = actionable.sort((a, b) => {
       // Pending always comes first
       if (a.status !== b.status) {
         // Pending always comes first; if only one is pending, that decides it.
@@ -200,7 +221,7 @@ export async function GET(request: Request) {
 
     // Filter by status if requested
     const filtered = filter === "pending"
-      ? sorted.filter((p: any) => p.status === "pending")
+      ? sorted.filter((p) => p.status === "pending")
       : sorted;
 
     return NextResponse.json(filtered, {
@@ -295,9 +316,9 @@ export async function POST(request: Request) {
       const attempts = isRunId
         ? [runByIdSql]
         : [commentByTaskSql, runByTaskSql];
-      let rows: any[] = [];
+      let rows: ProposalRow[] = [];
       for (const sql of attempts) {
-        rows = await shJson(sql);
+        rows = await shJson<ProposalRow>(sql);
         if (rows.length) break;
       }
       if (!rows.length) {

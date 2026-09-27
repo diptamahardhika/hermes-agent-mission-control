@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { execSync } from "child_process";
 import { prisma } from "@/lib/prisma";
 
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
   const draft = await prisma.draft.findUnique({ where: { id: draftId } });
   if (!draft) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const updateData: any = {
+  const updateData: Prisma.DraftUpdateInput = {
     status: "posted",
     postedAt: new Date(),
     postedUrl: tweetUrl || null,
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
             data: updateData,
           });
 
-          const { feedbackRating, feedbackReason, updatedAt, ...rest } = updated as any;
+          const { feedbackRating, feedbackReason, updatedAt, ...rest } = updated;
           return NextResponse.json({
             ...rest,
             feedback: { rating: feedbackRating ?? null, reason: feedbackReason ?? "" },
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
     data: updateData,
   });
 
-  const { feedbackRating, feedbackReason, updatedAt, ...rest } = updated as any;
+  const { feedbackRating, feedbackReason, updatedAt, ...rest } = updated;
   return NextResponse.json({
     ...rest,
     feedback: { rating: feedbackRating ?? null, reason: feedbackReason ?? "" },

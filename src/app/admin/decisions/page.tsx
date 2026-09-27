@@ -215,7 +215,7 @@ export default function AdminDecisionsPage() {
             <label className="text-[11px] font-medium text-[var(--text-3)] mb-2 block">Date Range</label>
             <select
               value={filters.dateRange}
-              onChange={(e) => setFilters((f) => ({ ...f, dateRange: e.target.value as any }))}
+              onChange={(e) => setFilters((f) => ({ ...f, dateRange: e.target.value as DecisionFilters["dateRange"] }))}
               className="w-full bg-[var(--surface-1)] border border-[var(--line)] rounded px-2 py-1.5 text-[12px] text-[var(--text)]"
             >
               <option value="all">All Time</option>

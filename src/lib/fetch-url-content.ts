@@ -18,6 +18,21 @@ const JS_RENDERED_DOMAINS = [
   "reddit.com",
 ];
 
+/** Media variant entry from the Twitter v2 `includes.media` expansion. */
+type TwitterMedia = {
+  media_key?: string;
+  url?: string;
+  preview_image_url?: string;
+};
+
+/** Single web result from the Brave Search API. */
+type BraveWebResult = {
+  url: string;
+  title?: string;
+  description?: string;
+  extra_snippets?: string[];
+};
+
 function isXUrl(url: string): boolean {
   try {
     const hostname = new URL(url).hostname.replace("www.", "");
@@ -60,7 +75,7 @@ async function fetchFromTwitterApi(url: string): Promise<{ title: string; body: 
     let imageUrl = "";
     const coverKey = article.cover_media || "";
     if (coverKey && data.includes?.media) {
-      const media = data.includes.media.find((m: any) => m.media_key === coverKey);
+      const media = data.includes.media.find((m: TwitterMedia) => m.media_key === coverKey);
       if (media) imageUrl = media.url || media.preview_image_url || "";
     }
 
@@ -100,7 +115,7 @@ async function braveSearchUrl(
 
     // Find the result that matches our URL (or is close)
     const urlHost = new URL(url).hostname.replace("www.", "");
-    const match = results.find((r: any) => {
+    const match = results.find((r: BraveWebResult) => {
       try {
         const rHost = new URL(r.url).hostname.replace("www.", "");
         return rHost === urlHost;

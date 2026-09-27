@@ -3,11 +3,32 @@ export const maxDuration = 30;
 
 import { NextRequest, NextResponse } from "next/server";
 import { fetchUrlContent } from "@/lib/fetch-url-content";
+import { errorMessage } from "@/lib/errors";
 
 function extractTweetId(url: string): string | null {
   const match = url.match(/(?:x\.com|twitter\.com)\/\w+\/status\/(\d+)/);
   return match ? match[1] : null;
 }
+
+// Minimal shapes of the Twitter/X API v2 responses used below. Both are
+// third-party JSON, so only the fields actually read are declared.
+type TwitterMedia = {
+  media_key: string;
+  url?: string;
+  preview_image_url?: string;
+};
+type TweetPublicMetrics = {
+  impression_count?: number;
+  like_count?: number;
+  bookmark_count?: number;
+};
+type QuoteTweet = {
+  id: string;
+  text?: string;
+  author_id?: string;
+  created_at?: string;
+  public_metrics?: TweetPublicMetrics;
+};
 
 // Try Twitter API v2 — requires TWITTER_BEARER_TOKEN
 async function fetchFromTwitterApi(tweetId: string, bearerToken: string) {
@@ -36,7 +57,7 @@ async function fetchFromTwitterApi(tweetId: string, bearerToken: string) {
     let coverImageUrl = "";
     const coverMediaKey = article.cover_media || "";
     if (coverMediaKey && data.includes?.media) {
-      const coverMedia = data.includes.media.find((m: any) => m.media_key === coverMediaKey);
+      const coverMedia = data.includes.media.find((m: TwitterMedia) => m.media_key === coverMediaKey);
       if (coverMedia) {
         coverImageUrl = coverMedia.url || coverMedia.preview_image_url || "";
       }
@@ -114,7 +135,7 @@ async function fetchQuoteTweets(tweetId: string, bearerToken: string, authorId?:
 
     // Find the author's own QT (most likely the promotional tweet)
     // If no authorId, return the most-liked QT
-    let bestQt = null;
+    let bestQt: QuoteTweet | null = null;
     for (const qt of quotes) {
       if (authorId && qt.author_id === authorId) {
         bestQt = qt;
@@ -123,7 +144,7 @@ async function fetchQuoteTweets(tweetId: string, bearerToken: string, authorId?:
     }
     if (!bestQt && quotes.length > 0) {
       // Pick the most-liked quote tweet
-      bestQt = quotes.reduce((best: any, qt: any) =>
+      bestQt = quotes.reduce((best: QuoteTweet, qt: QuoteTweet) =>
         (qt.public_metrics?.like_count || 0) > (best.public_metrics?.like_count || 0) ? qt : best
       , quotes[0]);
     }
@@ -416,8 +437,8 @@ export async function POST(req: NextRequest) {
       qtImpressions,
       qtLikes,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("POST /api/articles/scrape error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }

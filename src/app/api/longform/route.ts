@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { errorMessage } from "@/lib/errors";
 
 export async function GET() {
   try {
@@ -10,9 +11,9 @@ export async function GET() {
     return NextResponse.json(scripts, {
       headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
     });
-  } catch (e: any) {
-    console.error("[longform GET]", e?.message || e);
-    return NextResponse.json({ error: e?.message || "DB error" }, { status: 500 });
+  } catch (e) {
+    console.error("[longform GET]", errorMessage(e));
+    return NextResponse.json({ error: errorMessage(e, "DB error") }, { status: 500 });
   }
 }
 

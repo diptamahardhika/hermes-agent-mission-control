@@ -5,7 +5,7 @@ export async function GET() {
   const row = await prisma.dataStore.findUnique({
     where: { key: "omniroute-cost" },
   });
-  const cur = (row?.data ?? {}) as Record<string, any>;
+  const cur = (row?.data ?? {}) as Record<string, unknown>;
 
   return NextResponse.json({
     syncedAt: cur.syncedAt ?? null,

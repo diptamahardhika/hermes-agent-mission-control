@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
+
+// Draft.editHistory is JSON in Prisma; every writer pushes this shape.
+type DraftEditEntry = { original: string; edited: string; editedAt: string };
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +34,7 @@ export async function POST(req: NextRequest) {
     } catch {}
 
     // Return the draft in API format
-    const { feedbackRating, feedbackReason, updatedAt, ...rest } = draft as any;
+    const { feedbackRating, feedbackReason, updatedAt, ...rest } = draft;
     return NextResponse.json({
       ...rest,
       feedback: { rating: feedbackRating ?? null, reason: feedbackReason ?? "" },
@@ -42,7 +46,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const updateData: any = {};
+  const updateData: Prisma.DraftUpdateInput = {};
 
   if (removeVisual) {
     updateData.visualUrl = null;
@@ -74,7 +78,7 @@ export async function POST(req: NextRequest) {
 
   // Inline edit with history tracking
   if (editText !== undefined) {
-    const currentHistory = (draft.editHistory as any[]) || [];
+    const currentHistory = (draft.editHistory as DraftEditEntry[] | null) || [];
     updateData.editHistory = [
       ...currentHistory,
       { original: draft.text, edited: editText, editedAt: new Date().toISOString() },
@@ -113,7 +117,7 @@ export async function POST(req: NextRequest) {
     data: updateData,
   });
 
-  const { feedbackRating, feedbackReason, updatedAt, ...rest } = updated as any;
+  const { feedbackRating, feedbackReason, updatedAt, ...rest } = updated;
   return NextResponse.json({
     ...rest,
     feedback: { rating: feedbackRating ?? null, reason: feedbackReason ?? "" },

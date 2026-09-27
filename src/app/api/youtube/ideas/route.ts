@@ -15,6 +15,17 @@ export async function GET() {
   }
 }
 
+/** Shape of an inbound YouTube idea item (single object or bulk array). */
+interface IncomingYoutubeIdea {
+  title: string;
+  hook?: string | null;
+  angle?: string | null;
+  hookType?: string | null;
+  funnelStage?: string | null;
+  status?: string | null;
+  rejectedReason?: string | null;
+}
+
 /** Bulk-import or create a single idea. Requires internal secret header. */
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-internal-secret");
@@ -23,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const items: any[] = Array.isArray(body) ? body : [body];
+  const items: IncomingYoutubeIdea[] = Array.isArray(body) ? body : [body];
 
   // Fetch existing titles to deduplicate
   const existing = await prisma.youtubeIdea.findMany({ select: { title: true } });

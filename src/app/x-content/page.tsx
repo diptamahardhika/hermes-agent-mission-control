@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef, memo } from "react";
 import { EmptyState } from "@/components/ui/kit";
 import { usePolling } from "@/lib/use-polling";
+import { errorMessage } from "@/lib/errors";
 
 // ── shared calm-luxury chip styling ─────────────────────────────────────────
 const CHIP = "text-[11px] px-2.5 py-1 rounded-[var(--r-sm)] font-medium transition-colors inline-flex items-center gap-1";
@@ -610,8 +611,8 @@ export default function XContentPage() {
     try {
       setFetchError(null);
       setDrafts(await fetchDrafts());
-    } catch (e: any) {
-      setFetchError(e?.message || "Failed to load drafts");
+    } catch (e) {
+      setFetchError(errorMessage(e, "Failed to load drafts"));
     }
     setLoading(false);
   }, []);

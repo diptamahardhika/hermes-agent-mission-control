@@ -3,6 +3,7 @@ export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from "next/server";
 import { fetchUrlContent } from "@/lib/fetch-url-content";
+import { errorMessage } from "@/lib/errors";
 
 const TRACK_DESCRIPTIONS: Record<string, string> = {
   "mega-viral": `MEGA-VIRAL TRACK: Shocking data stories about how companies harvest user data, manipulate users, or profit from something people don't realize.
@@ -156,8 +157,8 @@ Example: ["Title 1", "Title 2", ...]`;
       themes: selectedThemes,
       inspirationUrls: urls,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("POST /api/articles/generate-titles error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }

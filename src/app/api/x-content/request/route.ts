@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export async function PATCH(req: NextRequest) {
   const existing = await prisma.contentRequest.findUnique({ where: { id: requestId } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const updateData: any = {};
+  const updateData: Prisma.ContentRequestUpdateInput = {};
   if (status) updateData.status = status;
   if (resultDraftIds) updateData.resultDraftIds = resultDraftIds;
   if (status === "done") updateData.completedAt = new Date();

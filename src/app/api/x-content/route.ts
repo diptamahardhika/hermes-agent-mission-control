@@ -1,9 +1,63 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import type { Draft, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { errorMessage } from "@/lib/errors";
+
+/**
+ * The API draft shape: the Prisma row with feedback flattened into a nested
+ * object and `updatedAt` dropped (the client never reads it).
+ */
+type ApiDraft = Omit<
+  Draft,
+  "feedbackRating" | "feedbackReason" | "updatedAt" | "metrics"
+> & {
+  feedback: { rating: string | null; reason: string };
+  /**
+   * Widened from Prisma's `JsonValue | null`: `mergeMetrics` can return
+   * `undefined` when both sources are empty, and the row is only ever
+   * serialized to JSON (where an `undefined` key is omitted, as before).
+   */
+  metrics: Prisma.JsonValue | null | undefined;
+};
+
+/**
+ * A row for a tweet posted directly on X, which has no Draft row. Returned
+ * alongside real drafts by GET. Dates are ISO strings here, exactly as the
+ * synthetic row has always been serialized.
+ */
+type SyntheticDraft = {
+  id: string;
+  text: string;
+  model: string;
+  status: string;
+  type: string;
+  feedback: { rating: string; reason: string };
+  createdAt: string;
+  postedAt: string;
+  tweetUrl: string | null;
+  postedUrl: string | null;
+  tweetId: string | null;
+  metrics: Prisma.JsonValue;
+  editHistory: unknown[];
+};
+
+/** Read a property from an untyped JSON value without asserting `any`. */
+function prop(value: unknown, key: string): unknown {
+  if (typeof value !== "object" || value === null) return undefined;
+  return (value as Record<string, unknown>)[key];
+}
+
+/** Coerce a Prisma JSON column to a plain object, defaulting to `{}`. */
+function asMetricsBlob(value: Prisma.JsonValue | null): Prisma.InputJsonObject {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Prisma.InputJsonObject;
+  }
+  return {};
+}
 
 /** Convert a Prisma Draft row to the API shape the frontend expects. */
-function draftToApi(draft: any) {
+function draftToApi(draft: Draft): ApiDraft {
   const { feedbackRating, feedbackReason, updatedAt, ...rest } = draft;
   return {
     ...rest,
@@ -12,13 +66,14 @@ function draftToApi(draft: any) {
 }
 
 /** Extract the best (highest) view count from a metrics object (flat or checkpoint format). */
-function bestViews(m: any): number {
+function bestViews(m: Prisma.JsonValue | null | undefined): number {
   if (!m || typeof m !== "object") return 0;
-  if (typeof m.views === "number") return m.views;
+  const flat = prop(m, "views");
+  if (typeof flat === "number") return flat;
   let best = 0;
   for (const val of Object.values(m)) {
     if (val && typeof val === "object") {
-      const v = Number((val as any).views) || 0;
+      const v = Number(prop(val, "views")) || 0;
       if (v > best) best = v;
     }
   }
@@ -26,7 +81,10 @@ function bestViews(m: any): number {
 }
 
 /** Merge metrics: combine both sources, preferring whichever has higher views. */
-function mergeMetrics(draftMetrics: any, tweetMetricCheckpoints: any): any {
+function mergeMetrics(
+  draftMetrics: Prisma.JsonValue | null | undefined,
+  tweetMetricCheckpoints: Prisma.JsonValue | null | undefined,
+): Prisma.JsonValue | undefined {
   const draftViews = bestViews(draftMetrics);
   const tmViews = bestViews(tweetMetricCheckpoints);
   // If both have data, merge checkpoints (draft.metrics wins on conflict)
@@ -47,7 +105,7 @@ export async function GET(req: NextRequest) {
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
   // Build where clause for status filter
-  const where: any = {};
+  const where: Prisma.DraftWhereInput = {};
   if (statusFilter) {
     where.status = statusFilter;
   }
@@ -63,8 +121,8 @@ export async function GET(req: NextRequest) {
   const dbMetrics = await prisma.tweetMetric.findMany();
 
   // Build lookup: tweetId -> metrics, draftId -> metrics
-  const metricsByTweetId: Record<string, any> = {};
-  const metricsByDraftId: Record<string, any> = {};
+  const metricsByTweetId: Record<string, (typeof dbMetrics)[number]> = {};
+  const metricsByDraftId: Record<string, (typeof dbMetrics)[number]> = {};
   for (const m of dbMetrics) {
     if (m.tweetId) metricsByTweetId[m.tweetId] = m;
     if (m.draftId) metricsByDraftId[m.draftId] = m;
@@ -75,26 +133,29 @@ export async function GET(req: NextRequest) {
 
   // Track which metric entries are already matched to a draft
   const matchedMetricTweetIds = new Set<string>();
-  const existingDraftIds = new Set(drafts.map((d: any) => d.id));
+  const existingDraftIds = new Set(drafts.map((d) => d.id));
 
   // Merge metrics into existing drafts
   for (const draft of drafts) {
     const m = metricsByDraftId[draft.id] || (draft.tweetId && metricsByTweetId[draft.tweetId]);
     if (m) {
       // Merge TweetMetric checkpoints with draft.metrics — keep whichever has higher views
-      draft.metrics = mergeMetrics(draft.metrics, (m as any).checkpoints);
-      if (!draft.tweetUrl && (m as any).url) draft.tweetUrl = (m as any).url;
-      if (!draft.postedUrl && (m as any).url) draft.postedUrl = (m as any).url;
+      draft.metrics = mergeMetrics(draft.metrics, m.checkpoints);
+      if (!draft.tweetUrl && m.url) draft.tweetUrl = m.url;
+      if (!draft.postedUrl && m.url) draft.postedUrl = m.url;
       if (!draft.tweetId && m.tweetId) draft.tweetId = m.tweetId;
       if (m.tweetId) matchedMetricTweetIds.add(m.tweetId);
     }
   }
 
-  // Add posted tweets that aren't in drafts yet (posted directly on X)
+  // Add posted tweets that aren't in drafts yet (posted directly on X).
+  // Collected separately so the array never mixes a full Draft row with a
+  // partial one; the response concatenates them in the same order as before.
+  const syntheticDrafts: SyntheticDraft[] = [];
   for (const m of dbMetrics) {
     const draftIdExists = m.draftId && existingDraftIds.has(m.draftId);
     if (m.tweetId && !matchedMetricTweetIds.has(m.tweetId) && !draftIdExists) {
-      drafts.push({
+      syntheticDrafts.push({
         id: m.draftId || `tweet-${m.tweetId}`,
         text: "",
         model: "posted-directly",
@@ -106,19 +167,19 @@ export async function GET(req: NextRequest) {
         tweetUrl: m.url,
         postedUrl: m.url,
         tweetId: m.tweetId,
-        metrics: (m as any).checkpoints,
+        metrics: m.checkpoints,
         editHistory: [],
       });
       matchedMetricTweetIds.add(m.tweetId);
     }
   }
 
-  return NextResponse.json(drafts, {
+  return NextResponse.json([...drafts, ...syntheticDrafts], {
     headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
   });
-  } catch (err: any) {
+  } catch (err) {
     console.error("GET /api/x-content error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
 
@@ -171,7 +232,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Draft not found" }, { status: 404 });
   }
 
-  const updateData: any = {};
+  const updateData: Prisma.DraftUpdateInput = {};
 
   if (undoRejection) {
     updateData.status = "pending";
@@ -186,13 +247,17 @@ export async function PATCH(req: NextRequest) {
   if (postedAt) updateData.postedAt = new Date(postedAt);
   if (metrics) {
     // Merge with existing metrics rather than overwrite
-    const existing = (draft.metrics as any) || {};
-    updateData.metrics = { ...existing, ...metrics };
+    const existing = asMetricsBlob(draft.metrics);
+    updateData.metrics = { ...existing, ...(metrics as Prisma.InputJsonObject) };
   }
 
   if (text) {
     if (draft.text !== text) {
-      const currentHistory = (draft.editHistory as any[]) || [];
+      const currentHistory: Prisma.InputJsonValue[] = Array.isArray(
+        draft.editHistory,
+      )
+        ? (draft.editHistory as Prisma.InputJsonValue[])
+        : [];
       updateData.editHistory = [
         ...currentHistory,
         {

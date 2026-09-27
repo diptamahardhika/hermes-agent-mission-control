@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { AgentState } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sh, KANBAN_DB } from "@/lib/kanban-db";
 import { homedir } from "os";
@@ -56,6 +57,17 @@ async function hermesKanbanLive(): Promise<Record<string, Live>> {
 type Live = { status: string; currentTask?: string; lastActive?: string };
 
 type Activity = { timestamp: string; action: string; result?: string };
+
+// AgentState.recentActivity is JSON in Prisma; the only writer is POST() below.
+type AgentActivityEntry = Activity;
+
+// DataStore "hermes-health" row, written by bridge.mjs mirrorHealth().
+type BridgeHealth = {
+  online?: boolean;
+  gateway?: string;
+  detail?: string;
+  lastSeen?: string;
+};
 
 // ── Recent activity + completed-task counts, derived live from kanban.db ──
 // recentActivity used to depend on cron jobs POSTing an `action` to this
@@ -208,7 +220,7 @@ export async function getAgentsData() {
       hermesKanbanActivity(),
       prisma.dataStore.findUnique({ where: { key: "hermes-health" } }),
     ]);
-    const stateMap: Record<string, any> = {};
+    const stateMap: Record<string, AgentState> = {};
     for (const s of states) {
       stateMap[s.id] = s;
     }
@@ -221,9 +233,9 @@ export async function getAgentsData() {
     // running kanban task. Without this, the agents page shows them as static
     // idle dots while the bridge is actually up — a visual gap between the
     // in-app browser's agent list and hermy-hq's /agents view.
-    // DataStore.data is JsonValue — cast to any since we control the shape written
-    // by bridge.mjs mirrorHealth() (always { online, gateway, detail, lastSeen }).
-    const healthData = (healthRow?.data as any) ?? {};
+    // DataStore.data is JsonValue; bridge.mjs mirrorHealth() always writes
+    // { online, gateway, detail, lastSeen }.
+    const healthData = (healthRow?.data as BridgeHealth | null) ?? {};
     const bridgeHealthy = healthData.online === true && healthData.gateway === "running";
     const liveMap: Record<string, Live> = {
       // NB: spread kanbanLive FIRST — the sessionLiveMap must win for any agent
@@ -290,7 +302,7 @@ export async function POST(request: Request) {
     // Get existing state or create defaults
     const existing = await prisma.agentState.findUnique({ where: { id: agentId } });
 
-    const recentActivity = (existing?.recentActivity as any[]) || [];
+    const recentActivity = (existing?.recentActivity as AgentActivityEntry[] | null) || [];
     const newRecentActivity = action
       ? [
           { timestamp: new Date().toISOString(), action },

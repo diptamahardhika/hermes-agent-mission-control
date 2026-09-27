@@ -1669,7 +1669,7 @@ function ArticleEditor({
   }
 
   const handleSave = () => {
-    const updates: Partial<Article> & Record<string, any> = {
+    const updates: Partial<Article> & Record<string, unknown> = {
       title,
       body,
       qtTweet: qtTweet || null,

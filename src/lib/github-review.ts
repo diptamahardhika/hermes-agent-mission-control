@@ -12,6 +12,7 @@ import { execSync } from "child_process";
 import { homedir } from "os";
 import { join, dirname } from "path";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
+import { errorMessage, errorStdout } from "@/lib/errors";
 
 interface ReviewFinding {
   severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO";
@@ -36,6 +37,14 @@ interface ReviewResult {
     total: number;
   };
   status: "PASS" | "BLOCK" | "WARN";
+}
+
+/** One row of `npm audit --json` output. */
+interface AuditEntry {
+  severity: string;
+  module?: string;
+  title?: string;
+  advisory?: { url?: string };
 }
 
 // ── Configuration ─────────────────────────────────────────────────────────────
@@ -81,8 +90,8 @@ function runCommand(cmd: string, args: string[], cwd?: string): string {
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 30000,
     });
-  } catch (err: any) {
-    return err.stdout || err.message || "";
+  } catch (err) {
+    return errorStdout(err) || errorMessage(err, "");
   }
 }
 
@@ -108,7 +117,7 @@ function runAudit(cwd: string): ReviewFinding[] {
   // Parse JSON output if available
   if (auditOutput.trim().startsWith("[")) {
     try {
-      const audits: any[] = JSON.parse(auditOutput);
+      const audits: AuditEntry[] = JSON.parse(auditOutput);
       for (const audit of audits) {
         if (audit.severity === "critical" || audit.severity === "high") {
           findings.push({
@@ -342,7 +351,7 @@ export async function postPRComment(opts: {
   prNumber: number;
   token: string;
   comment: string;
-}): Promise<{ success: boolean; status: number; data?: any }> {
+}): Promise<{ success: boolean; status: number; data?: unknown }> {
   const { repo, prNumber, token, comment } = opts;
   
   try {

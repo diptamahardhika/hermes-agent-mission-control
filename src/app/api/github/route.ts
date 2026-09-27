@@ -70,6 +70,49 @@ interface ActivitySummary {
   }>;
 }
 
+/** Raw `/user/repos` + `/repos` payload fields we read. */
+interface GhRepoApi {
+  id: number | string;
+  name: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  stargazers_count?: number;
+  forks_count?: number;
+  language: string | null;
+  updated_at?: string;
+  created_at?: string;
+  private: boolean;
+  fork?: boolean;
+}
+
+/** Raw `/users/:login/events` payload fields we read. */
+interface GhEvent {
+  type: string;
+  created_at: string;
+  repo?: { name?: string };
+  payload?: {
+    action?: string;
+    ref?: string;
+    ref_type?: string;
+    head?: string;
+    pull_request?: {
+      number?: number;
+      title?: string;
+      html_url?: string;
+      head?: { sha?: string };
+    };
+    issue?: { number?: number; html_url?: string };
+    release?: { tag_name?: string; html_url?: string; target_commitish?: string };
+  };
+}
+
+/** Raw `/repos/:owner/:repo/commits` payload fields we read. */
+interface GhCommit {
+  sha?: string;
+  commit?: { message?: string; author?: { date?: string } };
+}
+
 export async function GET() {
   if (!GITHUB_USERNAME) {
     return NextResponse.json({ error: "GITHUB_USERNAME not set" }, { status: 500 });
@@ -120,8 +163,8 @@ export async function GET() {
     // ── Pinned repos ─────────────────────────────────────────────────
     let pinnedRepos: Repo[] = [];
     if (pinnedRes.status === "fulfilled" && pinnedRes.value && pinnedRes.value.ok) {
-      const repos = await pinnedRes.value.json();
-      pinnedRepos = repos.map((r: any) => ({
+      const repos = (await pinnedRes.value.json()) as GhRepoApi[];
+      pinnedRepos = repos.map((r) => ({
         id: String(r.id),
         name: r.name,
         fullName: r.full_name,
@@ -139,11 +182,11 @@ export async function GET() {
     // ── Recent repos ─────────────────────────────────────────────────
     let recentRepos: Repo[] = [];
     if (reposRes.status === "fulfilled" && reposRes.value.ok) {
-      const repos = await reposRes.value.json();
+      const repos = (await reposRes.value.json()) as GhRepoApi[];
       recentRepos = repos
-        .filter((r: any) => !r.fork) // skip forks for cleaner list
+        .filter((r) => !r.fork) // skip forks for cleaner list
         .slice(0, 10)
-        .map((r: any) => ({
+        .map((r) => ({
           id: String(r.id),
           name: r.name,
           fullName: r.full_name,
@@ -175,10 +218,10 @@ export async function GET() {
     ]);
 
     // Aggregate stats from events (covers all repos, reliable counts)
-    const events: any[] =
-      eventsData.status === "fulfilled" ? eventsData.value : [];
-    const commits: any[] =
-      commitsData.status === "fulfilled" ? commitsData.value : [];
+    const events: GhEvent[] =
+      (eventsData.status === "fulfilled" ? eventsData.value : []) as GhEvent[];
+    const commits: GhCommit[] =
+      (commitsData.status === "fulfilled" ? commitsData.value : []) as GhCommit[];
     void commits;
 
     if (events.length > 0) {

@@ -16,6 +16,28 @@ export const revalidate = 0;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
 const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "";
 
+/** Minimal shape of the GitHub contributions calendar we query for. */
+interface ContributionDay {
+  date: string;
+  contributionCount: number;
+}
+
+interface ContributionWeek {
+  contributionDays?: ContributionDay[];
+}
+
+interface ContributionsResponse {
+  data?: {
+    user?: {
+      contributionsCollection?: {
+        contributionCalendar?: {
+          weeks?: ContributionWeek[];
+        };
+      };
+    };
+  };
+}
+
 async function weeklyGithubContributions() {
   if (!GITHUB_TOKEN || !GITHUB_USERNAME) return null;
   try {
@@ -47,8 +69,8 @@ async function weeklyGithubContributions() {
       next: { revalidate: 600 },
     });
     if (!res.ok) return null;
-    const json = await res.json();
-    const weeks: any[] = json?.data?.user?.contributionsCollection?.contributionCalendar?.weeks ?? [];
+    const json = (await res.json()) as ContributionsResponse;
+    const weeks: ContributionWeek[] = json?.data?.user?.contributionsCollection?.contributionCalendar?.weeks ?? [];
     const since = Date.now() - 7 * 86_400_000;
     let count = 0;
     for (const w of weeks) {

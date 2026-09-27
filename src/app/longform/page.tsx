@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { EmptyState } from "@/components/ui/kit";
+import { errorMessage } from "@/lib/errors";
 
 interface LongformScript {
   id: string;
@@ -26,6 +27,8 @@ interface LongformScript {
   tweetViews?: number;
   tweetLikes?: number;
   tweetBookmarks?: number;
+  tweetRetweets?: number;
+  tweetReplies?: number;
 }
 
 /* ── presentational tone helpers (Calm Luxury) ── */
@@ -215,8 +218,8 @@ export default function LongFormPage() {
           finalScript: data.transcript || "",
         });
         setScraped(true);
-      } catch (e: any) {
-        setScrapeError(e.message || "Could not scrape video — fill in manually");
+      } catch (e) {
+        setScrapeError(errorMessage(e, "Could not scrape video — fill in manually"));
       } finally {
         setScraping(false);
       }
@@ -297,7 +300,7 @@ export default function LongFormPage() {
                   thumbnailUrl: postForm.thumbnailUrl,
                   title: postForm.finalTitle || postModal.title,
                   fullScript: postForm.finalScript,
-                } as any);
+                });
                 setPostModal(null);
               }}
               disabled={!postForm.youtubeUrl}
@@ -620,13 +623,13 @@ export default function LongFormPage() {
 
     function saveYt() {
       if (ytUrl !== script.youtubeUrl) {
-        updateScript(script.id, { youtubeUrl: ytUrl } as any);
+        updateScript(script.id, { youtubeUrl: ytUrl });
         scrapeAndUpdate(ytUrl, undefined);
       }
       setEditingYt(false);
     }
     function saveTw() {
-      if (twUrl !== script.tweetUrl) updateScript(script.id, { tweetUrl: twUrl } as any);
+      if (twUrl !== script.tweetUrl) updateScript(script.id, { tweetUrl: twUrl });
       setEditingTw(false);
     }
 
@@ -727,7 +730,7 @@ export default function LongFormPage() {
               <div className="space-y-1">
                 <div className="flex justify-between">
                   <span className="text-[11px] text-[var(--text-3)]">Views</span>
-                  <span className="text-[11px] text-[var(--text)] font-medium num">{(script as any).tweetViews?.toLocaleString() ?? "—"}</span>
+                  <span className="text-[11px] text-[var(--text)] font-medium num">{script.tweetViews?.toLocaleString() ?? "—"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[11px] text-[var(--text-3)]">Likes</span>
@@ -739,11 +742,11 @@ export default function LongFormPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[11px] text-[var(--text-3)]">Retweets</span>
-                  <span className="text-[11px] text-[var(--text)] font-medium num">{(script as any).tweetRetweets?.toLocaleString() ?? "—"}</span>
+                  <span className="text-[11px] text-[var(--text)] font-medium num">{script.tweetRetweets?.toLocaleString() ?? "—"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[11px] text-[var(--text-3)]">Replies</span>
-                  <span className="text-[11px] text-[var(--text)] font-medium num">{(script as any).tweetReplies?.toLocaleString() ?? "—"}</span>
+                  <span className="text-[11px] text-[var(--text)] font-medium num">{script.tweetReplies?.toLocaleString() ?? "—"}</span>
                 </div>
               </div>
             </div>
@@ -759,7 +762,7 @@ export default function LongFormPage() {
               >{refreshing ? "Fetching..." : "Refresh Metrics"}</button>
             )}
             <button
-              onClick={() => updateScript(script.id, { status: "filmed" } as any)}
+              onClick={() => updateScript(script.id, { status: "filmed" })}
               className={`${BTN_BASE} ${TONE.ghost}`}
             >↩ Back to Filmed</button>
           </div>

@@ -3,6 +3,7 @@ export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from "next/server";
 import { fetchUrlContent } from "@/lib/fetch-url-content";
+import { errorMessage } from "@/lib/errors";
 
 const TRACK_FORMULAS: Record<string, string> = {
   "mega-viral": `MEGA-VIRAL FORMULA (Data Betrayal Story):
@@ -393,8 +394,8 @@ Write the COMPLETE article. Match the voice, pacing, and energy of the examples 
       inspirationUrls: urls,
       wordCount: articleBody.split(/\s+/).length,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("POST /api/articles/generate-article error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }

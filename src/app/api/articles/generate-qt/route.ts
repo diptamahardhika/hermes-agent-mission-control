@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { errorMessage } from "@/lib/errors";
 
 const QT_SYSTEM = `You write viral Quote Tweets (QTs) for your articles.
 
@@ -194,8 +195,8 @@ ${libraryQtExamples}`;
       title: articleTitle,
       track: articleTrack,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("POST /api/articles/generate-qt error:", err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
