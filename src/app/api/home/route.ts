@@ -234,10 +234,12 @@ async function getHomeData() {
     const events = eventsResult?.status === "fulfilled" && Array.isArray(eventsResult.value)
       ? (eventsResult.value as Array<{ type?: string; created_at?: string; payload?: Record<string, unknown> }>)
       : [];
-    // Per-day counts for the last 7 days — GitHub's calendar sometimes drops
+    // Per-day counts for the last 14 days — GitHub's calendar sometimes drops
     // whole days (observed: a merge-heavy day stayed 0 permanently), not just
-    // today. The events feed covers ~90 events ≈ several days of history.
-    const days = new Set([0, 1, 2, 3, 4, 5, 6].map(o => new Date(Date.now() - o * 86400000).toISOString().slice(0, 10)));
+    // today. The events feed reaches back ~20 days, so 14 is covered by it.
+    // The window must exceed the calendar's lag: a 7-day window left 2026-09-20
+    // (offset 7) permanently unpatchable, showing 0 while GitHub reported 1.
+    const days = new Set(Array.from({ length: 14 }, (_, o) => new Date(Date.now() - o * 86400000).toISOString().slice(0, 10)));
     const perDay = new Map<string, number>();
     for (const ev of events) {
       const day = (ev.created_at || "").slice(0, 10);
@@ -470,9 +472,19 @@ async function getHomeData() {
       : Promise.resolve(null),
     // GitHub events: 5-minute TTL (R3c). Events feed is near-instant, so caching
     // 5 min is safe — the contribution patching uses it only for recent-day boosts.
+    // Paginate: 100 events only reach ~4 days back on an active account, but the
+    // boost window is 14 days, so a single page left 2026-09-20 unpatchable
+    // (rendered 0 while GitHub reported 1). 3 pages reach ~20 days, covering it.
     GITHUB_USERNAME && githubEventsUrl && GITHUB_TOKEN
-      ? ttlFetch(GH_CACHE, "github-events", async () =>
-          fetch(githubEventsUrl, { headers, cache: "no-store" }).then(r => r.json()),
+      ? ttlFetch(GH_CACHE, "github-events", async () => {
+          const pages = await Promise.all([1, 2, 3].map((p) =>
+            fetch(`${githubEventsUrl}&page=${p}`, { headers, cache: "no-store" })
+              .then((r) => r.json())
+              .then((j) => (Array.isArray(j) ? j : []))
+              .catch(() => []),
+          ));
+          return pages.flat();
+        },
         300_000).then(r => r as any) // eslint-disable-line @typescript-eslint/no-explicit-any
       : Promise.resolve(null),
     // GitHub GraphQL contributions: 5-minute TTL (R3c) — single GraphQL call.
