@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Server, Cpu, Waypoints, RefreshCw, Activity, CircleDot, Zap } from "lucide-react";
+import { Twitter, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Server, Cpu, Waypoints, RefreshCw, Activity, CircleDot } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
@@ -10,24 +11,29 @@ import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget"
 import type { Decision } from "@/types/decision";
 import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 import { Panel } from "@/components/ui/kit";
-import { AccessibleTabList, AccessibleTabPanel } from "@/components/accessible-tabs";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { DiagnosticsStrip } from "@/components/diagnostics-strip";
 import {
-  IdeasSkeleton, TweetsSkeleton, XAnalyticsSkeleton,
-  SpendSkeleton, OmniSkeleton, FreeLLMSkeleton,
+  TweetsSkeleton, SpendSkeleton, FreeLLMSkeleton,
   YouTubeSkeleton, AgentsSkeleton, KanbanSkeleton,
   CryptoSkeleton, SageSkeleton,
   FreeLLMShareBarsSkeleton, ModelShareBarsSkeleton, OmniShareBarsSkeleton,
   TokenIOSplitSkeleton,
 } from "@/components/dashboard/panel-skeletons";
-import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData, CoqFinanceData, HomeData, HLPosition, Tweet, Video, Draft, YTIdea, BuildIdea, BoardIdea, Process, GitHubProfile, GitHubRepo, GitHubActivity, GitHubContribDay, GitHubContributions, GitHubHomeData, KanbanTask, HermesKanban, ScoreComponent, ScoreData } from "@/types/home-dashboard";
+import type { SpendData, OmniSpendData, FreeLLMData, HomelabHomeData, CoqFinanceData, HomeData, HLPosition, Tweet, Video, Process, GitHubProfile, GitHubRepo, GitHubActivity, GitHubContribDay, GitHubContributions, GitHubHomeData, KanbanTask, HermesKanban, ScoreComponent, ScoreData } from "@/types/home-dashboard";
 import { useDashboardWS } from "@/lib/dashboard-ws";
 import { AIModelNewsPanel } from "@/app/dashboard/aimodel-news-panel";
 import { GitHubHomeCard } from "@/app/dashboard/github-home-card";
 import { HomelabHomeCard } from "@/app/dashboard/homelab-home-card";
 
 // Types now imported from @/types/home-dashboard
+
+// ── Below-the-fold panels, split into their own chunks so the homepage
+// hydrates without parsing them up front. Same markup, deferred parse. ──
+const SpendPanel = dynamic(() => import("@/app/dashboard/spend-panel"));
+const OmniRoutePanel = dynamic(() => import("@/app/dashboard/omni-spend-panel"));
+const XAnalyticsPanel = dynamic(() => import("@/app/dashboard/x-analytics-panel"));
+const IdeasPanel = dynamic(() => import("@/app/dashboard/ideas-panel"));
 
 const EMPTY: HomeData = {
   xFollowers: 0, xGoal: 100000, xHandle: "yourhandle",
@@ -198,110 +204,6 @@ function SectionLabel({ children, right }: { children: React.ReactNode; right?: 
 // ── Ideas section ─────────────────────────────────────────
 type IdeaTab = "board" | "x" | "youtube" | "builds";
 
-function IdeasPanel({ boardIdeas, sageDrafts, ytIdeas, buildIdeas }: {
-  boardIdeas: BoardIdea[]; sageDrafts: Draft[]; ytIdeas: YTIdea[]; buildIdeas: BuildIdea[];
-}) {
-  const [tab, setTab] = useState<IdeaTab>("board");
-  const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, []);
-  const tabs: { key: IdeaTab; label: string; count: number }[] = [
-    { key: "board", label: "Board", count: boardIdeas.length },
-    { key: "x", label: "X", count: sageDrafts.length },
-    { key: "youtube", label: "YouTube", count: ytIdeas.length },
-    { key: "builds", label: "Builds", count: buildIdeas.length },
-  ];
-
-  return (
-    <div className="panel flex flex-col p-6">
-      {loading && <IdeasSkeleton />}
-      <div className="flex items-center justify-between mb-4">
-        <span className="eyebrow">Top Ideas</span>
-        <AccessibleTabList
-          idPrefix="ideas"
-          panelId="ideas-tabpanel"
-          ariaLabel="Idea sources"
-          tabs={tabs.map((t) => ({
-            key: t.key,
-            label: <>{t.label}{t.count > 0 && <span className="ml-1 num text-[var(--hq-text-ghost)]">{t.count}</span>}</>,
-          }))}
-          activeTab={tab}
-          onChange={setTab}
-          className="flex gap-1 rounded-lg border border-[var(--hq-hairline)] p-0.5"
-          buttonClassName={(active) => `px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${active ? "bg-white/[0.08] text-[var(--hq-text)]" : "text-[var(--hq-text-dim)] hover:text-[var(--hq-text)]"}`}
-        />
-      </div>
-
-      <AccessibleTabPanel id="ideas-tabpanel" labelledBy={`ideas-tab-${tab}`} className="space-y-1 min-h-[172px]">
-        {tab === "board" && (boardIdeas.length > 0 ? (
-          <div>
-            <div className="space-y-0">
-              {boardIdeas.map((it, i) => {
-                const catLabel = CATEGORY_LABEL[it.category] || it.category || "Build";
-                const catColor = CATEGORY_COLOR[it.category] || "#34d399";
-                const src = it.source && it.source !== "manual" ? `via ${it.source}` : null;
-                return (
-                  <a key={it.id} href="/ideas" className="group flex gap-3 items-start py-2.5 border-b border-[var(--hq-hairline)] last:border-0">
-                    <span className="num text-[11px] text-[var(--hq-text-ghost)] w-5 shrink-0 mt-0.5">{String(i + 1).padStart(2, "0")}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-[var(--hq-text-dim)] text-[13px] font-medium leading-snug line-clamp-1 group-hover:text-[var(--hq-text)] transition-colors flex-1">{it.title}</p>
-                        <span className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full num"
-                          style={{ color: catColor, background: `${catColor}14`, border: `1px solid ${catColor}30` }}>
-                          {catLabel}
-                        </span>
-                      </div>
-                      {it.description && <p className="text-[var(--hq-text-ghost)] text-[12px] leading-snug line-clamp-2 mb-1.5">{it.description}</p>}
-                      <div className="flex items-center gap-2 text-[10px] num text-[var(--hq-text-faint)]">
-                        {src && <span>{src}</span>}
-                        {it.estimatedTime && <span>· {it.estimatedTime}</span>}
-                        {it.agent && <span>· @{it.agent}</span>}
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-[var(--hq-text-ghost)] group-hover:text-[var(--hq-text-dim)] shrink-0 mt-0.5 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                  </a>
-                );
-              })}
-            </div>
-            <a href="/ideas" className="mt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
-              Open idea board <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-            </a>
-          </div>
-        ) : <Empty>No active ideas on the board yet.</Empty>)}
-
-        {tab === "x" && (sageDrafts.length > 0 ? sageDrafts.map((d, i) => (
-          <a key={d.id} href="/x-content" className="group flex gap-3 items-center py-2 border-b border-[var(--hq-hairline)] last:border-0 hover:opacity-100 transition-opacity">
-            <span className="num text-[11px] text-[var(--hq-text-ghost)] w-5 shrink-0">{String(i + 1).padStart(2, "0")}</span>
-            <p className="text-[var(--hq-text-dim)] text-[13px] leading-snug line-clamp-1 flex-1 group-hover:text-[var(--hq-text)] transition-colors">{d.text}</p>
-            <ChevronRight className="w-3.5 h-3.5 text-[var(--hq-text-ghost)] group-hover:text-[var(--hq-text-dim)] shrink-0 transition-all group-hover:translate-x-0.5" />
-          </a>
-        )) : <Empty>No pending drafts.</Empty>)}
-
-        {tab === "youtube" && (ytIdeas.length > 0 ? ytIdeas.map((it, idx) => (
-          <a key={idx} href="/youtube" className="group flex gap-3 items-center py-2 border-b border-[var(--hq-hairline)] last:border-0">
-            <span className="num text-[11px] text-[var(--hq-text-ghost)] w-5 shrink-0">{String(idx + 1).padStart(2, "0")}</span>
-            <p className="text-[var(--hq-text-dim)] text-[13px] font-medium line-clamp-1 flex-1 group-hover:text-[var(--hq-text)] transition-colors">{it.title}</p>
-            <ChevronRight className="w-3.5 h-3.5 text-[var(--hq-text-ghost)] group-hover:text-[var(--hq-text-dim)] shrink-0 transition-all group-hover:translate-x-0.5" />
-          </a>
-        )) : <Empty>No YouTube ideas yet.</Empty>)}
-
-        {tab === "builds" && (buildIdeas.length > 0 ? buildIdeas.map((it, idx) => (
-          <div key={idx} className="flex gap-3 items-center py-2 border-b border-[var(--hq-hairline)] last:border-0">
-            <span className="num text-[11px] text-[var(--hq-text-ghost)] w-5 shrink-0">{String(idx + 1).padStart(2, "0")}</span>
-            <p className="text-[var(--hq-text-dim)] text-[13px] font-medium line-clamp-1 flex-1">{it.title}</p>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-md num border shrink-0"
-              style={it.effort === "quick win"
-                ? { color: "var(--hq-up)", borderColor: "rgba(52,211,153,0.25)", background: "rgba(52,211,153,0.08)" }
-                : it.effort === "large"
-                ? { color: "var(--hq-down)", borderColor: "rgba(251,113,133,0.25)", background: "rgba(251,113,133,0.08)" }
-                : { color: "var(--hq-warn)", borderColor: "rgba(251,191,36,0.25)", background: "rgba(251,191,36,0.08)" }}>
-              {it.effort}
-            </span>
-          </div>
-        )) : <Empty>No build ideas yet.</Empty>)}
-      </AccessibleTabPanel>
-    </div>
-  );
-}
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="text-[var(--hq-text-ghost)] text-[13px] py-8 text-center">{children}</p>;
@@ -359,161 +261,8 @@ function TopTweetsPanel({ tweets }: { tweets: Tweet[] }) {
   );
 }
 
-// ── X analytics panel ─────────────────────────────────────
-function XAnalyticsPanel({ views, trend, totalTweets, bestDay, bestHour }: {
-  views: number; trend: number[]; totalTweets: number; bestDay: string; bestHour: string;
-}) {
-  const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, []);
-  return (
-    <div className="panel flex flex-col p-6">
-      {loading && <XAnalyticsSkeleton />}
-      <div className="flex items-center gap-2 mb-4">
-        <Twitter className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
-        <span className="eyebrow">X Analytics</span>
-      </div>
-      <div className="space-y-4">
-        <div>
-          <div className="eyebrow mb-2 !text-[9.5px]">Views · 7d</div>
-          <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">{fmt(views)}</div>
-          {trend.some(v => v > 0) && <Sparkline data={trend} color="#38bdf8" area idSeed="xviews" className="h-9 mt-3" aria-label="X views trend over 7 days" />}
-        </div>
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <div>
-            <div className="eyebrow mb-1.5 !text-[9.5px]">Tracked</div>
-            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{fmtExact(totalTweets)}</div>
-          </div>
-          <div>
-            <div className="eyebrow mb-1.5 !text-[9.5px]">Best window</div>
-            <div className="text-[13px] font-medium text-[var(--hq-text-dim)]">{bestDay}<span className="num"> · {bestHour}</span></div>
-          </div>
-        </div>
-      </div>
-      <a href="/x" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
-        Open X dashboard <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-      </a>
-    </div>
-  );
-}
 
-// ── Agent compute spend panel ─────────────────────────────
-function SpendPanel({ spend }: { spend: SpendData }) {
-  const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, []);
-  const series = spend.days.map(d => d.tokens);
-  const topModel = [...spend.byModel].sort((a, b) => b.tokens - a.tokens)[0];
-  return (
-    <div className="panel flex flex-col p-6">
-      {loading && <SpendSkeleton />}
-      <div className="flex items-center gap-2 mb-4">
-        <Cpu className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
-        <span className="eyebrow">Agent Compute · 7d</span>
-        {spend.syncedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">synced {timeAgo(spend.syncedAt)}</span>}
-      </div>
-      <div className="space-y-4">
-        <div>
-          <div className="eyebrow mb-2 !text-[9.5px]">Total tokens · 7d</div>
-          <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
-            {spend.totalTokens != null ? fmtExact(spend.totalTokens) : "—"}
-          </div>
-          {series.some(v => v > 0) && <Sparkline data={series} color="#a78bfa" area idSeed="spend" className="h-9 mt-3" aria-label="Agent tokens trend over 7 days" />}
-        </div>
-        {(() => {
-          const cached = spend.byModel.reduce((s, m) => s + (m.cacheReadTokens ?? 0), 0);
-          const topCache = topModel?.cacheReadTokens ?? 0;
-          const topCachePct = topModel && topModel.tokens ? Math.round((topCache / topModel.tokens) * 100) : 0;
-          return (
-        <>
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <div>
-            <div className="eyebrow mb-1.5 !text-[9.5px]">Sessions</div>
-            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{spend.sessions != null ? fmtExact(spend.sessions) : "—"}</div>
-          </div>
-          <div>
-            <div className="eyebrow mb-1.5 !text-[9.5px]">Tool calls</div>
-            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{spend.toolCalls != null ? fmtExact(spend.toolCalls) : "—"}</div>
-          </div>
-        </div>
-        {cached > 0 && (
-          <div className="text-[12px] text-[var(--hq-text-dim)]">
-            Cached reads <span className="num text-[var(--hq-text)] font-medium">{fmt(cached)}</span>
-            <span className="num text-[var(--hq-text-ghost)]"> · {Math.round((cached / (spend.totalTokens || 1)) * 100)}% of total</span>
-          </div>
-        )}
-        {topModel && (
-          <div className="text-[12px] text-[var(--hq-text-dim)]">
-            Top model <span className="text-[var(--hq-text)] font-medium">{topModel.model}</span>
-            <span className="num text-[var(--hq-text-ghost)]">
-               · {fmt(topModel.tokens)} tok{topCache > 0 ? ` (${topCachePct}% cached)` : ""}
-            </span>
-          </div>
-        )}
-        </>
-        );
-          })()}
-      </div>
-      <a href="/hermes#runs" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
-        Open Hermes hub <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-      </a>
-    </div>
-  );
-}
 
-// ── OmniRoute compute spend panel — twin of SpendPanel for the router ──
-function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
-  const [loading, setLoading] = useState(true);
-  useEffect(() => { setLoading(false); }, []);
-  const series = omni.days.map(d => d.tokens);
-  const topModel = [...omni.byModel].sort((a, b) => b.tokens - a.tokens)[0];
-  const topCache = topModel?.cacheReadTokens ?? 0;
-  const topCachePct = topModel && topModel.tokens ? Math.round((topCache / topModel.tokens) * 100) : 0;
-  return (
-    <div className="panel flex flex-col p-6">
-      {loading && <OmniSkeleton />}
-      <div className="flex items-center gap-2 mb-4">
-        <Waypoints className="w-3.5 h-3.5" style={{ color: "#2dd4bf" }} />
-        <span className="eyebrow">OmniRoute Compute · 7d</span>
-        {omni.syncedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">synced {timeAgo(omni.syncedAt)}</span>}
-      </div>
-      <div className="space-y-4">
-        <div>
-          <div className="eyebrow mb-2 !text-[9.5px]">Total tokens · 7d</div>
-          <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
-            {omni.totalTokens != null ? fmtExact(omni.totalTokens) : "—"}
-          </div>
-          {series.some(v => v > 0) && <Sparkline data={series} color="#2dd4bf" area idSeed="omni-spend" className="h-9 mt-3" aria-label="OmniRoute tokens trend over 7 days" />}
-        </div>
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <div>
-            <div className="eyebrow mb-1.5 !text-[9.5px]">Calls</div>
-            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{fmtExact(omni.totalCalls)}</div>
-          </div>
-          <div>
-            <div className="eyebrow mb-1.5 !text-[9.5px]">Models</div>
-            <div className="num font-semibold text-[18px] text-[var(--hq-text)]">{fmtExact(omni.byModel.length)}</div>
-          </div>
-        </div>
-        {omni.cacheReadTokens > 0 && (
-          <div className="text-[12px] text-[var(--hq-text-dim)]">
-            Cached reads <span className="num text-[var(--hq-text)] font-medium">{fmt(omni.cacheReadTokens)}</span>
-            <span className="num text-[var(--hq-text-ghost)]"> · {Math.round((omni.cacheReadTokens / (omni.totalTokens || 1)) * 100)}% of total</span>
-          </div>
-        )}
-        {topModel && (
-          <div className="text-[12px] text-[var(--hq-text-dim)]">
-            Top model <span className="text-[var(--hq-text)] font-medium">{topModel.model}</span>
-            <span className="num text-[var(--hq-text-ghost)]">
-               · {fmt(topModel.tokens)} tok{topCache > 0 ? ` (${topCachePct}% cached)` : ""}
-            </span>
-          </div>
-        )}
-      </div>
-      <a href="/api/omniroute/link" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
-        Open OmniRoute analytics <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-      </a>
-    </div>
-  );
-}
 
 // ── FreeLLMAPI per-model share bars (provider from local router) ──
 const FREELLM_TOK_COLORS = { input: "#f59e0b", cache: "#fcd34d", output: "#fbbf24" };
