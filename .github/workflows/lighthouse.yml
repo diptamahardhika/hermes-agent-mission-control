@@ -48,10 +48,16 @@ jobs:
         env:
           CI: 'true'
 
+      # include-hidden-files is required: .lighthouse-ci is a dot-directory and
+      # upload-artifact@v4 excludes hidden paths by default, so this step has
+      # been reporting success while uploading nothing. Mirrors the accessibility
+      # workflow, which already sets the same flag.
       - name: Upload Lighthouse report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-report-${{ github.sha }}
           path: .lighthouse-ci/
+          if-no-files-found: error
           retention-days: 7
+          include-hidden-files: true
