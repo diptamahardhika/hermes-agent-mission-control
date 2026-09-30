@@ -121,4 +121,31 @@ test.describe('API health', () => {
       expect(body, `${path} returned no JSON`).toBeTruthy();
     }
   });
+
+  // The regression that motivated all of this: withCache was backed by Redis,
+  // no REDIS_URL was set and nothing listened on :6379, so every call failed
+  // inside a try/catch that returned null. Every request silently took the
+  // miss path and re-ran the handler — /api/home went from ~7ms to ~450ms and
+  // never once reported the failure. A status check cannot see this; only the
+  // cache header can.
+  test('polled routes are actually cached', async ({ request }) => {
+    test.skip(
+      !!process.env.CI,
+      'no database in CI; /api/home and /api/agents require Postgres',
+    );
+
+    for (const path of ['/api/home', '/api/agents']) {
+      // Prime, then assert the second request is served from cache. Fetch is
+      // used directly rather than the request fixture so the X-Cache header
+      // is readable on the warm response.
+      await request.get(path);
+
+      const warm = await request.get(path);
+      expect(warm.status(), `${path} warm HTTP status`).toBe(200);
+      expect(
+        warm.headers()['x-cache'],
+        `${path} was not served from cache — a cache that silently never populates is the regression this guards against`,
+      ).toBe('HIT');
+    }
+  });
 });
