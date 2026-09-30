@@ -33,6 +33,12 @@ const CONSOLE_NOISE: RegExp[] = [
   // the API test covers the data routes, so the generic resource message
   // carries no signal here.
   /Failed to load resource/i,
+  // `/api/tasks` reads an Obsidian vault from the filesystem. Without
+  // OBSIDIAN_VAULT_PATH (unset in CI) it throws, and the page logs that error
+  // before rendering its own error state. The failure is already visible to
+  // the user in the UI, so the console echo is not additional signal.
+  /OBSIDIAN_VAULT_PATH is not set/i,
+  /Failed to fetch tasks/i,
 ];
 
 /** True when a console message is dev-server noise rather than a defect. */
