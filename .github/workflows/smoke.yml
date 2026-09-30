@@ -32,8 +32,20 @@ jobs:
       - name: Start Next.js server
         run: PORT=8888 npm run start &
 
+      # Wait for the server to actually serve. Polling `/` rather than
+      # /api/hermes/health: the health route queries Postgres, which is not
+      # available in CI, so it would hang and time out here.
       - name: Wait for server
-        run: sleep 10 && curl -sf http://localhost:8888/api/hermes/health > /dev/null
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8888/ > /dev/null; then
+              echo "server up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "server did not come up in 30s"
+          exit 1
 
       # SKIP_WEBSERVER: the server is already running above, so the config's
       # webServer block is disabled rather than starting a second instance.

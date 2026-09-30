@@ -34,11 +34,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+  // Readiness probe. Deliberately NOT /api/hermes/health: that route queries
+  // Postgres, and CI has no database, so waiting on it would always time out.
   webServer: process.env.SKIP_WEBSERVER
     ? undefined
     : {
         command: 'npm run dev',
-        url: `${BASE_URL}/api/hermes/health`,
+        url: `${BASE_URL}/`,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
         stdout: 'ignore',
