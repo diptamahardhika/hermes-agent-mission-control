@@ -83,12 +83,15 @@ function getHomelabLabel(checkedAt: string | undefined, connected: boolean) {
   const age = Date.now() - new Date(checkedAt).getTime();
   return age > 10 * 60 * 1000 ? "STALE" : "LIVE";
 }
-function HomelabStatusBadge({ data }: { data: HomelabHomeData | undefined }) {
+/**
+ * `now` is the caller's ticking clock, passed in rather than read with
+ * `Date.now()` here: calling an impure function during render is a React
+ * purity violation, and the parent already re-renders every second.
+ */
+function HomelabStatusBadge({ data, now }: { data: HomelabHomeData | undefined; now: Date }) {
   const connected = data?.connected;
   const checkedAt = data?.checkedAt;
-  const ageRef = useRef<number>(0);
-  const [age, setAge] = useState<number>(0);
-  const showPing = connected && checkedAt && age <= 10 * 60 * 1000;
+  const showPing = connected && checkedAt && (now.getTime() - new Date(checkedAt).getTime()) <= 10 * 60 * 1000;
   return (
     <div className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium" style={getHomelabBadgeStyle(checkedAt, connected ?? false)}>
       <span className="relative flex w-1.5 h-1.5">
@@ -774,7 +777,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
         <span className="text-base leading-none">🪙</span>
         <span className="eyebrow">Binance / Crypto</span>
         {data.hlLastSync && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">synced {timeAgo(data.hlLastSync)}</span>}
-        <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">spot · flexible earn</span>
+        <span className="num text-[10px] text-[var(--hq-text-ghost)]">spot · flexible earn</span>
       </div>
 
       {!hasData ? (
@@ -1083,7 +1086,7 @@ if (!mounted) return null;
 
         {/* ── Stale-data warning banner ─────────────── */}
         {fetchFailureCount >= 2 && (
-          <div className="sticky top-0 z-50 mx-auto mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-[13px] font-medium"
+          <div role="alert" aria-live="assertive" className="sticky top-0 z-50 mx-auto mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-[13px] font-medium"
             style={{
               color: "var(--hq-warn)",
               borderColor: "rgba(251,191,36,0.25)",
@@ -1122,7 +1125,7 @@ if (!mounted) return null;
                   <span className="num">{data.daysSincePost === 0 ? "Posted today" : `${data.daysSincePost}d since post`}</span>
                 </div>
               )}
-              <HomelabStatusBadge data={data.homelab} />
+              <HomelabStatusBadge data={data.homelab} now={time} />
             </div>
             {score && <ScoreGauge score={score} />}
           </div>
@@ -1239,7 +1242,6 @@ if (!mounted) return null;
             recentDecisions={decisions?.decisions?.slice(0, 5) || []}
             loading={!decisions}
             onAction={(action, decisionId) => {
-              console.log("Dashboard decision action:", action, decisionId);
               router.push(`/admin/decisions?highlight=${decisionId}`);
             }}
           />

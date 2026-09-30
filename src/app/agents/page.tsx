@@ -74,11 +74,13 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isExpanded: boolean; onToggle: () => void; onChat: () => void }) {
+function AgentCard({ agent, isExpanded, onToggle, onChat, onChatRef }: { agent: Agent; isExpanded: boolean; onToggle: () => void; onChat: () => void; onChatRef?: React.RefObject<HTMLButtonElement | null> }) {
   const status = statusConfig[agent.status] || statusConfig.offline;
   const lastActivity = agent.recentActivity.length > 0 ? agent.recentActivity[0] : null;
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    // Only handle keys on the card itself, not descendants (e.g. chat button)
+    if (e.target !== e.currentTarget) return;
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); }
   }
 
@@ -160,7 +162,7 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
       {/* Chat button — visible on Cards view */}
       {onChat && (
         <div className="px-5 py-3" style={{ borderTop: "1px solid var(--line)" }}>
-          <button onClick={onChat} className="flex items-center gap-2 w-full rounded-full min-h-[44px] px-4 py-2.5 text-[13px] text-[var(--text-2)] transition-colors panel-interactive hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          <button onClick={onChat} ref={onChatRef} className="flex items-center gap-2 w-full rounded-full min-h-[44px] px-4 py-2.5 text-[13px] text-[var(--text-2)] transition-colors panel-interactive hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             style={{ background: "var(--surface-1)", border: "1px solid var(--line)" }}>
             <span>{agent.emoji}</span> Chat with {agent.name}
           </button>
@@ -171,19 +173,24 @@ function AgentCard({ agent, isExpanded, onToggle, onChat }: { agent: Agent; isEx
 }
 
 // ── Live Agent Chat ───────────────────────────────────────
-function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
+function AgentChat({ agent, triggerRef, onClose }: { agent: Agent; triggerRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<{ role: "user"|"assistant"; content: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
-  const firstFocusableRef = useRef<HTMLButtonElement>(null);
 
-  // Focus first focusable on open, restore to trigger on close
+  // Save the element that triggered the modal, and restore focus on close
   useEffect(() => {
-    if (modalRef.current && firstFocusableRef.current) {
-      firstFocusableRef.current.focus();
+    // Focus the first focusable element in the modal (close button)
+    const focusable = modalRef.current?.querySelectorAll<HTMLElement>('button, [tabindex]:not([tabindex="-1"])');
+    if (focusable && focusable.length > 0) {
+      focusable[0].focus();
     }
+    // Cleanup: restore focus to the trigger when modal closes
+    return () => {
+      triggerRef.current?.focus();
+    };
   }, []);
 
   // Prevent body scroll when modal is open
@@ -258,8 +265,7 @@ function AgentChat({ agent, onClose }: { agent: Agent; onClose: () => void }) {
             <div className="text-[14px] font-semibold text-[var(--text)]">{agent.name}</div>
             <div className="text-[12px] text-[var(--text-3)]">{agent.role}</div>
           </div>
-          <button onClick={onClose} ref={firstFocusableRef}
-            className="ml-auto text-[var(--text-3)] hover:text-[var(--text)] transition-colors text-xl leading-none"
+          <button onClick={onClose} className="ml-auto text-[var(--text-3)] hover:text-[var(--text)] transition-colors text-xl leading-none"
             aria-label="Close chat">×</button>
         </div>
         {/* Messages */}
@@ -321,6 +327,7 @@ export default function AgentsPage() {
   const [view, setView] = useState<"cards" | "office">("office");
   const [chatAgent, setChatAgent] = useState<Agent | null>(null);
   const [proposals, setProposals] = useState<AgentProposal[]>([]);
+  const chatTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [proposalsCollapsed, setProposalsCollapsed] = useState(false);
   const [proposalsLoading, setProposalsLoading] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "agent">("newest");
@@ -531,7 +538,7 @@ export default function AgentsPage() {
       </div>
 
       {/* Live Agent Chat Modal */}
-      {chatAgent && <AgentChat agent={chatAgent} onClose={() => setChatAgent(null)} />}
+      {chatAgent && <AgentChat agent={chatAgent} triggerRef={chatTriggerRef} onClose={() => { setChatAgent(null); } } />}
 
       {/* Proposals section */}
       {proposals.length > 0 && (() => {
@@ -730,6 +737,7 @@ export default function AgentsPage() {
               isExpanded={expandedAgent === maxAgent.id}
               onToggle={() => setExpandedAgent(expandedAgent === maxAgent.id ? null : maxAgent.id)}
               onChat={() => setChatAgent(maxAgent)}
+              onChatRef={chatTriggerRef}
             />
           )}
 
@@ -742,6 +750,7 @@ export default function AgentsPage() {
                 isExpanded={expandedAgent === agent.id}
                 onToggle={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
                 onChat={() => setChatAgent(agent)}
+                onChatRef={chatTriggerRef}
               />
             ))}
           </div>
