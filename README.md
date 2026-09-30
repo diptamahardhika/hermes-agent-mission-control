@@ -187,6 +187,13 @@ Open <http://localhost:3000> and sign in with a Google account whose email is in
 
 ### 5. Deploy to Vercel
 
+> **Caveat:** a few routes write trigger files to the local filesystem for the
+> Hermes agents to pick up, and read bundled data files. Those do not work on a
+> serverless host like Vercel, where the filesystem is read-only and ephemeral.
+> See [docs/local-only-paths.md](docs/local-only-paths.md) for the affected
+> routes and what a real move would take. The supported deployment is Docker on
+> your own hardware.
+
 ```sh
 npm i -g vercel   # if you don't have it
 vercel            # link + deploy a preview

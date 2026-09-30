@@ -6,6 +6,7 @@ import { execSync } from "child_process";
 import { prisma } from "@/lib/prisma";
 
 // TODO: This path won't exist on Vercel — consider bundling voice-rules or storing in DB
+// Intentional for the local Docker deployment; see docs/local-only-paths.md
 const VOICE_RULES = path.join("./data/tweet-library", "voice-rules.md");
 
 // Draft.editHistory is JSON in Prisma; every writer pushes this shape.

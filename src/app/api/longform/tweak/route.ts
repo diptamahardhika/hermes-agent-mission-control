@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 
+// Trigger file is local-only by design; see docs/local-only-paths.md
 // TODO: Trigger files written to the local filesystem won't work on Vercel.
 // This route needs to be reworked for serverless (e.g., use a database queue,
 // Inngest, or a similar job system) when deploying to Vercel.

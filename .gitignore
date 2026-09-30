@@ -122,3 +122,9 @@ graphify-out/GRAPH_REPORT.md
 .lighthouseci/
 .lighthouse-results.json
 .codex/
+
+# Playwright smoke tests
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

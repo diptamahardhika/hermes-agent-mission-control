@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     // Note: tweakRequested is not in the Prisma schema, so we store it as part of a JSON update
     // For now, just write the trigger file
     // TODO: Trigger file paths won't exist on Vercel — needs a different mechanism (e.g. queue, webhook)
+    // Intentional for the local Docker deployment; see docs/local-only-paths.md
     try {
       const triggerDir = path.join("./data", "triggers");
       fs.mkdirSync(triggerDir, { recursive: true });
