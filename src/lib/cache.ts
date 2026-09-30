@@ -1,5 +1,19 @@
+/**
+ * In-process response cache for API routes.
+ *
+ * This was previously backed by Redis, but no `REDIS_URL` was configured and
+ * nothing was listening on :6379, so every request took the miss path and
+ * re-ran the full handler — `/api/home` never once returned `X-Cache: HIT`.
+ * The failure was silent because every Redis call was wrapped in a try/catch
+ * that returned `null`. For a single-instance dashboard an in-process `Map`
+ * gives the same TTL with no external service to keep alive.
+ *
+ * Trade-off: state is per-process. If this ever runs behind more than one
+ * instance, each keeps its own cache and the TTL becomes approximate. At that
+ * point move to a shared store.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, connectRedis } from './redis';
 
 // Cache TTL constants (in seconds)
 export const CACHE_TTL = {
@@ -18,6 +32,24 @@ export const CACHE_TTL = {
 // Cache key prefix for the application
 const CACHE_PREFIX = 'hermes:hq:api:';
 
+type CacheEntry = {
+  /** The JSON payload plus the headers `withCache` was asked to preserve. */
+  data: unknown;
+  headers: Record<string, string>;
+  expires: number;
+};
+
+/**
+ * Stored on `globalThis` so a Next.js dev hot-reload — which re-evaluates
+ * modules — does not silently start with an empty cache. Same pattern as
+ * `lib/prisma.ts` and the previous `lib/redis.ts`.
+ */
+const globalForCache = globalThis as unknown as {
+  __hqCache?: Map<string, CacheEntry>;
+};
+
+const store: Map<string, CacheEntry> = (globalForCache.__hqCache ??= new Map());
+
 /**
  * Generate a cache key from the request URL and optional custom suffix
  */
@@ -30,63 +62,68 @@ export function generateCacheKey(request: NextRequest, suffix?: string): string 
 }
 
 /**
- * Get cached response if available
+ * Get a cached response if it has not expired.
+ *
+ * Expired entries are dropped on read, so the map cannot grow without bound
+ * for keys that are never re-requested within their TTL.
  */
 export async function getCachedResponse<T>(key: string): Promise<T | null> {
-  try {
-    await connectRedis();
-    const cached = await redis.get(key);
-    if (cached) {
-      return JSON.parse(cached) as T;
-    }
-    return null;
-  } catch (error) {
-    console.warn('[cache] Get failed:', error);
+  const hit = store.get(key);
+  if (!hit) return null;
+  if (Date.now() >= hit.expires) {
+    store.delete(key);
     return null;
   }
+  return hit as T;
 }
 
 /**
- * Set cache with TTL
+ * Set cache with TTL. `data` is the `{ data, headers }` envelope `withCache`
+ * builds — the same shape the previous Redis implementation stored.
  */
-export async function setCache(key: string, data: unknown, ttlSeconds: number): Promise<void> {
-  try {
-    await connectRedis();
-    await redis.setex(key, ttlSeconds, JSON.stringify(data));
-  } catch (error) {
-    console.warn('[cache] Set failed:', error);
-  }
+export async function setCache(
+  key: string,
+  data: { data: unknown; headers: Record<string, string> },
+  ttlSeconds: number
+): Promise<void> {
+  store.set(key, {
+    data: data.data,
+    headers: data.headers,
+    expires: Date.now() + ttlSeconds * 1000,
+  });
 }
 
 /**
  * Invalidate cache by key pattern
  */
 export async function invalidateCache(pattern: string): Promise<number> {
-  try {
-    await connectRedis();
-    const keys = await redis.keys(`${CACHE_PREFIX}${pattern}*`);
-    if (keys.length > 0) {
-      return await redis.del(...keys);
-    }
-    return 0;
-  } catch (error) {
-    console.warn('[cache] Invalidate failed:', error);
-    return 0;
+  if (!pattern) {
+    const count = store.size;
+    store.clear();
+    return count;
   }
+
+  // The Redis version matched `${CACHE_PREFIX}${pattern}*`; a Map has no glob,
+  // so treat the pattern as a substring of the key. The only caller passes an
+  // empty pattern ("clear everything"), handled by the branch above.
+  const needle = pattern.startsWith(CACHE_PREFIX)
+    ? pattern.slice(CACHE_PREFIX.length)
+    : pattern;
+  let count = 0;
+  for (const key of [...store.keys()]) {
+    if (key.includes(needle)) {
+      store.delete(key);
+      count++;
+    }
+  }
+  return count;
 }
 
 /**
  * Invalidate specific cache key
  */
 export async function invalidateCacheKey(key: string): Promise<boolean> {
-  try {
-    await connectRedis();
-    const result = await redis.del(key);
-    return result > 0;
-  } catch (error) {
-    console.warn('[cache] Invalidate key failed:', error);
-    return false;
-  }
+  return store.delete(key);
 }
 
 /**
