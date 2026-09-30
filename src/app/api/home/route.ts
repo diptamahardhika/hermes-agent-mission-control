@@ -4,6 +4,7 @@ import ideasJson from "@/data/ideas.json" assert { type: "json" };
 import { withCache, CACHE_TTL } from "@/lib/cache";
 import { CoqFinanceData, FreeLLMData } from "@/types/home-dashboard";
 import { getAgentsData } from "@/app/api/agents/route";
+import { getFreeLLMData } from "@/app/api/freellm/route";
 
 // GitHub API profile shape for normalizeGithubProfile.
 interface GitHubProfileApi {
@@ -399,36 +400,50 @@ async function getHomeData() {
       };
       // Authoritative total: wallet/balance reports every wallet's value in BTC
       // (Earn, Trading Bots, Spot, Funding, Margin...). Convert via BTCUSDT.
-      let btcTotal = 0;
-      const wallets: { name: string; btc: number }[] = [];
-      try {
-        const wb = await call("/sapi/v1/asset/wallet/balance");
-        for (const w of wb as { walletName: string; balance: string }[]) {
-          const btc = parseFloat(w.balance);
-          if (btc > 0) { btcTotal += btc; wallets.push({ name: w.walletName, btc }); }
-        }
-      } catch { /* fall back to partial data below */ }
-      const btcPrice = await fetch(`${base}/api/v3/ticker/price?symbol=BTCUSDT`, { cache: "no-store" })
+      // These four calls are independent, so issue them together — running them
+      // in sequence stacked ~400ms of network latency into every cache miss.
+      const btcTotalPromise = call("/sapi/v1/asset/wallet/balance")
+        .then((wb) => {
+          let btcTotal = 0;
+          const wallets: { name: string; btc: number }[] = [];
+          for (const w of wb as { walletName: string; balance: string }[]) {
+            const btc = parseFloat(w.balance);
+            if (btc > 0) { btcTotal += btc; wallets.push({ name: w.walletName, btc }); }
+          }
+          return { btcTotal, wallets };
+        })
+        .catch(() => ({ btcTotal: 0, wallets: [] as { name: string; btc: number }[] }));
+
+      const btcPricePromise = fetch(`${base}/api/v3/ticker/price?symbol=BTCUSDT`, { cache: "no-store" })
         .then(r => r.json()).then((p: { price: string }) => parseFloat(p.price)).catch(() => 0);
+
+      const pricesPromise = fetch(`${base}/api/v3/ticker/price`, { cache: "no-store" })
+        .then(r2 => r2.json())
+        .then((px) => Object.fromEntries((px as { symbol: string; price: string }[]).map(p2 => [p2.symbol, parseFloat(p2.price)])))
+        .catch(() => ({}) as Record<string, number>);
+
+      const flexPromise = call("/sapi/v1/simple-earn/flexible/position?size=100")
+        .catch(() => null);
+
+      const [{ btcTotal }, btcPrice, prices, flex] = await Promise.all([
+        btcTotalPromise,
+        btcPricePromise,
+        pricesPromise,
+        flexPromise,
+      ]);
       const balance = btcTotal * btcPrice;
 
       // Asset-level breakdown from flexible earn positions (largest component)
-      let prices: Record<string, number> = {};
-      try {
-        const px = await fetch(`${base}/api/v3/ticker/price`, { cache: "no-store" }).then(r2 => r2.json());
-        prices = Object.fromEntries((px as { symbol: string; price: string }[]).map(p2 => [p2.symbol, parseFloat(p2.price)]));
-      } catch { /* skip */ }
       const usdtValue = (asset: string, qty: number) =>
         asset === "USDT" ? qty : (prices[`${asset}USDT`] ?? 0) * qty;
       const assets: { asset: string; amount: number; usdValue: number; wallet: string }[] = [];
-      try {
-        const flex = await call("/sapi/v1/simple-earn/flexible/position?size=100");
+      if (flex) {
         for (const row of flex.rows as { asset: string; totalAmount: string }[]) {
           const qty = parseFloat(row.totalAmount);
           if (qty <= 0) continue;
           assets.push({ asset: row.asset, amount: qty, usdValue: usdtValue(row.asset, qty), wallet: "Earn" });
         }
-      } catch { /* optional */ }
+      }
       // Trading bots remainder (total minus identified)
       const identified = assets.reduce((s, a) => s + a.usdValue, 0);
       const botsValue = balance - identified;
@@ -912,9 +927,11 @@ let hlBalance = 0;
   let freeLLM: FreeLLMData | null = null;
 
   try {
-    const freellmRes = await fetch("http://localhost:8888/api/freellm", { cache: "no-store" });
-    if (freellmRes.ok) {
-      const data = await freellmRes.json();
+    // Called directly, not via fetch() to our own /api/freellm. A nested
+    // self-request cost ~467ms here versus ~15ms direct, because the dev
+    // server serializes a request that is itself awaiting a request to itself.
+    const data = await getFreeLLMData();
+    if (data.configured) {
       freeLLM = {
         configured: true,
         baseUrl: process.env.FREELLM_API_BASE_URL || null,

@@ -92,7 +92,19 @@ export interface FreeLLMData {
   avgLatencyMs: number;
   firstRequestAt: string | null;
   byModel: FreeLLMByModel[];
-  days: { date: string; requests: number; tokens: number; avgLatencyMs: number | null }[];
+  /**
+   * Note: `avgLatencyMs` was declared here but `/api/home` never emitted it —
+   * its mapping produces `successCount`/`failureCount` instead, and the
+   * `as any` on the untyped JSON hid the mismatch. Corrected to the shape the
+   * route actually returns. Latency per model lives on `byModel`.
+   */
+  days: {
+    date: string;
+    requests: number;
+    tokens: number;
+    successCount: number | null;
+    failureCount: number | null;
+  }[];
   lifetimeTotalRequests: number | null;
   estimatedCostSavings: number | null;
   pinnedRequests: number | null;

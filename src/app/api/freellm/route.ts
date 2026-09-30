@@ -8,8 +8,18 @@ const FREELLM_EMAIL = process.env.FREELLM_API_EMAIL || "";
 const FREELLM_PASSWORD = process.env.FREELLM_API_PASSWORD || "";
 const FREELLM_SESSION_TOKEN = process.env.FREELLM_API_SESSION_TOKEN || "";
 
-async function getSessionToken(): Promise<string | null> {
-  if (FREELLM_SESSION_TOKEN) return FREELLM_SESSION_TOKEN;
+/**
+ * In-flight/resolved login token.
+ *
+ * `authFetch` is called three times per payload, and this route is hit on every
+ * dashboard poll. Without memoization each call performed its own login, so one
+ * payload cost 3 logins + 3 data calls, all sequential. Caching the *promise*
+ * (not the value) means concurrent callers share a single login rather than
+ * each starting their own.
+ */
+let sessionTokenPromise: Promise<string | null> | null = null;
+
+async function loginForToken(): Promise<string | null> {
   if (!FREELLM_EMAIL || !FREELLM_PASSWORD) return null;
 
   try {
@@ -26,6 +36,19 @@ async function getSessionToken(): Promise<string | null> {
   }
 }
 
+async function getSessionToken(): Promise<string | null> {
+  if (FREELLM_SESSION_TOKEN) return FREELLM_SESSION_TOKEN;
+  // A null result (bad credentials, service down) is not cached: a later poll
+  // should retry the login rather than stay broken for the process lifetime.
+  if (!sessionTokenPromise) {
+    sessionTokenPromise = loginForToken().then((t) => {
+      if (!t) sessionTokenPromise = null;
+      return t;
+    });
+  }
+  return sessionTokenPromise;
+}
+
 async function authFetch(path: string): Promise<unknown> {
   const token = await getSessionToken();
   if (!token) return null;
@@ -37,9 +60,27 @@ async function authFetch(path: string): Promise<unknown> {
   return res.json();
 }
 
-export async function GET() {
+/**
+ * Fetch the FreeLLM analytics payload.
+ *
+ * Exported so `/api/home` can call it directly instead of making a nested HTTP
+ * request back into this same dev server. That self-fetch cost ~467ms nested
+ * (versus ~15ms called directly) because the dev server serializes a request
+ * that is itself waiting on a request to itself — on the most-polled endpoint
+ * on the dashboard. Same shape as `getAgentsData` in `api/agents/route`.
+ */
+export async function getFreeLLMData() {
   try {
-    const summary = (await authFetch("/api/analytics/summary?range=7d")) as
+    // The three analytics endpoints are independent, so issue them together.
+    // Run in sequence they stacked 3 round-trips (plus logins) into every
+    // dashboard poll, which was the bulk of /api/home's latency.
+    const [summaryRaw, byModelRaw, timelineRaw] = await Promise.all([
+      authFetch("/api/analytics/summary?range=7d"),
+      authFetch("/api/analytics/by-model?range=7d"),
+      authFetch("/api/analytics/timeline?range=7d&interval=day"),
+    ]);
+
+    const summary = summaryRaw as
       | {
           totalRequests?: number;
           totalInputTokens?: number;
@@ -55,7 +96,7 @@ export async function GET() {
         }
       | null;
 
-    const byModel = (await authFetch("/api/analytics/by-model?range=7d")) as
+    const byModel = byModelRaw as
       | Array<{
           modelId?: string;
           displayName?: string;
@@ -71,7 +112,7 @@ export async function GET() {
         }>
       | null;
 
-    const timeline = (await authFetch("/api/analytics/timeline?range=7d&interval=day")) as
+    const timeline = timelineRaw as
       | Array<{
           timestamp?: string;
           requests?: number;
@@ -84,7 +125,7 @@ export async function GET() {
       | null;
 
     if (!summary && !byModel && !timeline) {
-      return NextResponse.json({ configured: false });
+      return { configured: false as const };
     }
 
     const totalTokens =
@@ -121,8 +162,8 @@ export async function GET() {
       avgLatencyMs: row.avgLatencyMs ?? null,
     }));
 
-    return NextResponse.json({
-      configured: true,
+    return {
+      configured: true as const,
       syncedAt: new Date().toISOString(),
       totalRequests: summary?.totalRequests || 0,
       lifetimeTotalRequests: summary?.lifetimeTotalRequests ?? null,
@@ -141,8 +182,12 @@ export async function GET() {
       firstRequestAt: summary?.firstRequestAt || null,
       byModel: modelRows,
       days,
-    });
+    };
   } catch {
-    return NextResponse.json({ configured: false });
+    return { configured: false as const };
   }
+}
+
+export async function GET() {
+  return NextResponse.json(await getFreeLLMData());
 }
