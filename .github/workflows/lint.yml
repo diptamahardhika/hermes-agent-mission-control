@@ -21,14 +21,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Report-only, not a merge gate. Next.js 16 dropped ESLint from
-      # `next build`, so nothing catches lint regressions today. This job
-      # restores visibility, but the repo carries a pre-existing error
-      # backlog, so a hard gate would fail every PR until it is cleared.
-      # Delete `continue-on-error` once the error count reaches zero.
+      # Real merge gate. This change cleared the repo's error backlog: the
+      # 20 CI-visible errors were the two max-lines breaches in
+      # articles/page.tsx and readme-validator.ts, plus the CommonJS/any
+      # errors in the tracked seed scripts and scanner tooling (relaxed via
+      # scoped overrides in eslint.config.mjs, not rewritten). So
+      # `continue-on-error` is gone.
       #
-      # Note: this also surfaces max-lines on src/app/articles/page.tsx
-      # (2401 lines) for the first time — see eslint.config.mjs.
+      # Warnings are NOT gated: 122 pre-existing warnings remain, so a
+      # --max-warnings threshold would fail every PR until the whole backlog
+      # is cleared. Errors gate; warnings stay advisory.
       - name: Lint
-        continue-on-error: true
         run: npm run lint

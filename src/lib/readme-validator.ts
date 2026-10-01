@@ -1,4 +1,5 @@
 import { execSync } from "child_process";
+import { existsSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 
 interface ExampleResult {
@@ -164,7 +165,7 @@ export function validateReadmeExamples(repoPath: string): ReadmeValidationResult
   ];
   
   for (const path of possiblePaths) {
-    if (require('fs').existsSync(path)) {
+    if (existsSync(path)) {
       readmePath = path;
       break;
     }
@@ -179,7 +180,7 @@ export function validateReadmeExamples(repoPath: string): ReadmeValidationResult
     };
   }
   
-  const content = require('fs').readFileSync(readmePath, 'utf-8');
+  const content = readFileSync(readmePath, 'utf-8');
   const examples = extractCodeExamples(content);
   const results = examples.map(example => validateExample(example, repoPath));
   
