@@ -1,12 +1,65 @@
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams, useRouter } from "next/navigation";
 import { rise, Skeleton } from "@/components/ui/kit";
-import { ArticleEditor } from "@/components/articles/article-editor";
-import { CalendarTab } from "@/components/articles/calendar-tab";
 import type { Article, SavedTitle, ChatMessage, Track, Tab } from "@/lib/articles-config";
 import { TRACK_CONFIG, THEMES, STATUS_COLUMNS } from "@/lib/articles-config";
+
+function TabSkeleton() {
+  return (
+    <div className="space-y-4 pt-4">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="panel p-5 space-y-3">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-3/4" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Prop shapes for the deferred panels. Declared here rather than exported from
+// the components themselves: `dynamic()` needs the type at this call site, and
+// exporting them would widen those modules' public surface for no other caller.
+// Both are structurally identical to what the components declare internally.
+
+type DeferredCalendarTabProps = {
+  articles: Article[];
+  weekDays: { date: string; label: string; dayName: string; isToday: boolean }[];
+  weekOffset: number;
+  onPrevWeek: () => void;
+  onNextWeek: () => void;
+  onToday: () => void;
+  onUpdateArticle: (id: string, updates: Partial<Article>) => void;
+  onOpenArticle: (article: Article) => void;
+};
+
+type DeferredArticleEditorProps = {
+  article: Article;
+  onClose: () => void;
+  onUpdate: (updates: Partial<Article>) => void;
+  onDelete: () => void;
+};
+
+// Both panels are rendered behind a conditional (calendar only when the tab is
+// active, the editor only when a row is opened), so neither appears in the
+// initial HTML. Deferring them keeps their code out of the first-paint payload.
+// `ssr: false` is required for the editor (it touches browser APIs); it is
+// included on the calendar for consistency with the /youtube and /x tab
+// pattern, which use the same option on components that are equally SSR-safe.
+// The loaders unwrap the named exports — both components are named exports,
+// not default exports, so `dynamic()` needs the property access.
+const CalendarTab = dynamic<DeferredCalendarTabProps>(
+  () => import("@/components/articles/calendar-tab").then((m) => m.CalendarTab),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
+const ArticleEditor = dynamic<DeferredArticleEditorProps>(
+  () => import("@/components/articles/article-editor").then((m) => m.ArticleEditor),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
