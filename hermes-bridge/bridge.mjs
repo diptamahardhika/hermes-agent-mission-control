@@ -89,8 +89,15 @@ const RECONNECT_DELAY_MS = 2000; // 2s between attempts
 // existing `updatedAt` column (backoff clock) so this needs NO schema change
 // and NO prisma db push. Attempts are parsed back out of the marker; that is
 // fine for a cap of 2 and would need a real column past ~9 attempts.
+// RETRY_MAX_ATTEMPTS counts REQUEUES, not total executions: a value of 2 means
+// "run once, then retry up to twice" — 3 executions at most, which is what
+// RETRY_BACKOFF_MS is sized for (one entry per requeue). `attempt` below is the
+// ordinal of the requeue being considered (1st retry, 2nd retry, ...), read as
+// <requeues already done> + 1, so requeue while attempt <= the cap.
+// (An earlier version guarded with `attempt >= RETRY_MAX_ATTEMPTS`, which
+// stopped one execution early and left RETRY_BACKOFF_MS[1] unreachable.)
 const RETRY_MAX_ATTEMPTS = 2;
-const RETRY_BACKOFF_MS = [30_000, 90_000]; // after attempt 1, then after attempt 2
+const RETRY_BACKOFF_MS = [30_000, 90_000]; // after requeue 1, then after requeue 2
 // Failures that rerunning cannot fix. Matched case-insensitively against
 // message + stderr + stdout.
 const RETRY_FATAL_HINTS = [
@@ -114,12 +121,18 @@ const RETRY_TRANSIENT_HINTS = [
 ];
 
 function readRetryAttempt(err) {
-  const m = /\[retry-pending attempt=(\d+)\//.exec(err || "");
+  // Matches the marker bridge.mjs writes itself:
+  //   "[retry-pending attempt=1 in=30s] <cause>"
+  // Note the `\s` — the character after the digits is a SPACE (the `in=` part
+  // follows), not `/`. An earlier version expected `/` here, which never
+  // matched: every requeue read back attempt=0, so a permanently-failing
+  // request requeued forever instead of stopping at RETRY_MAX_ATTEMPTS.
+  const m = /\[retry-pending attempt=(\d+)\s/.exec(err || "");
   return m ? Number(m[1]) : 0;
 }
 
 function isRetryable(e, attempt) {
-  if (attempt >= RETRY_MAX_ATTEMPTS) return false;
+  if (attempt > RETRY_MAX_ATTEMPTS) return false; // out of requeues
   const body = `${(e.message || "")} ${(e.stderr || "")} ${(e.stdout || "")}`.toLowerCase();
   if (RETRY_FATAL_HINTS.some((h) => body.includes(h))) return false;
   if (e.killed || e.signal || e.timeout) return true; // OOM / SIGTERM / CLI timeout
@@ -1315,9 +1328,12 @@ async function runRequest(r) {
     // instead of parking it in 'failed'. The backoff window is enforced in
     // processQueue() via updatedAt, so this stays safe even across a restart.
     // The marker is parsed back out by readRetryAttempt() on the next failure.
+    // `attempt` is the ordinal of the requeue being considered: 1st retry, 2nd
+    // retry, ... isRetryable() allows it while attempt <= RETRY_MAX_ATTEMPTS.
     const attempt = readRetryAttempt(r.error) + 1;
     if (isRetryable(e, attempt)) {
-      const backoffMs = RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length) - 1] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1];
+      const requeues = attempt;                 // == this requeue's 1-based index
+      const backoffMs = RETRY_BACKOFF_MS[Math.min(requeues, RETRY_BACKOFF_MS.length) - 1] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1];
       // Cap the marker so it can't eat the 600-char budget on the real cause.
       const note = `[retry-pending attempt=${attempt} in=${Math.round(backoffMs / 1000)}s] ${cause}`.slice(0, 600);
       await q(
