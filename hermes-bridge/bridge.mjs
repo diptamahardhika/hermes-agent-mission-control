@@ -79,6 +79,55 @@ const q = (text, params) => pool.query(text, params);
 const RECONNECT_MAX_ATTEMPTS = 30;
 const RECONNECT_DELAY_MS = 2000; // 2s between attempts
 
+// ── Self-healing: auto-retry transient run failures ─────────────────────
+// A run can fail for reasons that clear up on their own: the gateway is
+// restarting, the CLI got OOM-killed, a TCP connection reset mid-call. Today
+// those land in the 'failed' bucket and wait for a human. Instead we requeue
+// them with a short backoff and let the normal claim path pick them up.
+//
+// Retry state lives in the existing `error` String (prefix marker) + the
+// existing `updatedAt` column (backoff clock) so this needs NO schema change
+// and NO prisma db push. Attempts are parsed back out of the marker; that is
+// fine for a cap of 2 and would need a real column past ~9 attempts.
+const RETRY_MAX_ATTEMPTS = 2;
+const RETRY_BACKOFF_MS = [30_000, 90_000]; // after attempt 1, then after attempt 2
+// Failures that rerunning cannot fix. Matched case-insensitively against
+// message + stderr + stdout.
+const RETRY_FATAL_HINTS = [
+  "unknown kind",         // malformed request payload
+  "unknown decision op",
+  "model '",              // drift_skip — healCronDrift() pins the model instead
+  "invalid json",
+  "unexpected token",     // malformed prompt payload
+  "enoent",               // hermes binary missing — not a transient blip
+];
+// Failures that almost always clear within a minute.
+const RETRY_TRANSIENT_HINTS = [
+  "connection refused",
+  "econnreset",
+  "econnrefused",
+  "etimedout",
+  "epipe",
+  "socket hang up",
+  "not running",
+  "temporarily unavailable",
+];
+
+function readRetryAttempt(err) {
+  const m = /\[retry-pending attempt=(\d+)\//.exec(err || "");
+  return m ? Number(m[1]) : 0;
+}
+
+function isRetryable(e, attempt) {
+  if (attempt >= RETRY_MAX_ATTEMPTS) return false;
+  const body = `${(e.message || "")} ${(e.stderr || "")} ${(e.stdout || "")}`.toLowerCase();
+  if (RETRY_FATAL_HINTS.some((h) => body.includes(h))) return false;
+  if (e.killed || e.signal || e.timeout) return true; // OOM / SIGTERM / CLI timeout
+  if (RETRY_TRANSIENT_HINTS.some((h) => body.includes(h))) return true;
+  if (typeof e.code === "number" && e.code !== 0) return true; // non-zero exit, no fatal hint
+  return false;
+}
+
 // ── Self-healing: stale kanban.lock recovery ─────────────────────────
 // Hermes's SQLite-backed kanban can be left with a stale 0-byte init/dispatch
 // lock when the gateway or CLI is killed uncleanly (e.g. power loss, OOM).
@@ -1260,7 +1309,31 @@ async function runRequest(r) {
     else if (e.code != null && e.code !== 0) bits.push(`exit ${e.code}`);
     const tail = (s) => (s || "").toString().trim().split("\n").slice(-3).join(" | ").slice(0, 300);
     const body = tail(e.stderr) || tail(e.stdout) || (e.message || "error").split("\n")[0];
-    const msg = `[${HOST}] ${r.kind} failed after ${durS}s: ${bits.length ? bits.join(", ") + " — " : ""}${body}`.slice(0, 600);
+    const cause = `[${HOST}] ${r.kind} failed after ${durS}s: ${bits.length ? bits.join(", ") + " — " : ""}${body}`;
+
+    // Transient failure (gateway restart, OOM kill, socket reset): requeue
+    // instead of parking it in 'failed'. The backoff window is enforced in
+    // processQueue() via updatedAt, so this stays safe even across a restart.
+    // The marker is parsed back out by readRetryAttempt() on the next failure.
+    const attempt = readRetryAttempt(r.error) + 1;
+    if (isRetryable(e, attempt)) {
+      const backoffMs = RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length) - 1] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1];
+      // Cap the marker so it can't eat the 600-char budget on the real cause.
+      const note = `[retry-pending attempt=${attempt} in=${Math.round(backoffMs / 1000)}s] ${cause}`.slice(0, 600);
+      await q(
+        `UPDATE "AgentRequest" SET status='queued', "startedAt"=NULL, "finishedAt"=NULL, error=$2, "updatedAt"=now() WHERE id=$1`,
+        [r.id, note]
+      );
+      await emit("run", `Retrying (${attempt}/${RETRY_MAX_ATTEMPTS}): ${r.title}`, {
+        level: "warn",
+        detail: `${cause.slice(0, 300)} — requeued in ~${Math.round(backoffMs / 1000)}s`,
+        meta: { requestId: r.id, host: HOST, attempt, retry: true },
+      });
+      log(`request requeued for retry (${attempt}/${RETRY_MAX_ATTEMPTS}):`, r.id, body);
+      return;
+    }
+
+    const msg = cause.slice(0, 600);
     await q(`UPDATE "AgentRequest" SET status='failed', error=$2, "finishedAt"=now(), "updatedAt"=now() WHERE id=$1`, [r.id, msg]);
     await emit("run", `Failed: ${r.title}`, { level: "down", detail: msg, meta: { requestId: r.id, host: HOST } });
     log("request failed:", r.id, msg);
@@ -1279,11 +1352,22 @@ async function processQueue() {
   // Atomic claim: the subquery locks candidate rows (SKIP LOCKED), so when two
   // bridges poll the same DB each request is claimed by exactly one runner —
   // no double hermes runs, and startedAt marks who moved first.
+  // Rows requeued for retry carry a '[retry-pending attempt=N in=NNs]' marker in
+  // `error`; hold them out of the claim until that backoff window has elapsed.
+  // The backoff is read back per row out of the marker and measured against the
+  // existing updatedAt column — no schema change, no prisma db push. If the
+  // marker is somehow unreadable the window collapses to 0s (claim immediately),
+  // which is the pre-change behaviour.
   const { rows } = await q(
     `UPDATE "AgentRequest" SET status='running', "startedAt"=now(), "updatedAt"=now()
      WHERE id IN (
        SELECT id FROM "AgentRequest"
        WHERE status IN ('queued','approved')
+         AND (
+           error IS NULL
+           OR error NOT LIKE '%[retry-pending%'
+           OR "updatedAt" < now() - make_interval(secs => COALESCE(NULLIF(replace(substring(error from 'in=[0-9]+'), 'in=', ''), ''), '0')::int)
+         )
        ORDER BY "createdAt" ASC LIMIT 3
        FOR UPDATE SKIP LOCKED
      )
