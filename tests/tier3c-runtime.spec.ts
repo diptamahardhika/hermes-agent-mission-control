@@ -4,11 +4,19 @@ import path from "node:path";
 
 // Tier 3C: defer HermesRuns on /hermes behind next/dynamic.
 //
-// DB-independent by design. /hermes reads /api/hermes/* which is backed by
+// Both tests are DB-independent. /hermes reads /api/hermes/* which is backed by
 // Postgres, and CI runs with no database at all (the DATABASE_URL set on the
 // workflow's build step never reaches the server step, and prisma/dev.db is
 // gitignored). So these tests never assert "no console errors" — a broken
 // database logs "Can't reach database server" regardless of deferral.
+//
+// It also means the panel marker must be UNCONDITIONAL markup, never
+// data-dependent text. CI caught that: the first marker, "Top providers", sits
+// behind `{providers.length > 0 && ...}` (hermes-runs.tsx:590), so it never
+// renders against an empty database and the test failed on the runner while
+// passing locally. "Recent runs" is the SectionHeader title, returned before
+// any data branch. Verified against a production `next start` with a
+// deliberately unreachable DATABASE_URL.
 //
 // WHAT PROVES DEFERRAL HERE, AND WHY THE EARLIER VERSION WAS A TAUTOLOGY
 //
@@ -41,8 +49,16 @@ const BASE = process.env.BASE_URL ?? "http://localhost:8888";
  */
 const MAX_HERMES_CLIENT_KB = 95;
 
-/** A literal that exists only inside hermes-runs.tsx's compiled output. */
-const RUNS_PANEL_MARKER = "Top providers";
+/**
+ * A literal from hermes-runs.tsx's own markup that renders UNCONDITIONALLY.
+ *
+ * This must NOT be data-dependent. "Top providers" was the first choice and it
+ * is gated on `{providers.length > 0 && ...}` (hermes-runs.tsx:590), so with
+ * CI's empty database it never renders and the test failed there. "Recent runs"
+ * is the SectionHeader title of the runs table, which is returned before any
+ * data branch — present whether or not the API returns anything.
+ */
+const RUNS_PANEL_MARKER = "Recent runs";
 
 test("deferred runs panel resolves to real content, not a stuck skeleton", async ({ page }) => {
   // The assertion that actually catches a broken deferral: a failed dynamic
