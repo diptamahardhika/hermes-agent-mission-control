@@ -22,11 +22,19 @@ jobs:
         run: npm ci
 
       # Real merge gate. This change cleared the repo's error backlog: the
-      # 20 CI-visible errors were the two max-lines breaches in
-      # articles/page.tsx and readme-validator.ts, plus the CommonJS/any
-      # errors in the tracked seed scripts and scanner tooling (relaxed via
-      # scoped overrides in eslint.config.mjs, not rewritten). So
-      # `continue-on-error` is gone.
+      # 20 CI-visible errors were the max-lines breach in
+      # articles/page.tsx, the CommonJS/any errors in the tracked seed
+      # scripts and scanner tooling, and errors in src/middleware.ts and
+      # src/app/hermes/page.tsx (relaxed via scoped overrides in
+      # eslint.config.mjs, not rewritten). So `continue-on-error` is gone.
+      #
+      # Correction (2026-10-02): an earlier version of this comment also
+      # blamed readme-validator.ts for a max-lines breach. That was wrong —
+      # the file is 220 lines against a 2000 cap and was never over it.
+      # `git show <rev>:src/lib/readme-validator.ts | wc -l` returns 218/219/
+      # 220/220 across its four commits, and at 6d85cbd^ exactly one tracked
+      # file exceeded 2000 lines (articles/page.tsx, 2401). That file has
+      # since been split and deleted.
       #
       # Warnings are NOT gated: 122 pre-existing warnings remain, so a
       # --max-warnings threshold would fail every PR until the whole backlog
