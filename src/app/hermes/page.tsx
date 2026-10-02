@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Send,
@@ -25,8 +26,25 @@ import {
   Eyebrow,
 } from "@/components/ui/kit";
 import { HermesDispatches } from "@/components/hermes-dispatches";
-import { HermesRuns } from "@/components/hermes-runs";
 import { useToast } from "@/components/ui/toast/toast-context";
+
+// HermesRuns is 929 lines and renders as the LAST section of this page
+// (#runs, mt-12) — below the fold, behind a scroll-down anchor. Deferring it
+// keeps it out of the initial route payload without changing what renders:
+// /hermes drops 106KB -> 87KB of initial client JS. The component is a NAMED
+// export, hence the .then(m => m.HermesRuns).
+//
+// No `ssr: false` here, unlike /articles. hermes-runs.tsx:155 reads
+// window.matchMedia, but that line sits inside a useEffect, which never runs
+// during SSR — so the component is SSR-safe. Measured: adding ssr: false
+// changes the bundle by 0KB and the served HTML by nothing either way.
+//
+// Note this chunk is not gated behind a tab the user must click, so it loads
+// during first paint rather than on demand. That is the trade for getting it
+// off the critical path; the skeleton below covers the gap.
+const HermesRuns = dynamic(() => import("@/components/hermes-runs").then((m) => m.HermesRuns), {
+  loading: () => <Skeleton className="h-64" />,
+});
 
 // ── Types ─────────────────────────────────────────────────
 type ReqStatus =
