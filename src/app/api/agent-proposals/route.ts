@@ -224,8 +224,26 @@ export async function GET(request: Request) {
       ? sorted.filter((p) => p.status === "pending")
       : sorted;
 
-    return NextResponse.json(filtered, {
-      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    // Optional `limit` caps the returned rows so a caller that only paints the
+    // first few (the home widget shows 2) doesn't pay for the whole history.
+    // The response stays a plain array either way: callers that omit `limit`
+    // (/agents) are unaffected, and there is no second JSON shape to
+    // type-narrow. Counts the limited caller can no longer derive from the
+    // array length travel as headers — see src/lib/agent-proposals-contract.ts
+    // for the read side and its fallback.
+    const limitRaw = Number(searchParams.get("limit"));
+    const hasLimit = Number.isInteger(limitRaw) && limitRaw > 0;
+    const page = hasLimit ? filtered.slice(0, limitRaw) : filtered;
+    const pendingCount = filtered.filter((p) => p.status === "pending").length;
+
+    return NextResponse.json(page, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        // Total across the whole filtered set, not the returned page.
+        "X-Proposals-Total": String(filtered.length),
+        "X-Proposals-Pending": String(pendingCount),
+        "X-Proposals-Truncated": hasLimit && filtered.length > page.length ? "1" : "0",
+      },
     });
   } catch (error) {
     console.error("Agent proposals API error:", error);

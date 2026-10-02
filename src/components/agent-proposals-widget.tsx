@@ -11,6 +11,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Inbox, ArrowUpRight, SortAsc, SortDesc } from "lucide-react";
 import { Panel, Pill, EmptyState, Eyebrow } from "@/components/ui/kit";
 import { ProposalCard } from "@/app/agents/proposal-card";
+import {
+  proposalsUrl,
+  readProposalCounts,
+  type ProposalCounts,
+} from "@/lib/agent-proposals-contract";
 
 interface Proposal {
   id: string;
@@ -37,32 +42,51 @@ export function AgentProposalsWidget() {
   const [sortBy, setSortBy] = useState<SortMode>("newest");
   const [filter, setFilter] = useState<FilterMode>("all");
 
+  const [counts, setCounts] = useState<ProposalCounts>({ total: 0, pending: 0, truncated: false });
+
+  // Only the first few rows are ever painted (see `visible` below), so ask the
+  // server for just those instead of the full history. It was 125 records /
+  // ~112KB every 20s to render 2 cards. Counts still describe the whole set:
+  // they arrive as response headers, and readProposalCounts falls back to
+  // deriving them from the array if the headers are ever absent.
+  const LIMIT = 3;
+  const url = proposalsUrl({ sortBy, filter, limit: LIMIT });
+
+  const applyResponse = (res: Response, data: unknown) => {
+    const rows = Array.isArray(data) ? (data as Proposal[]) : [];
+    setProposals(rows);
+    setCounts(readProposalCounts(res, rows));
+  };
+
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`/api/agent-proposals?sortBy=${sortBy}&filter=${filter}`);
-      const data = await r.json();
-      setProposals(Array.isArray(data) ? data : []);
+      const r = await fetch(url);
+      applyResponse(r, await r.json());
     } catch { /* keep last state */ }
     setLoaded(true);
-  }, [sortBy, filter]);
+  }, [url]);
 
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/agent-proposals?sortBy=${sortBy}&filter=${filter}`);
+        const r = await fetch(url);
         const data = await r.json();
-        if (!cancelled) setProposals(Array.isArray(data) ? data : []);
+        if (cancelled) return;
+        const rows = Array.isArray(data) ? (data as Proposal[]) : [];
+        setProposals(rows);
+        setCounts(readProposalCounts(r, rows));
       } catch { /* keep last state */ }
       if (!cancelled) setLoaded(true);
     };
     tick();
     const iv = setInterval(tick, 20000);
     return () => { cancelled = true; clearInterval(iv); };
-  }, [sortBy, filter]);
+  }, [url]);
 
-  const pending = proposals.filter((p) => p.status === "pending");
-  const handled = proposals.length - pending.length;
+  // Badges describe the full set from the headers, not the returned page, so
+  // they stay correct while the array itself is capped. (`handled` was derived
+  // here but never rendered — dropped rather than carried forward as dead code.)
   const visible = [...proposals].slice(0, 2);
 
   const reject = async (taskId: string) => {
@@ -126,12 +150,12 @@ export function AgentProposalsWidget() {
           <Eyebrow>Agent proposals</Eyebrow>
           <p className="text-[10px] text-[var(--text-4)] mt-0.5">Review agent work</p>
         </div>
-              {pending.length > 0 && (
+              {counts.pending > 0 && (
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium num transition-colors hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--warn)]"
                   style={{ color: "var(--warn)", background: "color-mix(in srgb, var(--warn) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--warn) 22%, transparent)" }}
                 >
-                  {pending.length} waiting
+                  {counts.pending} waiting
                 </span>
               )}
       </div>
@@ -223,9 +247,14 @@ export function AgentProposalsWidget() {
               <ProposalCard key={p.taskId} proposal={p} onReject={reject} onApprove={approve} onCreateTask={createTask} onComplete={complete} onReply={reply} />
             ))}
           </div>
-          {proposals.length > visible.length && (
+          {/* Overflow must come from the header count, not `proposals.length`:
+              the array is capped at LIMIT, so deriving it from the returned
+              rows showed "+1 more" when 125 rows actually existed. `truncated`
+              is the server telling us the page is not the whole set — without
+              it we cannot know there is anything more to count. */}
+          {counts.truncated && counts.total > visible.length && (
             <p className="mt-2 text-[11px] text-[var(--text-3)]">
-              +{proposals.length - visible.length} more on{" "}
+              +{counts.total - visible.length} more on{" "}
               <a href="/agents" className="font-medium" style={{ color: "var(--accent)" }}>Agents →</a>
             </p>
           )}
