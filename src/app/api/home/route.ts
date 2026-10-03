@@ -856,10 +856,12 @@ let hlBalance = 0;
       } : null,
     };
   } else if (d?.syncedAt) {
-    // Monitor was checked but overview unavailable (service down).
-    // Keep checkedAt fresh so badge shows OFFLINE accurately instead of
-    // frozen loading state.
-    homelab.checkedAt = d.syncedAt;
+    // Monitor was polled but overview unavailable (service down). Use
+    // lastSeenAt — the last time it actually answered — NOT syncedAt, which
+    // the bridge rewrites every tick even on failure. Feeding syncedAt here
+    // renders a failed poll as "OFFLINE · just now", which reads like a live
+    // probe that just failed rather than "no contact in hours".
+    homelab.checkedAt = d.lastSeenAt || "";
   }
 
   // ─── Agent compute spend (mirrored by the bridge from `hermes insights`) ─────

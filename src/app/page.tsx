@@ -62,8 +62,14 @@ const EMPTY: HomeData = {
 };
 
 // ── Homelab status badge (pure helper + component) ─────────
-// States: !checkedAt = loading/pending (no data yet), connected = LIVE,
-// connected=false with checkedAt = OFFLINE, stale >10min = STALE.
+// `undefined` data = /api/home has not answered yet → "…". Distinct from a
+// real failure, which is the whole point: `EMPTY.homelab` also carries
+// checkedAt:"" while loading, so keying the label on checkedAt alone asserts
+// UNREACHABLE on first paint, before any probe has run.
+// With data present: checkedAt = last SUCCESSFUL contact (the bridge rewrites
+// its sync stamp every tick even on failure, so that stamp is not usable here).
+// checkedAt empty = never answered → UNREACHABLE; present but disconnected =
+// OFFLINE (had it, lost it); older than 10min = STALE.
 function getHomelabBadgeStyle(checkedAt: string | undefined, connected: boolean) {
   if (!checkedAt) return { color: "var(--hq-text-ghost)", borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)" };
   if (!connected) return { color: "var(--hq-down)", borderColor: "rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.07)" };
@@ -77,8 +83,11 @@ function getHomelabDotColor(checkedAt: string | undefined, connected: boolean) {
   const age = Date.now() - new Date(checkedAt).getTime();
   return age > 10 * 60 * 1000 ? "var(--hq-warn)" : "var(--hq-up)";
 }
-function getHomelabLabel(checkedAt: string | undefined, connected: boolean) {
-  if (!checkedAt) return "…";
+function getHomelabLabel(loaded: boolean, checkedAt: string | undefined, connected: boolean) {
+  if (!loaded) return "…";
+  // Polled, but the monitor has never answered — no contact on record at all,
+  // as opposed to OFFLINE which means it dropped after a good contact.
+  if (!checkedAt) return "UNREACHABLE";
   if (!connected) return "OFFLINE";
   const age = Date.now() - new Date(checkedAt).getTime();
   return age > 10 * 60 * 1000 ? "STALE" : "LIVE";
@@ -88,7 +97,7 @@ function getHomelabLabel(checkedAt: string | undefined, connected: boolean) {
  * `Date.now()` here: calling an impure function during render is a React
  * purity violation, and the parent already re-renders every second.
  */
-function HomelabStatusBadge({ data, now }: { data: HomelabHomeData | undefined; now: Date }) {
+function HomelabStatusBadge({ data, loaded, now }: { data: HomelabHomeData | undefined; loaded: boolean; now: Date }) {
   const connected = data?.connected;
   const checkedAt = data?.checkedAt;
   const showPing = connected && checkedAt && (now.getTime() - new Date(checkedAt).getTime()) <= 10 * 60 * 1000;
@@ -98,7 +107,7 @@ function HomelabStatusBadge({ data, now }: { data: HomelabHomeData | undefined; 
         {showPing && <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--hq-up) 60%, transparent)" }} />}
         <Activity className="relative inline-flex w-1.5 h-1.5" style={{ color: getHomelabDotColor(checkedAt, connected ?? false) }} aria-hidden="true" />
       </span>
-      <span className="eyebrow !text-[9.5px] font-semibold">{getHomelabLabel(checkedAt, connected ?? false)}</span>
+      <span className="eyebrow !text-[9.5px] font-semibold">{getHomelabLabel(loaded, checkedAt, connected ?? false)}</span>
       {checkedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)] font-normal">{timeAgo(checkedAt)}</span>}
     </div>
   );
@@ -1125,7 +1134,7 @@ if (!mounted) return null;
                   <span className="num">{data.daysSincePost === 0 ? "Posted today" : `${data.daysSincePost}d since post`}</span>
                 </div>
               )}
-              <HomelabStatusBadge data={data.homelab} now={time} />
+              <HomelabStatusBadge data={data.homelab} loaded={!wsLoading && wsData !== null} now={time} />
             </div>
             {score && <ScoreGauge score={score} />}
           </div>

@@ -1146,6 +1146,32 @@ async function homelabGet(path) {
   return res.json();
 }
 
+// Tracks the last time the monitor answered SUCCESSFULLY. `syncedAt` is
+// written on every tick — including failed ones — so it only proves the
+// bridge is alive, never that the homelab is reachable. Without this the
+// dashboard renders a failed poll as "OFFLINE · just now", reading like a
+// live probe that just failed, when the truth is "no contact in hours".
+//
+// Seeded from the stored value on first use: setStore replaces the whole row,
+// so a plain module variable would drop the last known contact on every
+// bridge restart that happens while the monitor is down — losing the age the
+// badge exists to show.
+let homelabLastSeenAt = null;
+let homelabLastSeenLoaded = false;
+
+async function homelabStoredLastSeen() {
+  if (homelabLastSeenLoaded) return homelabLastSeenAt;
+  homelabLastSeenLoaded = true;
+  try {
+    const row = await q(`SELECT data FROM "DataStore" WHERE key = 'homelab-monitor'`);
+    const prev = JSON.parse(row.rows[0]?.data);
+    if (prev && typeof prev.lastSeenAt === "string") homelabLastSeenAt = prev.lastSeenAt;
+  } catch {
+    // No prior row, or malformed JSON — fall through to "never seen".
+  }
+  return homelabLastSeenAt;
+}
+
 async function mirrorHomelab() {
   if (!HOMELAB_URL) return;
   const [overview, sysHistory, history] = await Promise.allSettled([
@@ -1154,13 +1180,19 @@ async function mirrorHomelab() {
     homelabGet("/api/history"),
   ]);
   const data = { syncedAt: new Date().toISOString() };
-  if (overview.status === "fulfilled") data.overview = overview.value;
+  if (overview.status === "fulfilled") {
+    data.overview = overview.value;
+    homelabLastSeenAt = data.syncedAt;
+    homelabLastSeenLoaded = true;
+  } else {
+    await homelabStoredLastSeen();
+  }
   if (sysHistory.status === "fulfilled") data.systemHistory = sysHistory.value;
   if (history.status === "fulfilled") data.history = history.value;
-  // Always write the DataStore key with whatever data is available,
-  // even on partial failure. This keeps checkedAt fresh so the
-  // HomelabStatusBadge doesn't show STALE when the monitor is
-  // temporarily unreachable. Only log errors for observability.
+  // Always write the DataStore key with whatever data is available, even on
+  // partial failure, so the badge can distinguish "monitor is down" from
+  // "bridge stopped mirroring" (no lastSeenAt on record at all).
+  if (homelabLastSeenAt) data.lastSeenAt = homelabLastSeenAt;
   if (overview.status !== "fulfilled" && sysHistory.status !== "fulfilled") {
     log("mirrorHomelab: homelab monitor unreachable, writing partial data");
   }
