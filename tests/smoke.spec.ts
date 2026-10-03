@@ -148,4 +148,64 @@ test.describe('API health', () => {
       ).toBe('HIT');
     }
   });
+
+  // The diagnostics route used to spawn one `hermes kanban show` subprocess per
+  // requested id inside a serial await loop: ~700ms each, so the 18-task board
+  // took ~14s and blocked the /hermes page load. It now makes ONE batched
+  // `list --json` call regardless of how many ids are asked for.
+  //
+  // The N+1 is invisible to a status check — every version returned 200 — so
+  // this asserts two things instead: that the response leaks no id the caller
+  // did not ask for, and that the cost is independent of how many ids are
+  // requested (a batched call), which a per-id subprocess loop cannot do.
+  test('diagnostics returns only requested ids, batched not per-id', async ({ request }) => {
+    test.skip(
+      !!process.env.CI,
+      'needs the hermes CLI on PATH to answer; CI has no kanban board',
+    );
+
+    // Mix of ids that may or may not exist: the contract is "a key appears
+    // only for a task that actually failed", so we assert on subset behavior
+    // rather than an exact count that would drift as the board changes.
+    const ids = ['t_380a4e2f', 't_definitely_not_a_real_task'];
+    const query = ids.map((i) => encodeURIComponent(i)).join(',');
+
+    const response = await request.get(`/api/hermes/tasks/diagnostics?ids=${query}`);
+    expect(response.status(), 'diagnostics HTTP status').toBe(200);
+    const body = await response.json();
+    expect(typeof body, 'diagnostics returned a non-object').toBe('object');
+
+    // Every returned key must be one we asked for — the route must not leak
+    // the whole board back.
+    for (const key of Object.keys(body)) {
+      expect(ids, `diagnostics returned unrequested key ${key}`).toContain(key);
+      expect(typeof body[key], `diagnostics value for ${key} is not a string`).toBe('string');
+    }
+
+    // A serial per-id subprocess loop costs ~700ms per id. Requesting enough
+    // ids that the loop cannot hide under any plausible CI slowness is the
+    // whole point: 25 ids is ~17s serial versus ~1s batched, so the ceiling
+    // below separates the two implementations by a wide margin instead of by
+    // the noise on a loaded machine.
+    const many = Array.from({ length: 25 }, (_, i) => `t_guard_${i}`);
+    const manyQuery = many.map((i) => encodeURIComponent(i)).join(',');
+    const manyStarted = Date.now();
+    const manyResponse = await request.get(`/api/hermes/tasks/diagnostics?ids=${manyQuery}`);
+    const manyElapsed = Date.now() - manyStarted;
+
+    expect(manyResponse.status(), 'diagnostics (25 ids) HTTP status').toBe(200);
+    expect(
+      manyElapsed,
+      `diagnostics took ${manyElapsed}ms for 25 ids — the per-id subprocess loop is back`,
+    ).toBeLessThan(5_000);
+  });
+
+  // Guard the empty-input contract, which is pure route logic and needs no CLI.
+  test('diagnostics returns an empty object for missing or empty ids', async ({ request }) => {
+    for (const query of ['', '?ids=', '?ids=,']) {
+      const response = await request.get(`/api/hermes/tasks/diagnostics${query}`);
+      expect(response.status(), `diagnostics${query} HTTP status`).toBe(200);
+      expect(await response.json(), `diagnostics${query} should be {}`).toEqual({});
+    }
+  });
 });
