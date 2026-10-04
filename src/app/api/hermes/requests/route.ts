@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withCache, CACHE_TTL, invalidateApiCache } from "@/lib/cache";
 
-export async function GET(req: Request) {
+// Typed NextRequest (not the plain Request the route used before): withCache's
+// handler signature is NextRequest because generateCacheKey reads nextUrl.
+async function getRequests(req: NextRequest) {
   const url = new URL(req.url);
   const status = url.searchParams.get("status");
   const kind = url.searchParams.get("kind");
@@ -15,6 +18,16 @@ export async function GET(req: Request) {
   });
   const pending = await prisma.agentRequest.count({ where: { status: "awaiting_approval" } });
   return NextResponse.json({ requests, pending });
+}
+
+// The approval inbox polls this every 5s, so an uncached GET meant two Prisma
+// queries per poll. 30s (not the 60s default) keeps a freshly-queued request
+// from feeling stuck. Cache keys include the query string (see generateCacheKey),
+// so ?take=15 and ?take=50 never share an entry.
+const cachedGet = withCache(getRequests, { ttl: CACHE_TTL.VERY_DYNAMIC });
+
+export async function GET(req: Request) {
+  return cachedGet(req as NextRequest);
 }
 
 export async function POST(req: Request) {
@@ -43,5 +56,10 @@ export async function POST(req: Request) {
       status: "queued",
     },
   });
+
+  // A just-created request is the one the operator is watching for, so drop
+  // the cached GETs instead of making them wait out the 30s TTL. Failing to
+  // invalidate only costs staleness, so it must not fail the create.
+  await invalidateApiCache(["/api/hermes/requests"]).catch(() => {});
   return NextResponse.json({ request }, { status: 201 });
 }
