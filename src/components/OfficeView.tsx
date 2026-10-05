@@ -241,6 +241,14 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
   const spriteSize = isMax ? 56 : 44;
   const walk = WALK[agent?.id as keyof typeof WALK] ?? WALK.sage;
 
+  // NB: the desk tile is deliberately NOT role="button" / tabIndex={0}. It has no
+  // activation — no onClick, no navigation, and OfficeView receives no onChat prop —
+  // so announcing it as a button would tell AT users the tile is actionable when
+  // Enter/Space do nothing. It stays a non-focusable group carrying a label, which
+  // also keeps it out of the global [role="button"]:focus-visible rule in
+  // globals.css (that rule forces border-radius 6px, which would fight the tile's
+  // rounded-2xl and animate a visible corner morph on focus).
+
   // Bubble text only while actually working — stale "last activity" lines
   // made idle desks look mid-task. Working prefers the live currentTask.
   const bubbleText = isWorking
@@ -264,6 +272,8 @@ function AgentDesk({ agent, label, isMax }: { agent: Agent | undefined; label: s
           : isOnline
             ? { animation: "online-ring 2.5s infinite" }
             : undefined}
+        role="group"
+        aria-label={`Agent desk: ${agent?.name ?? "Empty"} — ${agent?.role ?? "offline"}. Status: ${rawStatus}.`}
       >
         {/* Desk surface */}
         <div className={`absolute bottom-3 left-3 right-3 h-1/3 rounded-lg

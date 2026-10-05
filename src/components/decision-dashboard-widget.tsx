@@ -220,7 +220,7 @@ export function DecisionDashboardWidget({
         <div className="mt-3 pt-3 border-t border-[var(--line)]">
           <a
             href="/admin/decisions"
-            className="inline-flex items-center gap-1 text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors duration-150 ease-out"
+            className="inline-flex items-center gap-1 text-[11px] text-[var(--accent)] hover:text-[var(--text)] transition-colors duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           >
             View all decisions <ArrowUpRight className="w-3 h-3" />
           </a>

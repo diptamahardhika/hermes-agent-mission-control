@@ -177,7 +177,7 @@ function ToastItem({
         type="button"
         onClick={() => onDismiss(t.id)}
         aria-label="Dismiss notification"
-        className="shrink-0 p-1 rounded-md transition-colors hover:bg-white/[0.06] text-[var(--text-3)] hover:text-[var(--text)]"
+        className="shrink-0 p-1 rounded-md transition-colors hover:bg-white/[0.06] text-[var(--text-3)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         style={{ color: "inherit", opacity: 0.6 }}
       >
         <X className="w-3.5 h-3.5" />

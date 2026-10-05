@@ -84,7 +84,8 @@ function DecisionItemRow({
         <button
           type="button"
           onClick={onToggle}
-          className="flex gap-2.5 py-1.5 items-start w-full text-left hover:bg-[var(--surface-1)] transition-colors -mx-1 px-1 rounded-md"
+          className="flex gap-2.5 py-1.5 items-start w-full text-left hover:bg-[var(--surface-1)] transition-colors -mx-1 px-1 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          aria-expanded={expanded}
         >
           <span className="text-[var(--text-4)] shrink-0 pt-0.5 text-[12px]">·</span>
           <p className="flex-1 text-[13px] leading-snug text-[var(--text-2)] font-medium">
@@ -127,7 +128,8 @@ function DecisionItemRow({
       <button
         type="button"
         onClick={onToggle}
-        className="flex gap-2.5 py-1.5 items-start w-full text-left hover:bg-[var(--surface-1)] transition-colors -mx-1 px-1 rounded-md"
+        className="flex gap-2.5 py-1.5 items-start w-full text-left hover:bg-[var(--surface-1)] transition-colors -mx-1 px-1 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        aria-expanded={expanded}
       >
         <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: "var(--warn)" }} />
         <p className="flex-1 text-[13px] leading-snug text-[var(--text)] font-semibold">
