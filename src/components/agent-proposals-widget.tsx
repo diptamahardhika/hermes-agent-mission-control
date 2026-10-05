@@ -171,6 +171,7 @@ export function AgentProposalsWidget() {
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
+            aria-label="Sort by newest first"
             title="Sort by newest first"
             type="button"
           >
@@ -183,6 +184,7 @@ export function AgentProposalsWidget() {
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
+            aria-label="Sort by oldest first"
             title="Sort by oldest first"
             type="button"
           >
@@ -195,6 +197,7 @@ export function AgentProposalsWidget() {
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
+            aria-label="Sort alphabetically by title"
             title="Sort by title (A-Z)"
             type="button"
           >
@@ -211,7 +214,9 @@ export function AgentProposalsWidget() {
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
+            aria-label="Filter by all proposals"
             title="Filter by all"
+            type="button"
           >
             All
           </button>
@@ -222,6 +227,9 @@ export function AgentProposalsWidget() {
                 ? "bg-white/[0.08] text-[var(--text)]"
                 : "text-[var(--text-3)] hover:text-[var(--text-2)]"
             }`}
+            aria-label="Filter by pending proposals"
+            title="Filter by pending"
+            type="button"
           >
             Pending
           </button>
@@ -255,7 +263,7 @@ export function AgentProposalsWidget() {
           {counts.truncated && counts.total > visible.length && (
             <p className="mt-2 text-[11px] text-[var(--text-3)]">
               +{counts.total - visible.length} more on{" "}
-              <a href="/agents" className="font-medium" style={{ color: "var(--accent)" }}>Agents →</a>
+              <a href="/agents" className="font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]" style={{ color: "var(--accent)" }}>Agents →</a>
             </p>
           )}
           <a

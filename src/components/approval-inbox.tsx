@@ -281,7 +281,7 @@ export function ApprovalInbox({ compact = false }: { compact?: boolean }) {
           {compact && count > 3 && (
             <a
               href="/hermes"
-              className="inline-flex items-center gap-1 self-start text-[12.5px] font-medium transition-colors"
+              className="inline-flex items-center gap-1 self-start text-[12.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               style={{ color: "var(--accent)" }}
             >
               View all in Hermes →
