@@ -23,6 +23,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
+import { parseGatewayState } from "./health-parse.mjs";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -763,16 +764,16 @@ async function mirrorHealth() {
     await pool.query("SELECT 1");
     const out = await hermes(["status"], { timeout: 12000 });
     detail = out.slice(0, 4000);
-    // Check for "running" near "gateway" or "online" keywords
-    // The gateway status appears on a separate line from the header, so
-    // use a case-insensitive search that doesn't anchor to a single line.
-    const lower = out.toLowerCase();
+    // Check for "running" near "gateway" or "online" keywords.
     online = /(online|running|connected)/.test(out);
-    // "gateway service" section header followed by "status:" line with
-    // optional checkmark and running/online. The lines between them may
-    // contain other info (PID, manager, etc.). Match across newlines.
-    const gatewayMatch = out.match(/gateway service\s*\n[\s\S]*?status:\s*[✓✗\s]*(running|online)/i);
-    gateway = gatewayMatch ? "running" : (lower.includes("gateway") ? "stopped" : "unknown");
+    // Gateway state lives in its own parser (health-parse.mjs) because two
+    // layouts are live — the summary row `Gateway: ✓ running` that plain
+    // `hermes status` prints, and the `Gateway Service` / `Status:` section
+    // that `--full` prints. An earlier inline regex only matched the latter,
+    // so the summary output this function actually receives always fell
+    // through to "stopped" — which then read as "gateway down" to
+    // healStuckKanban() and the watchdog. Pinned by health-parse.test.mjs.
+    gateway = parseGatewayState(out);
   } catch (e) { detail = e.message.split("\n")[0]; }
   await setStore("hermes-health", { online, gateway, detail, lastSeen: new Date().toISOString() });
 }
