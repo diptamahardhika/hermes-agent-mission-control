@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withCache, CACHE_TTL } from "@/lib/cache";
 
 /** Extract the latest metrics from either a flat metrics object or a checkpoints time-series */
 function extractMetrics(raw: unknown): { views: number; likes: number; bookmarks: number; replies: number; retweets: number } {
@@ -39,7 +40,8 @@ function extractMetrics(raw: unknown): { views: number; likes: number; bookmarks
   return best;
 }
 
-export async function GET() {
+async function getXAnalytics(req: NextRequest) {
+  void req; // no query params or headers are read; signature is required by withCache
   try {
     // Fetch posted drafts
     const dbDrafts = await prisma.draft.findMany({
@@ -154,4 +156,16 @@ export async function GET() {
   } catch {
     return NextResponse.json({ tweets: [], heatmap: [] });
   }
+}
+
+// Uncached this handler cost ~938ms per mount (it fans out over every posted
+// draft plus metric checkpoints) — the slowest polled route in the app. It is
+// pure read: no writes, no auth, no query params, and nothing in this file can
+// invalidate the cache, so the TTL is the only staleness bound. 60s is
+// imperceptible on a tweet heatmap; the previous upstream contract for
+// /api/github's PR lookup is also revalidate: 60.
+const cachedGet = withCache(getXAnalytics, { ttl: CACHE_TTL.DYNAMIC });
+
+export async function GET(req: Request) {
+  return cachedGet(req as NextRequest);
 }

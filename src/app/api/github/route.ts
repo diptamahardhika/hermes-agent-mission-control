@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { withCache, CACHE_TTL } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -113,7 +114,8 @@ interface GhCommit {
   commit?: { message?: string; author?: { date?: string } };
 }
 
-export async function GET() {
+async function getGitHub(req: NextRequest) {
+  void req; // no query params or headers are read; signature is required by withCache
   if (!GITHUB_USERNAME) {
     return NextResponse.json({ error: "GITHUB_USERNAME not set" }, { status: 500 });
   }
@@ -446,4 +448,22 @@ export async function GET() {
       { status: 500 }
     );
   }
+}
+
+// Uncached this handler cost ~692ms — five GitHub API calls in Promise.allSettled
+// — and /github re-polls it every 60s, so a tab left open re-ran the whole fan-out
+// once a minute forever. Pure read: no writes here, no auth, no per-request
+// variation, so nothing can invalidate the cache and the TTL is the only
+// staleness bound.
+//
+// 60s matches the `next: { revalidate: 60 }` already applied to the commits
+// fetch, so the outer cache cannot make PR/CI state staler than it already is.
+//
+// withCache only stores responses where `response.ok`, so the two 500 paths
+// above (missing GITHUB_USERNAME, upstream failure) are never cached and stay
+// live-retrying.
+const cachedGet = withCache(getGitHub, { ttl: CACHE_TTL.DYNAMIC });
+
+export async function GET(req: Request) {
+  return cachedGet(req as NextRequest);
 }
