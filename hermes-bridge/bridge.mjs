@@ -19,7 +19,7 @@
 import pg from "pg";
 import fs from "node:fs";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
@@ -160,23 +160,34 @@ function isRetryable(e, attempt) {
 // owns it. See healStuckKanban() for the actual recovery path when the
 // dispatcher is genuinely stuck.
 //
-// WORKAROUND retained for the genuinely-unremovable case: if the original
-// ~/.hermes/kanban.db cannot be locked at all (e.g. macOS ACL deny-delete on
-// the parent dir), copy the DB to /tmp and point HERMES_KANBAN_DB at the copy.
+// WORKAROUND retained: the CLI is pointed at a consistent snapshot of the DB
+// rather than the live file, so a snapshot can never interfere with the CLI's
+// own locking (see ensureTempKanbanDb below for how that snapshot is taken).
 const HERMES_HOME = path.join(os.homedir(), ".hermes");
 const TEMP_KANBAN_DB = "/tmp/hermes-db/kanban.db";
 function ensureTempKanbanDb() {
   try {
     fs.mkdirSync(path.dirname(TEMP_KANBAN_DB), { recursive: true });
     const src = path.join(HERMES_HOME, "kanban.db");
-    const dst = TEMP_KANBAN_DB;
-    // Always copy to pick up latest WAL state
-    if (fs.existsSync(src)) {
-      fs.copyFileSync(src, dst);
-      // Remove any lock files from the copy
-      for (const lockName of ["kanban.db.init.lock", "kanban.db.dispatch.lock"]) {
-        try { fs.unlinkSync(path.join(path.dirname(dst), lockName)); } catch {}
-      }
+    if (!fs.existsSync(src)) return TEMP_KANBAN_DB;
+    // Snapshot with SQLite's own online backup, NOT copyFileSync. The kanban DB
+    // is in WAL mode, so committed writes can sit in the `-wal` sidecar until a
+    // checkpoint folds them into the main file. copyFileSync() copies only the
+    // main file and would silently hand the CLI a database missing those
+    // committed rows. `.backup` reads through the WAL and writes a
+    // self-consistent copy (verified: integrity_check=ok).
+    //
+    // Opened read-only ("file:...?mode=ro") so the snapshot can never write to
+    // or checkpoint the real DB — the CLI owns it.
+    try {
+      execFileSync("/usr/bin/sqlite3", [`file:${src}?mode=ro`, `.backup '${TEMP_KANBAN_DB}'`], {
+        timeout: 20000, maxBuffer: 1024 * 1024,
+      });
+    } catch (e) {
+      // Fall back to a plain file copy: correct whenever the WAL is empty
+      // (the normal case between CLI runs), just not WAL-safe.
+      log(`ensureTempKanbanDb: sqlite3 .backup failed (${e.message.split("\n")[0]}), falling back to copyFileSync`);
+      fs.copyFileSync(src, TEMP_KANBAN_DB);
     }
     return TEMP_KANBAN_DB;
   } catch (e) {
@@ -184,10 +195,6 @@ function ensureTempKanbanDb() {
     return null;
   }
 }
-// Hermes holds its kanban locks with fcntl.flock, which the kernel releases the
-// moment the last fd closes; the empty lock files then persist by design, like a
-// stale .pid. They are not leaked state and must not be unlinked — see the note
-// above HERMES_HOME. The lock lifecycle belongs to the process that owns it.
 
 // ── Self-healing: dispatch stuck kanban tasks when gateway is down ──────────
 // When the gateway crashes or restarts, its embedded dispatcher stops running.
