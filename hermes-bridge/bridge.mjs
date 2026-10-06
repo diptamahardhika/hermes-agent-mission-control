@@ -24,6 +24,7 @@ import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
 import { parseGatewayState } from "./health-parse.mjs";
+import { walSize, walTransition } from "./wal-watch.mjs";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +42,9 @@ const HOST = os.hostname();
 const BOARD = process.env.HERMES_BOARD || "default";
 const POLL_MS = Number(process.env.BRIDGE_POLL_MS || 5000);
 const MIRROR_MS = Number(process.env.BRIDGE_MIRROR_MS || 30000);
+// WAL watcher cadence. A statSync costs ~0.75µs, so this is essentially free;
+// the interval only bounds how long a resident writer can go unnoticed.
+const WAL_WATCH_INTERVAL_MS = Number(process.env.BRIDGE_WAL_WATCH_MS || 5000);
 // NB: briefs routinely run 4-8 min (worse when the credential pool is dry and
 // Hermes falls back to a free model). The original 240s default killed every
 // long brief with a bare "Command failed" — raise it and override via env.
@@ -1472,6 +1476,28 @@ async function main() {
   }
   await mirrorTick();
   setInterval(() => mirrorTick().catch((e) => log("mirror loop", e.message)), MIRROR_MS);
+
+  // WAL watcher. The kanban DB is in WAL mode, so committed writes can sit in
+  // the `-wal` sidecar until a checkpoint folds them in. ensureTempKanbanDb()
+  // reads through the WAL (sqlite3 .backup), so snapshots are correct either
+  // way — this only makes the state observable. It logs on *transitions* only,
+  // so a resident writer produces two lines (open, close) rather than a
+  // heartbeat every tick.
+  //
+  // Relevant because plugins/kanban/dashboard `_EventTail` holds one SQLite
+  // connection per open dashboard socket, which keeps writes checkpoint-pending
+  // for as long as a board tab is open.
+  let lastWalSize = 0;
+  setInterval(() => {
+    try {
+      const t = walTransition(lastWalSize, walSize(path.join(HERMES_HOME, "kanban.db-wal")));
+      lastWalSize = t.prev;
+      if (t.log) log(t.message);
+    } catch (e) {
+      log("wal watcher tick error:", e.message.split("\n")[0]);
+    }
+  }, WAL_WATCH_INTERVAL_MS);
+
   const tick = async () => { try { await processQueue(); } catch (e) { log("queue loop", e.message); } finally { setTimeout(tick, POLL_MS); } };
   tick();
   setInterval(async () => {
