@@ -176,6 +176,10 @@ export default function HomelabPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
+      <h1 className="text-[32px] font-semibold tracking-[-0.025em] leading-none text-[var(--text)]">
+        Homelab
+      </h1>
+
       {/* ── Status banner ─────────────────────────────────────── */}
       <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 mt-4 ${
         allUp

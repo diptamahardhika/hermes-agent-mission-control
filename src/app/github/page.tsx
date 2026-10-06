@@ -216,6 +216,13 @@ export default function GitHubPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
+      {/* Page title. The hero below is the profile, which stays an h2: a screen
+          reader announcing "GitHub" then "Dipta Mahardhika" is the page/heading
+          relationship the passing pages (e.g. /agents) already follow. */}
+      <h1 className="text-[32px] font-semibold tracking-[-0.025em] leading-none text-[var(--text)]">
+        GitHub
+      </h1>
+
       {/* ── Profile hero ─────────────────────────────────────── */}
       <div className="panel p-6 md:p-8">
         <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">

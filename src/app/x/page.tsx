@@ -44,6 +44,10 @@ export default function XPage() {
 
   return (
     <div className="space-y-0">
+      <h1 className="text-[32px] font-semibold tracking-[-0.025em] leading-none text-[var(--text)]">
+        X
+      </h1>
+
       {/* Tab bar */}
       <div className="flex items-center gap-1 border-b border-[var(--line)] mb-0">
         {tabs.map((t) => (
