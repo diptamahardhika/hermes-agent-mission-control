@@ -142,17 +142,27 @@ function isRetryable(e, attempt) {
   return false;
 }
 
-// ── Self-healing: stale kanban.lock recovery ─────────────────────────
-// Hermes's SQLite-backed kanban can be left with a stale 0-byte init/dispatch
-// lock when the gateway or CLI is killed uncleanly (e.g. power loss, OOM).
-// The lock file is created with a touch() and never properly cleaned up,
-// so after the process dies the file persists — any subsequent `hermes kanban`
-// invocation hits "Operation not permitted" trying to initialise the DB.
+// ── kanban DB location ────────────────────────────────────────────────
+// Hermes guards its SQLite kanban with fcntl.flock on `kanban.db.init.lock` /
+// `kanban.db.dispatch.lock`. Those lock files are never unlinked by the CLI —
+// they are opened with "a+b" and released with flock(LOCK_UN) + close, so the
+// kernel drops the lock the moment the last fd closes and the empty file just
+// stays on disk like a stale .pid. That is harmless on its own.
 //
-// WORKAROUND: If the original ~/.hermes/kanban.db has unremovable locks
-// (e.g. macOS ACL deny-delete on parent dir), copy the DB to /tmp and use
-// HERMES_KANBAN_DB to point Hermes at the copy. The copy is refreshed on
-// each mirror tick so it stays reasonably current.
+// It is NOT harmless for us to unlink them, though. flock is inode-based, so
+// unlinking a lock file frees the inode; the next process to open it gets a
+// brand-new inode and flocks a different file — silently defeating the mutual
+// exclusion the dispatch lock exists to provide (two dispatchers writing
+// kanban.db concurrently is the multi-writer corruption this lock guards
+// against upstream).
+//
+// So: never delete these files. Leave the lock lifecycle to the process that
+// owns it. See healStuckKanban() for the actual recovery path when the
+// dispatcher is genuinely stuck.
+//
+// WORKAROUND retained for the genuinely-unremovable case: if the original
+// ~/.hermes/kanban.db cannot be locked at all (e.g. macOS ACL deny-delete on
+// the parent dir), copy the DB to /tmp and point HERMES_KANBAN_DB at the copy.
 const HERMES_HOME = path.join(os.homedir(), ".hermes");
 const TEMP_KANBAN_DB = "/tmp/hermes-db/kanban.db";
 function ensureTempKanbanDb() {
@@ -174,30 +184,10 @@ function ensureTempKanbanDb() {
     return null;
   }
 }
-// We check each lock's age: only remove it if it's genuinely stale
-// (older than 5 minutes). A real init/dispatch transaction completes in
-// milliseconds; if a lock persists beyond 5 minutes, nothing is running
-// and it's safe to remove. The previous 10-second threshold caused an
-// infinite clean-loop because Hermes recreates locks within ~12 seconds
-// of deletion, so the lock was always "stale" by the time we checked it.
-const STALE_LOCK_AGE_MS = 300_000; // 5 minutes
-function cleanStaleLocks() {
-  for (const lockName of ["kanban.db.init.lock", "kanban.db.dispatch.lock"]) {
-    const lockPath = path.join(HERMES_HOME, lockName);
-    try {
-      if (!fs.existsSync(lockPath)) continue;
-      const { mtimeMs } = fs.statSync(lockPath);
-      const age = Date.now() - (mtimeMs || 0);
-      if (age < STALE_LOCK_AGE_MS) continue; // not stale enough
-      try {
-        fs.unlinkSync(lockPath);
-        log(`self-heal: removed stale ${lockName} (age=${Math.round(age / 1000)}s)`);
-      } catch (e) {
-        // Silently ignore permission errors (e.g., macOS ACL deny-delete on parent dir)
-      }
-    } catch (e) { /* never fatal — next mirror tick will retry */ }
-  }
-}
+// Hermes holds its kanban locks with fcntl.flock, which the kernel releases the
+// moment the last fd closes; the empty lock files then persist by design, like a
+// stale .pid. They are not leaked state and must not be unlinked — see the note
+// above HERMES_HOME. The lock lifecycle belongs to the process that owns it.
 
 // ── Self-healing: dispatch stuck kanban tasks when gateway is down ──────────
 // When the gateway crashes or restarts, its embedded dispatcher stops running.
@@ -373,9 +363,10 @@ async function setStore(key, data) {
 
 /* ─────────────── PULL: mirror Hermes → Postgres ─────────────── */
 async function mirrorKanban() {
-  // Clean up stale kanban lock files before attempting to run hermes kanban
-  cleanStaleLocks();
-
+  // Hermes holds its kanban locks with fcntl.flock, released by the kernel on
+  // fd close. The empty lock files persist by design; unlinking them would
+  // break the lock's inode identity, so the bridge leaves them alone. See the
+  // note above HERMES_HOME.
   // Try to use temp DB copy if original has unremovable locks
   let hermesEnv = { ...process.env };
   const kanbanDbPath = ensureTempKanbanDb();
@@ -453,7 +444,6 @@ async function mirrorKanban() {
 }
 
 async function mirrorCrons() {
-  cleanStaleLocks();
   try {
     const out = await hermes(["cron", "list", "--all"], { timeout: 15000 });
     const lines = out.split("\n").map((l) => l.trimEnd()).filter(Boolean);
@@ -757,7 +747,6 @@ async function mirrorOmniRoute() {
 }
 
 async function mirrorHealth() {
-  cleanStaleLocks();
   let online = false, gateway = "unknown", detail = "";
   try {
     // Verify Postgres is connected before calling hermes CLI
@@ -928,7 +917,6 @@ async function generateBriefing() {
   let briefDone = false;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL));
-    cleanStaleLocks();
     let hermesEnv = { ...process.env };
     const kanbanDbPath = ensureTempKanbanDb();
     if (kanbanDbPath) hermesEnv.HERMES_KANBAN_DB = kanbanDbPath;
@@ -1477,10 +1465,6 @@ async function main() {
   }
   await mirrorTick();
   setInterval(() => mirrorTick().catch((e) => log("mirror loop", e.message)), MIRROR_MS);
-  // queue loop — NOTE: cleanStaleLocks() is NOT called here. It runs in
-  // mirrorTick() every 30s. Calling it here every 5s caused an infinite
-  // clean loop (locks recreated within seconds, threshold of 10s was too
-  // aggressive).
   const tick = async () => { try { await processQueue(); } catch (e) { log("queue loop", e.message); } finally { setTimeout(tick, POLL_MS); } };
   tick();
   setInterval(async () => {
