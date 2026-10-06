@@ -23,7 +23,23 @@
 import { test, expect } from "@playwright/test";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:8888";
-const TITLE = "3A runtime verify";
+
+// Unique per run, so an orphaned row from an interrupted run can never be
+// matched alongside this run's own article. A fixed title made the Library
+// locator ambiguous (strict-mode violation: 2 elements) as soon as a single
+// run was killed before its afterAll cleanup — which is a self-inflicted
+// flake: the second run failed because the *first* run was cut short.
+const TITLE = `3A runtime verify ${process.pid}-${Date.now()}`;
+
+/**
+ * The Library card for this run's article. Addressed by role+name rather than
+ * by text: the card's accessible name is "<title> <wordcount> · <date>", so a
+ * bare getByText(TITLE) matches the inner <h3> and trips strict mode the
+ * moment a second matching element exists. Anchoring on the button and
+ * prefix-matching the title keeps the locator to exactly one element.
+ */
+const card = (page: import("@playwright/test").Page, title: string) =>
+  page.getByRole("button", { name: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`) });
 
 test.describe.configure({ mode: "serial" });
 
@@ -138,9 +154,9 @@ test("opening an article mounts the deferred ArticleEditor", async ({ page }) =>
 
   await page.goto(`${BASE}/articles`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Library" }).click();
-  await expect(page.getByText(TITLE)).toBeVisible({ timeout: 15000 });
+  await expect(card(page, TITLE)).toBeVisible({ timeout: 15000 });
 
-  await page.getByText(TITLE).first().click();
+  await card(page, TITLE).click();
 
   // Editor-only UI. If ArticleEditor were a broken dynamic import, the modal
   // would never mount and these would time out.
@@ -153,7 +169,7 @@ test("editor sub-tabs still switch after deferral", async ({ page }) => {
 
   await page.goto(`${BASE}/articles`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Library" }).click();
-  await page.getByText(TITLE).first().click();
+  await card(page, TITLE).click();
 
   await expect(page.getByRole("button", { name: "Write" })).toBeVisible({ timeout: 15000 });
   await expect(page.getByPlaceholder(/hook tweet/i)).toBeVisible({ timeout: 15000 });
