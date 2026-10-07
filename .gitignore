@@ -55,6 +55,10 @@ kanban.db
 data/*.db*
 data/*.sqlite*
 
+# agent scratch: throwaway proof/benchmark scripts written while diagnosing.
+# Deliberately scoped to the scratch dir only — .hermes/plans/ IS tracked.
+/.hermes/scratch/
+
 # local dev utilities (not part of the project)
 restart.sh
 
