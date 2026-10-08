@@ -502,11 +502,45 @@ textarea, input {
   animation: hq-grow 1.2s var(--ease-out) both;
 }
 
+/*   ────────────────────────────────────────────────────────────
+   Sparkline draw-on. The line is revealed by a clip-path sweep on the
+   <svg>'s own box — no path length needed. A stroke-dash can't be used
+   here: `vector-effect: non-scaling-stroke` resolves stroke-dasharray
+   in screen px while the path's length lives in stretched viewBox
+   units, so the dash covers only part of the line at some card widths.
+   The area fades in behind it and the endpoint dot lands last. Pure CSS,
+   so it also plays on server-rendered markup.
+   ──────────────────────────────────────────────────────────── */
+@keyframes hq-spark-draw {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+@keyframes hq-spark-area {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes hq-spark-dot {
+  0%, 62% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  100%    { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.spark-line {
+  animation: hq-spark-draw 1.15s var(--ease-out) both;
+}
+.spark-area {
+  animation: hq-spark-area 0.9s var(--ease-out) 0.35s both;
+}
+.spark-dot {
+  animation: hq-spark-dot 0.4s var(--ease-out) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hq-rise { animation: none; opacity: 1; }
   .reveal:not(.is-visible) { opacity: 1; }
   .reveal.is-visible { animation: none; opacity: 1; transform: none; }
   .grow-bar { animation: none; width: var(--bar-w); }
+  .spark-line { animation: none; clip-path: none; }
+  .spark-area { animation: none; opacity: 1; }
+  .spark-dot { animation: none; opacity: 1; }
   .hq-ambient::before { animation: none; }
   .panel-interactive:hover,
   .panel-interactive:focus-visible { transform: none; }

@@ -42,7 +42,7 @@ export function Sparkline({ data, positive = true, color, area = false, classNam
       role="img"
       aria-label={ariaLabel ?? "Data trend"}
     >
-      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible" aria-hidden="true">
+      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible spark-line" aria-hidden="true">
         {area && (
           <defs>
             <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
@@ -51,7 +51,15 @@ export function Sparkline({ data, positive = true, color, area = false, classNam
             </linearGradient>
           </defs>
         )}
-        {areaPath && <path d={areaPath} fill={`url(#${gid})`} stroke="none" />}
+        {areaPath && (
+          <path d={areaPath} fill={`url(#${gid})`} stroke="none" className="spark-area" />
+        )}
+        {/* Draw-on is done with a clip sweep on the <svg>, not a stroke dash.
+            `vector-effect="non-scaling-stroke"` makes stroke-dasharray resolve in
+            screen px while the path's own length lives in stretched viewBox
+            units, and pathLength only rescales one of the two — so no dash value
+            is correct at every card width. A clip on the element's own box needs
+            no length at all. */}
         <polyline
           points={points}
           fill="none"
@@ -64,7 +72,7 @@ export function Sparkline({ data, positive = true, color, area = false, classNam
       </svg>
       {/* emphasized endpoint dot — overlaid so it stays a true circle */}
       <span
-        className="absolute rounded-full"
+        className="spark-dot absolute rounded-full"
         style={{
           left: `${last.x}%`,
           top: `${last.y}%`,
