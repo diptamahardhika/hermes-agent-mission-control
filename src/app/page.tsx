@@ -11,6 +11,7 @@ import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget"
 import type { Decision } from "@/types/decision";
 import { AgentProposalsWidget } from "@/components/agent-proposals-widget";
 import { Panel } from "@/components/ui/kit";
+import { Reveal } from "@/components/ui/reveal";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { DiagnosticsStrip } from "@/components/diagnostics-strip";
 import {
@@ -445,13 +446,13 @@ function ModelShareBars({ byModel, total }: { byModel: SpendData["byModel"]; tot
             </span>
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               {split ? (
-                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%` }}>
+                <div className="grow-bar h-full flex rounded-full" style={{ "--bar-w": `${widthPct}%` } as React.CSSProperties}>
                   {parts.filter(p2 => p2.v > 0).map(p2 => (
                     <div key={p2.label} className="h-full" style={{ width: `${(p2.v / modelTotal) * 100}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
                   ))}
                 </div>
               ) : (
-                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%`, background: "#a78bfa", opacity: 0.9 }} />
+                <div className="grow-bar h-full rounded-full" style={{ "--bar-w": `${widthPct}%`, background: "#a78bfa", opacity: 0.9 } as React.CSSProperties} />
               )}
             </div>
             <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
@@ -511,13 +512,13 @@ function OmniShareBars({ omni }: { omni: OmniSpendData }) {
             </span>
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               {split ? (
-                <div className="h-full flex rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%` }}>
+                <div className="grow-bar h-full flex rounded-full" style={{ "--bar-w": `${widthPct}%` } as React.CSSProperties}>
                   {parts.filter(p2 => p2.v > 0).map(p2 => (
                     <div key={p2.label} className="h-full" style={{ width: `${(p2.v / modelTotal) * 100}%`, background: p2.color, opacity: p2.label === "out" ? 0.85 : 0.9 }} />
                   ))}
                 </div>
               ) : (
-                <div className="h-full rounded-full transition-all duration-[1200ms] ease-out" style={{ width: `${widthPct}%`, background: OMNI_TOK_COLORS.input, opacity: 0.9 }} />
+                <div className="grow-bar h-full rounded-full" style={{ "--bar-w": `${widthPct}%`, background: OMNI_TOK_COLORS.input, opacity: 0.9 } as React.CSSProperties} />
               )}
             </div>
             <span className="num text-[9px] text-[var(--hq-text-ghost)] shrink-0 text-right whitespace-nowrap sm:w-36">
@@ -1257,6 +1258,7 @@ if (!mounted) return null;
         </Panel>
 
         {/* ── Brief + Approval inbox (side-by-side on wide) ─ */}
+        <Reveal>
         <div className="mt-5 grid grid-cols-1 xl:grid-cols-3 gap-5 items-stretch">
           <div className="xl:col-span-2 hq-rise" style={rise(4)}>
             <HermesBriefing />
@@ -1265,9 +1267,11 @@ if (!mounted) return null;
             <AgentProposalsWidget />
           </div>
         </div>
+        </Reveal>
 
         {/* ── Crypto ──────────────────────────────────────── */}
         <ErrorBoundary name="Crypto">
+        <Reveal>
         <div className="mt-14">
           <SectionLabel>Crypto</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -1276,6 +1280,7 @@ if (!mounted) return null;
             </div>
           </div>
         </div>
+        </Reveal>
         </ErrorBoundary>
 
         {/* ── Coq Finance Advisor ─────────────────────── */}
@@ -1353,23 +1358,28 @@ if (!mounted) return null;
 
         {/* ── AI model news ───────────────────────────────── */}
         <ErrorBoundary name="AIModels">
+        <Reveal>
         <div className="mt-14">
           <SectionLabel>AI Models</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="lg:col-span-2 hq-rise" style={rise(6)}><AIModelNewsPanel /></div>
           </div>
         </div>
+        </Reveal>
         </ErrorBoundary>
 
         {/* ── Diagnostics ──────────────────────────────────── */}
         <ErrorBoundary name="Diagnostics">
+        <Reveal>
         <div className="mt-14">
           <DiagnosticsStrip />
         </div>
+        </Reveal>
         </ErrorBoundary>
 
         {/* ── Signal ──────────────────────────────────────── */}
         <ErrorBoundary name="Signal">
+        <Reveal>
         <div className="mt-14">
           <SectionLabel>Signal</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -1377,16 +1387,20 @@ if (!mounted) return null;
             <div className="hq-rise" style={rise(6)}><IdeasPanel boardIdeas={data.topIdeas} sageDrafts={data.topSageDrafts} ytIdeas={data.topYoutubeIdeas} buildIdeas={data.topBuildIdeas} /></div>
           </div>
         </div>
+        </Reveal>
         </ErrorBoundary>
 
         {/* ── Agents strip ────────────────────────────────── */}
         <ErrorBoundary name="Agents">
+        <Reveal>
         <div className="mt-14">
           <AgentsStrip processes={data.processes} />
         </div>
+        </Reveal>
         </ErrorBoundary>
 
         {/* ── X / Twitter stats — pinned to the very bottom ── */}
+        <Reveal>
         <div className="mt-14">
           <SectionLabel>X · Twitter</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -1402,6 +1416,7 @@ if (!mounted) return null;
             <div className="lg:col-span-2 hq-rise" style={rise(8)}><TopTweetsPanel tweets={data.topTweets} /></div>
           </div>
         </div>
+        </Reveal>
       </div>
     </>
   );

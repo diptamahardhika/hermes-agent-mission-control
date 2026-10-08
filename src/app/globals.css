@@ -466,8 +466,47 @@ textarea, input {
   background: var(--line);
 }
 
+/* ── scroll reveal ─────────────────────────────────────────────
+   Panels below the fold animated on mount and were already at
+   their final state by the time you scrolled to them. These reveal
+   when they actually enter the viewport.
+
+   The hidden state is applied by JS (a class), never by the
+   server-rendered markup — so with JS disabled or before hydration
+   the content is simply visible rather than stuck at opacity 0.
+   ──────────────────────────────────────────────────────────── */
+@keyframes hq-reveal {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.reveal:not(.is-visible) {
+  opacity: 0;
+}
+.reveal.is-visible {
+  animation: hq-reveal 0.55s var(--ease-out) both;
+}
+
+/* ── bars grow from zero ──────────────────────────────────────
+   Bars carried `transition-all duration-[1200ms]` on width, but
+   width was already final on first paint, so there was nothing to
+   transition. Animating 0 -> var(--bar-w) gives the transition
+   something real to play. Pure CSS: no state, no effect, works
+   on the server-rendered markup too.
+   ──────────────────────────────────────────────────────────── */
+@keyframes hq-grow {
+  from { width: 0; }
+  to   { width: var(--bar-w); }
+}
+.grow-bar {
+  width: var(--bar-w);
+  animation: hq-grow 1.2s var(--ease-out) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hq-rise { animation: none; opacity: 1; }
+  .reveal:not(.is-visible) { opacity: 1; }
+  .reveal.is-visible { animation: none; opacity: 1; transform: none; }
+  .grow-bar { animation: none; width: var(--bar-w); }
   .hq-ambient::before { animation: none; }
   .panel-interactive:hover,
   .panel-interactive:focus-visible { transform: none; }
