@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Waypoints, ArrowUpRight } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
+import { CountUp } from "@/components/ui/count-up";
 import { OmniSkeleton } from "@/components/dashboard/panel-skeletons";
 import { fmt, fmtExact, timeAgo } from "@/lib/home-format";
 import type { OmniSpendData } from "@/types/home-dashboard";
@@ -26,7 +27,9 @@ export default function OmniRoutePanel({ omni }: { omni: OmniSpendData }) {
         <div>
           <div className="eyebrow mb-2 !text-[9.5px]">Total tokens · 7d</div>
           <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
-            {omni.totalTokens != null ? fmtExact(omni.totalTokens) : "—"}
+            {omni.totalTokens != null
+              ? <CountUp value={omni.totalTokens} format={fmtExact} />
+              : "—"}
           </div>
           {series.some(v => v > 0) && <Sparkline data={series} color="#2dd4bf" area idSeed="omni-spend" className="h-9 mt-3" aria-label="OmniRoute tokens trend over 7 days" />}
         </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Cpu, ArrowUpRight } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
+import { CountUp } from "@/components/ui/count-up";
 import { SpendSkeleton } from "@/components/dashboard/panel-skeletons";
 import { fmt, fmtExact, timeAgo } from "@/lib/home-format";
 import type { SpendData } from "@/types/home-dashboard";
@@ -24,7 +25,9 @@ export default function SpendPanel({ spend }: { spend: SpendData }) {
         <div>
           <div className="eyebrow mb-2 !text-[9.5px]">Total tokens · 7d</div>
           <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
-            {spend.totalTokens != null ? fmtExact(spend.totalTokens) : "—"}
+            {spend.totalTokens != null
+              ? <CountUp value={spend.totalTokens} format={fmtExact} />
+              : "—"}
           </div>
           {series.some(v => v > 0) && <Sparkline data={series} color="#a78bfa" area idSeed="spend" className="h-9 mt-3" aria-label="Agent tokens trend over 7 days" />}
         </div>

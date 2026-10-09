@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Twitter, ArrowUpRight } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
+import { CountUp } from "@/components/ui/count-up";
 import { XAnalyticsSkeleton } from "@/components/dashboard/panel-skeletons";
 import { fmt, fmtExact } from "@/lib/home-format";
 
@@ -21,7 +22,7 @@ export default function XAnalyticsPanel({ views, trend, totalTweets, bestDay, be
       <div className="space-y-4">
         <div>
           <div className="eyebrow mb-2 !text-[9.5px]">Views · 7d</div>
-          <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">{fmt(views)}</div>
+          <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]"><CountUp value={views} format={fmt} /></div>
           {trend.some(v => v > 0) && <Sparkline data={trend} color="#38bdf8" area idSeed="xviews" className="h-9 mt-3" aria-label="X views trend over 7 days" />}
         </div>
         <div className="grid grid-cols-2 gap-3 pt-1">

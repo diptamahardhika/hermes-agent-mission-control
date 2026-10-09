@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Twitter, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Server, Cpu, Waypoints, RefreshCw, Activity, CircleDot } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
+import { CountUp } from "@/components/ui/count-up";
 import { Sparkline } from "@/components/sparkline";
 import { HermesBriefing } from "@/components/hermes-briefing";
 import { DecisionDashboardWidget } from "@/components/decision-dashboard-widget";
@@ -355,7 +356,7 @@ function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
         <div>
           <div className="eyebrow mb-2 !text-[9.5px]">Total tokens · 7d</div>
           <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
-            {fmt(data.totalTokens)}
+            <CountUp value={data.totalTokens} format={fmtExact} enabled={!loading} />
           </div>
           {series.some(v => v > 0) && <Sparkline data={series} color="#f59e0b" area idSeed="freellm-spend" className="h-9 mt-3" aria-label="FreeLLM tokens trend over 7 days" />}
         </div>
@@ -800,7 +801,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
           <div>
             <div className="eyebrow mb-2 !text-[9.5px]">Wallet value</div>
             <div className="num font-semibold text-[40px] leading-[0.95] tracking-[-0.02em] text-[var(--hq-text)]">
-              ${balance > 0 ? balance.toFixed(2) : "0.00"}
+              <CountUp value={balance > 0 ? balance : 0} format={(n) => `$${n.toFixed(2)}`} />
             </div>
           </div>
 
