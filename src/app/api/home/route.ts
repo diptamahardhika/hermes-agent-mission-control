@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import ideasJson from "@/data/ideas.json" assert { type: "json" };
 import { withCache, CACHE_TTL } from "@/lib/cache";
-import { CoqFinanceData, FreeLLMData } from "@/types/home-dashboard";
+import { CoqFinanceData, FreeLLMData, BinanceStatus } from "@/types/home-dashboard";
 import { getAgentsData } from "@/app/api/agents/route";
 import { getFreeLLMData } from "@/app/api/freellm/route";
 
@@ -57,6 +57,25 @@ const HL_WALLET = process.env.HL_WALLET || ""; // legacy (unused since Binance s
 const BINANCE_API_KEY = process.env.BINANCE_API_KEY || "";
 const BINANCE_API_SECRET = process.env.BINANCE_API_SECRET || "";
 const HL_API = "https://api.hyperliquid.xyz/info";
+
+/**
+ * Turns a Binance fetch failure into something the card can show verbatim.
+ * The important distinction is 451: Binance serves it to restricted regions
+ * (the US included) even on public endpoints, so it means "this machine's IP
+ * is blocked", not "your credentials are wrong". Reporting that as a missing
+ * key sends people to re-add credentials they already have.
+ */
+function classifyBinanceError(e: unknown): BinanceStatus {
+  const status = typeof e === "object" && e && "httpStatus" in e
+    ? (e as { httpStatus?: number }).httpStatus
+    : undefined;
+  if (status === 451) return { state: "geo-blocked", httpStatus: 451 };
+  if (status === 401 || status === 403) {
+    return { state: "unauthorized", httpStatus: status };
+  }
+  const msg = e instanceof Error ? e.message : String(e);
+  return { state: "error", message: msg.slice(0, 160) };
+}
 const YT_API_KEY = process.env.YOUTUBE_API_KEY;
 const YT_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID || "";
 const HERMES_KANBAN_BOARD = process.env.HERMES_BOARD || "default";
@@ -381,7 +400,9 @@ async function getHomeData() {
     // Binance PnL (swapped from Hyperliquid 2026-08-24): 1-minute TTL cache.
     // Signed SAPI calls — requires BINANCE_API_KEY / BINANCE_API_SECRET in .env.
     ttlFetch(BN_CACHE, "binance-pnl", async () => {
-      if (!BINANCE_API_KEY || !BINANCE_API_SECRET) return null;
+      if (!BINANCE_API_KEY || !BINANCE_API_SECRET) {
+        return { balance: 0, assets: [], status: { state: "unconfigured" } as const };
+      }
       const crypto = await import("crypto");
       const base = "https://api.binance.com";
       const call = async (path: string) => {
@@ -395,13 +416,24 @@ async function getHomeData() {
           headers: { "X-MBX-APIKEY": BINANCE_API_KEY },
           cache: "no-store",
         });
-        if (!r.ok) throw new Error(`binance ${pathname} ${r.status}`);
+        if (!r.ok) {
+          // Carry the status through so the card can name the actual cause.
+          // 451 is Binance's geo-block (US and other restricted regions get it
+          // even on public endpoints); 401/403 means the credentials are bad.
+          const err = new Error(`binance ${pathname} ${r.status}`) as Error & { httpStatus?: number };
+          err.httpStatus = r.status;
+          throw err;
+        }
         return r.json();
       };
       // Authoritative total: wallet/balance reports every wallet's value in BTC
       // (Earn, Trading Bots, Spot, Funding, Margin...). Convert via BTCUSDT.
       // These four calls are independent, so issue them together — running them
       // in sequence stacked ~400ms of network latency into every cache miss.
+      // The wallet call is the one that decides whether the card has data, so its
+      // failure reason is recorded rather than discarded — otherwise a geo-block
+      // is indistinguishable from an empty account.
+      let walletFailure: BinanceStatus = { state: "ok" };
       const btcTotalPromise = call("/sapi/v1/asset/wallet/balance")
         .then((wb) => {
           let btcTotal = 0;
@@ -412,7 +444,10 @@ async function getHomeData() {
           }
           return { btcTotal, wallets };
         })
-        .catch(() => ({ btcTotal: 0, wallets: [] as { name: string; btc: number }[] }));
+        .catch((e: unknown) => {
+          walletFailure = classifyBinanceError(e);
+          return { btcTotal: 0, wallets: [] as { name: string; btc: number }[] };
+        });
 
       const btcPricePromise = fetch(`${base}/api/v3/ticker/price?symbol=BTCUSDT`, { cache: "no-store" })
         .then(r => r.json()).then((p: { price: string }) => parseFloat(p.price)).catch(() => 0);
@@ -451,7 +486,13 @@ async function getHomeData() {
         assets.push({ asset: "Trading Bots", amount: botsValue, usdValue: botsValue, wallet: "Bots" });
       }
       assets.sort((a, b) => b.usdValue - a.usdValue);
-      return { balance, assets };
+      // An empty account is a legitimate "ok, zero balance" answer; only report
+      // the failure reason when the wallet call itself did not get through.
+      const status = walletFailure.state === "ok" && assets.length === 0 && balance === 0
+        && btcTotal === 0
+        ? ({ state: "error", message: "Binance returned no wallet balances" } as BinanceStatus)
+        : walletFailure;
+      return { balance, assets, status };
     }, 60_000),
     // YouTube: 5-minute in-route TTL cache (R3b) — 3 separate Google API calls
     // per poll drop to one every 300s while warm.
@@ -742,20 +783,26 @@ let hlBalance = 0;
   let hlAllTimePnl = parseFloat(process.env.HL_ALL_TIME_PNL || "0");
   // Binance realized PnL overrides env fallbacks when the API reports data
   let binanceLive = false;
+  let bnStatus: BinanceStatus = { state: "ok" };
 
   let bnRealizedToday = 0;
   let bnRealizedTotal = 0;
   if (hlResult.status === "fulfilled" && hlResult.value) {
-      const bn = hlResult.value as { balance: number; assets?: { asset: string; amount: number; usdValue: number }[]; realizedToday?: number; realizedTotal?: number };
+      const bn = hlResult.value as { balance: number; assets?: { asset: string; amount: number; usdValue: number }[]; realizedToday?: number; realizedTotal?: number; status?: BinanceStatus };
   bnAssets = bn.assets ?? [];
     hlBalance = bn.balance;
     bnRealizedToday = bn.realizedToday ?? 0;
     bnRealizedTotal = bn.realizedTotal ?? 0;
+    // Surface why the card is empty so it never claims missing credentials
+    // when the real cause is a geo-block or a rejected key.
+    bnStatus = bn.status ?? { state: "ok" };
     if (bn.balance > 0 || bnRealizedTotal !== 0) {
       binanceLive = true;
       hlTodayPnl = bnRealizedToday;
       hlAllTimePnl = bnRealizedTotal;
     }
+  } else if (hlResult.status === "rejected") {
+    bnStatus = classifyBinanceError(hlResult.reason);
   }
 
   // ─── Polymarket balance (env var + DataStore fallback) ──────────────
@@ -1019,6 +1066,7 @@ let hlBalance = 0;
     hlAllTimePnl,
     hlAssets: bnAssets,
     hlLastSync: binanceLive ? new Date().toISOString() : null,
+    binanceStatus: bnStatus,
     allTimePnl: allTimePnl + hlAllTimePnl,
     todayPnl: todayPnl + hlTodayPnl,
     // GitHub

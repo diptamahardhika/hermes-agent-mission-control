@@ -45,7 +45,7 @@ const EMPTY: HomeData = {
   topIdeas: [],
   topVideo: null, latestVideo: null, ytSubscribers: 0, ytGoal: 20000,
   polyBalance: 0, polyWinRate: 0, polyTodayPnl: 0, polyAllTimePnl: 0,
-   hlBalance: 0, hlPosition: null, hlTodayPnl: 0, hlAllTimePnl: 0, hlAssets: [], hlLastSync: null,
+   hlBalance: 0, hlPosition: null, hlTodayPnl: 0, hlAllTimePnl: 0, hlAssets: [], hlLastSync: null, binanceStatus: null,
    allTimePnl: 0, todayPnl: 0, processes: [],
    hermesKanban: { board: "Hermes 24/7 Assistant", slug: "hermes-24-7-assistant", total: 0, counts: {}, tasks: [] },
    xViewsTrend: [], snapshots: [], lastUpdated: null,
@@ -777,8 +777,17 @@ function ScoreGauge({ score }: { score: ScoreData }) {
 function CryptoPortfolioCard({ data }: { data: HomeData }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => { setLoading(false); }, []);
-  const { hlBalance: balance, hlTodayPnl: todayPnl, hlAllTimePnl: allTimePnl, hlAssets: assets } = data;
+  const { hlBalance: balance, hlTodayPnl: todayPnl, hlAllTimePnl: allTimePnl, hlAssets: assets, binanceStatus } = data;
   const hasData = balance > 0 || (assets?.length ?? 0) > 0;
+  // Every failure used to render the same "add your key" line, including a
+  // geo-block — which reads as "your key is gone" when it is sitting in .env.
+  const status = binanceStatus ?? { state: "ok" as const };
+  const emptyReason =
+    status.state === "unconfigured" ? "Binance API not configured — add BINANCE_API_KEY / BINANCE_API_SECRET to .env"
+    : status.state === "geo-blocked" ? `Binance blocked this machine's IP (HTTP ${status.httpStatus}) — it refuses restricted regions, including on public endpoints. Your key is fine; turn off the VPN or route through a permitted region.`
+    : status.state === "unauthorized" ? `Binance rejected the credentials (HTTP ${status.httpStatus}) — check BINANCE_API_KEY / BINANCE_API_SECRET in .env`
+    : status.state === "error" ? `Binance unreachable — ${status.message}`
+    : "No Binance wallet balances found";
   const pnlColor = todayPnl > 0 ? "var(--up)" : todayPnl < 0 ? "var(--down)" : "var(--hq-text-ghost)";
   const allColor = allTimePnl > 0 ? "var(--up)" : allTimePnl < 0 ? "var(--down)" : "var(--hq-text-ghost)";
   return (
@@ -793,7 +802,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
 
       {!hasData ? (
         <p className="text-[12px] text-[var(--hq-text-ghost)] py-6 text-center">
-          Binance API not configured — add BINANCE_API_KEY / BINANCE_API_SECRET to .env
+          {emptyReason}
         </p>
       ) : (
         <>

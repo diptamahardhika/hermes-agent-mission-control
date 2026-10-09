@@ -355,8 +355,16 @@ export interface ScoreData {
 }
 
 /**
- * Complete home dashboard data structure
+ * Distinguishes the failure modes that all collapse into the same empty card.
+ * `unconfigured` is the only one the user can fix by editing `.env`.
  */
+export type BinanceStatus =
+  | { state: "ok" }
+  | { state: "unconfigured" }
+  | { state: "geo-blocked"; httpStatus: number }
+  | { state: "unauthorized"; httpStatus: number }
+  | { state: "error"; message: string };
+
 export interface HomeData {
    xFollowers: number;
    xGoal: number;
@@ -386,6 +394,13 @@ export interface HomeData {
    hlAllTimePnl: number;
    hlAssets?: { asset: string; amount: number; usdValue: number; wallet?: string }[];
    hlLastSync?: string | null;
+   /**
+    * Why the Binance card is showing what it shows. Without this the card
+    * cannot tell "you have no credentials" apart from "Binance refused the
+    * request" — a geo-blocked region produces the exact same empty state as
+    * a missing key, which sends you hunting for a key that is already there.
+    */
+   binanceStatus?: BinanceStatus | null;
    lastUpdated?: string | null;
    allTimePnl: number;
    todayPnl: number;
