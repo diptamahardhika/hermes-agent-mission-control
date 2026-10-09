@@ -1,33 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCountUp } from "@/components/ui/count-up";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
-
-// ── Reduced-motion-aware count-up ─────────────────────────
-function useCountUp(target: number, duration = 1400, enabled = true) {
-  const [val, setVal] = useState(0);
-  const raf = useRef<number | null>(null);
-  useEffect(() => {
-    const reduceMotion = typeof window !== "undefined"
-      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (!enabled || target === 0 || reduceMotion) {
-      // Defer state update to avoid synchronous setState in effect
-      const id = requestAnimationFrame(() => setVal(target));
-      return () => cancelAnimationFrame(id);
-    }
-    const start = Date.now();
-    const tick = () => {
-      const t = Math.min((Date.now() - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 4);
-      setVal(Math.round(target * ease));
-      if (t < 1) raf.current = requestAnimationFrame(tick);
-    };
-    raf.current = requestAnimationFrame(tick);
-    return () => { if (raf.current) cancelAnimationFrame(raf.current); };
-  }, [target, duration, enabled]);
-  return val;
-}
 
 const GHOST = "#52525b";
 
