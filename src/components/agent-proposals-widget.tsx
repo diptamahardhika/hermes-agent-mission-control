@@ -175,7 +175,7 @@ export function AgentProposalsWidget() {
             title="Sort by newest first"
             type="button"
           >
-            <SortDesc className="w-3 h-3" />
+            <SortDesc className="w-3 h-3" aria-hidden="true" />
           </button>
           <button
             onClick={() => setSortBy("oldest")}
@@ -188,7 +188,7 @@ export function AgentProposalsWidget() {
             title="Sort by oldest first"
             type="button"
           >
-            <SortAsc className="w-3 h-3" />
+            <SortAsc className="w-3 h-3" aria-hidden="true" />
           </button>
           <button
             onClick={() => setSortBy("agent")}
@@ -239,14 +239,14 @@ export function AgentProposalsWidget() {
       {loaded && proposals.length === 0 ? (
         <Panel className="p-2">
           <EmptyState
-            icon={<Check className="w-6 h-6" style={{ color: "var(--up)" }} />}
+            icon={<Check className="w-6 h-6" style={{ color: "var(--up)" }} aria-hidden="true" />}
             title="No proposals from your agents."
             hint="When an agent posts an idea or review, it lands here for your call."
           />
         </Panel>
       ) : !loaded ? (
         <Panel className="p-2">
-          <EmptyState icon={<Inbox className="w-6 h-6" />} title="Checking…" />
+          <EmptyState icon={<Inbox className="w-6 h-6" aria-hidden="true" />} title="Checking…" />
         </Panel>
       ) : (
         <>
@@ -267,13 +267,13 @@ export function AgentProposalsWidget() {
             </p>
           )}
           <a
-            href="/agents"
-            className="inline-flex items-center gap-1 self-start mt-3 text-[12.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-            style={{ color: "var(--accent)" }}
-          >
-            Review all on Agents floor
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </a>
+                      href="/agents"
+                      className="inline-flex items-center gap-1 self-start mt-3 text-[12.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      Review all on Agents floor
+                      <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
+                    </a>
         </>
       )}
     </div>

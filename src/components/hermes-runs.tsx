@@ -771,6 +771,7 @@ function RunRow({ run, reduce }: { run: Req; reduce: boolean }) {
             <ChevronRight
               className="w-3.5 h-3.5 text-[var(--text-3)] transition-transform"
               style={{ transform: open ? "rotate(90deg)" : "none" }}
+              aria-hidden="true"
             />
           )}
         </div>
