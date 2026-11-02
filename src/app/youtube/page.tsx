@@ -560,6 +560,19 @@ export default function YouTubePage() {
                   </div>
                 )}
               </div>
+{(ideaTab === "pending" ? ideas : rejectedIdeas).length === 0 ? (
+                <div className="col-span-full flex flex-col items-center justify-center py-12 gap-3 text-center">
+                  <p className="text-[var(--text-2)] text-sm">
+                    {ideaTab === "pending" ? "No pending ideas yet." : "No rejected ideas."}
+                  </p>
+                  {ideaTab === "pending" && (
+                    <p className="text-xs text-[var(--text-3)] max-w-md">
+                      Ideas are generated on demand via the Hermes model (no OpenAI key needed). Click "💡 More Ideas".
+                      Add <code className="mx-1 px-1 rounded bg-[var(--surface-2)]">BRAVE_API_KEY</code> to <code className="mx-1 px-1 rounded bg-[var(--surface-2)]">.env</code> for live web-sourced stories.
+                    </p>
+                  )}
+                </div>
+              ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {(ideaTab === "pending" ? ideas : rejectedIdeas).map((idea, i) => {
                   const isSelected = selectedIdeas.has(idea.title);
@@ -633,6 +646,7 @@ export default function YouTubePage() {
                   );
                 })}
               </div>
+              )}
             </div>
 
             {/* Preview */}

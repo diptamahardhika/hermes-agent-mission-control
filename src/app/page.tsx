@@ -3,6 +3,20 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+
+// Utility hooks
+function usePrefersReducedMotion(): boolean {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mq) return;
+    const on = () => setReduce(mq.matches);
+    on();
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  return reduce;
+}
 import { Twitter, ArrowUpRight, ArrowDownRight, ChevronRight, Github, Server, Cpu, Waypoints, RefreshCw, Activity, CircleDot } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { CountUp } from "@/components/ui/count-up";
@@ -247,7 +261,7 @@ function TopTweetsPanel({ tweets }: { tweets: Tweet[] }) {
     <div className="panel flex flex-col p-6">
       {loading && <TweetsSkeleton />}
       <div className="flex items-center gap-2 mb-4">
-        <Twitter className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} />
+        <Twitter className="w-3.5 h-3.5" style={{ color: "#38bdf8" }} aria-hidden="true" />
         <span className="eyebrow">Top Tweets · 7d</span>
       </div>
       {tweets.length === 0 ? <Empty>No tweet data yet</Empty> : (
@@ -266,7 +280,7 @@ function TopTweetsPanel({ tweets }: { tweets: Tweet[] }) {
                   {t.postedAt && <span className="text-[var(--hq-text-ghost)]">{timeAgo(t.postedAt)}</span>}
                 </div>
               </div>
-              <ArrowUpRight className="w-3.5 h-3.5 text-[var(--hq-text-ghost)] group-hover:text-[var(--hq-text-dim)] shrink-0 mt-0.5 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-[var(--hq-text-ghost)] group-hover:text-[var(--hq-text-dim)] shrink-0 mt-0.5 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
             </a>
           ))}
         </div>
@@ -348,7 +362,7 @@ function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
     <div className="panel flex flex-col p-6">
       {loading && <FreeLLMSkeleton />}
       <div className="flex items-center gap-2 mb-4">
-        <Cpu className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} />
+        <Cpu className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} aria-hidden="true" />
         <span className="eyebrow">FreeLLM Compute · 7d</span>
         {data.syncedAt && <span className="num ml-auto text-[10px] text-[var(--hq-text-ghost)]">synced {timeAgo(data.syncedAt)}</span>}
       </div>
@@ -389,8 +403,8 @@ function FreeLLMSpendPanel({ data }: { data: FreeLLMData }) {
           </div>
         )}
       </div>
-      <a href={data.baseUrl || process.env.NEXT_PUBLIC_FREELLM_URL || "/freellm"} target="_blank" rel="noopener noreferrer" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
-        Open FreeLLM dashboard <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      <a href={data.baseUrl || process.env.NEXT_PUBLIC_FREELLM_URL || "/freellm"} target="_blank" rel="noopener noreferrer" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] rounded">
+        Open FreeLLM dashboard <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
       </a>
     </div>
   );
@@ -558,20 +572,20 @@ function TokenIOSplit({ input, output, cache = 0, colors }: { input: number | nu
       </div>
       <div className="flex items-center justify-between mt-1.5 text-[10px] num text-[var(--hq-text-ghost)]">
         <span className="flex items-center gap-1.5">
-          <ArrowDownRight className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.input }} />
+          <ArrowDownRight className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.input }} aria-hidden="true" />
           in {fmt(input)}
         </span>
         <span className="flex items-center gap-1.5">
           {cache > 0 && (
             <>
               cached {fmt(cache)}
-          <CircleDot className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.cache }} />
+          <CircleDot className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.cache }} aria-hidden="true" />
             </>
           )}
         </span>
         <span className="flex items-center gap-1.5">
           out {fmt(output)}
-          <ArrowUpRight className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.output }} />
+          <ArrowUpRight className="inline-block w-1.5 h-1.5 shrink-0" style={{ color: c.output }} aria-hidden="true" />
         </span>
       </div>
     </div>
@@ -657,6 +671,7 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
 function AgentsStrip({ processes }: { processes: Process[] }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => { setLoading(false); }, []);
+  const reduceMotion = usePrefersReducedMotion();
   if (loading) return <AgentsSkeleton />;
   if (processes.length === 0) return null;
   return (
@@ -665,8 +680,8 @@ function AgentsStrip({ processes }: { processes: Process[] }) {
       {processes.map((p, i) => (
         <div key={i} className="flex items-center gap-1.5 rounded-lg border border-[var(--hq-hairline)] bg-white/[0.02] px-2.5 py-1.5">
           <span className="relative flex w-1.5 h-1.5">
-            {p.status === "online" && <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--up) 60%, transparent)" }} />}
-            <Server className="relative inline-flex w-1.5 h-1.5" style={{ color: p.status === "online" ? "var(--up)" : "var(--down)" }} />
+            {p.status === "online" && !reduceMotion && <span className="absolute inline-flex h-full w-full rounded-full animate-ping" style={{ background: "color-mix(in srgb, var(--up) 60%, transparent)" }} />}
+            <Server className="relative inline-flex w-1.5 h-1.5" style={{ color: p.status === "online" ? "var(--up)" : "var(--down)" }} aria-hidden="true" />
           </span>
           <span className="text-[var(--hq-text-dim)] text-[12px]">{p.name}</span>
           <span className="num text-[var(--hq-text-ghost)] text-[10px]">{p.uptime}</span>
@@ -715,7 +730,7 @@ function HermesKanbanPanel({ kanban }: { kanban: HermesKanban }) {
           {kanban.tasks.slice(0, 5).map((t) => (
             <div key={t.id} className="py-2.5 border-b border-[var(--hq-hairline)] last:border-0">
               <div className="flex items-center gap-3">
-                <CircleDot className="w-1.5 h-1.5 shrink-0" style={{ color: statusColor(t.status) }} />
+                <CircleDot className="w-1.5 h-1.5 shrink-0" style={{ color: statusColor(t.status) }} aria-hidden="true" />
                 <p className="text-[13px] text-[var(--hq-text-dim)] leading-snug line-clamp-1 flex-1">{t.title}</p>
                 {t.assignee && <span className="num text-[10.5px] text-[var(--hq-text-ghost)] shrink-0">{t.assignee}</span>}
               </div>
@@ -876,7 +891,7 @@ function CryptoPortfolioCard({ data }: { data: HomeData }) {
 
       <a href="/hermes#runs" className="mt-auto pt-4 flex items-center gap-1 text-[var(--hq-text-faint)] text-[11px] font-medium hover:text-[var(--hq-text-dim)] transition-colors group">
         via Hermes hub
-        <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+        <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
       </a>
     </div>
   );
@@ -977,7 +992,7 @@ function SageFindingsPanel() {
             return (
               <div key={group.key}>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <CircleDot className="w-1.5 h-1.5" style={{ color: group.dot }} />
+                  <CircleDot className="w-1.5 h-1.5" style={{ color: group.dot }} aria-hidden="true" />
                   <span className="eyebrow !text-[9.5px]" style={{ color: group.dot }}>{group.label}</span>
                 </div>
                 <div className="space-y-3">
@@ -995,7 +1010,7 @@ function SageFindingsPanel() {
                             {f.title}
                           </span>
                           <span className="num shrink-0 text-[10px] text-[var(--hq-text-ghost)]">{timeAgo(f.completedAt)}</span>
-                          <ChevronRight className={`w-3 h-3 shrink-0 text-[var(--hq-text-ghost)] transition-transform ${open ? "rotate-90" : ""}`} />
+                          <ChevronRight className={`w-3 h-3 shrink-0 text-[var(--hq-text-ghost)] transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
                         </button>
                         {open && (
                           <ul className="mt-2 space-y-1.5 pl-3 border-l" style={{ borderColor: `${group.dot}33` }}>
@@ -1131,7 +1146,7 @@ if (!mounted) return null;
               <button onClick={refreshData} disabled={refreshing}
               className="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-white/[0.06] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] min-w-[28px] min-h-[28px]"
               aria-label="Refresh data">
-                <RefreshCw className={`w-3 h-3 text-[var(--hq-text-ghost)] ${refreshing ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-3 h-3 text-[var(--hq-text-ghost)] ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />
               </button>
             </p>
           </div>

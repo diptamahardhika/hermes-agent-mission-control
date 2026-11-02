@@ -580,7 +580,7 @@ export default function AgentsPage() {
                     }`}
                     aria-label="Sort by newest first"
                   >
-                    <SortDesc className="w-3 h-3" />
+                    <SortDesc className="w-3 h-3" aria-hidden="true" />
                   </button>
                   <button
                     onClick={() => setSortBy("oldest")}
@@ -589,7 +589,7 @@ export default function AgentsPage() {
                     }`}
                     aria-label="Sort by oldest first"
                   >
-                    <SortAsc className="w-3 h-3" />
+                    <SortAsc className="w-3 h-3" aria-hidden="true" />
                   </button>
                   <button
                     onClick={() => setSortBy("agent")}

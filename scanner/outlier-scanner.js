@@ -289,7 +289,7 @@ async function main() {
     const { Client } = require('pg');
     // Try .env.production.local first, then .env.local
     let dbUrl = '';
-    for (const envFile of ['.env.production.local', '.env.local']) {
+    for (const envFile of ['.env.production.local', '.env.local', '.env']) {
       const envPath = path.join(__dirname, '..', envFile);
       if (!fs.existsSync(envPath)) continue;
       const envLines = fs.readFileSync(envPath, 'utf-8').split('\n');
@@ -302,7 +302,8 @@ async function main() {
       }
       if (dbUrl) break;
     }
-    const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+const isLocal = /sslmode=disable|localhost|127\.0\.0\.1/.test(dbUrl);
+    const client = new Client({ connectionString: dbUrl, ssl: isLocal ? false : { rejectUnauthorized: false } });
     await client.connect();
     const dataJson = JSON.stringify(output);
     await client.query(

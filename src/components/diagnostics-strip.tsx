@@ -36,7 +36,7 @@ export function DiagnosticsStrip() {
     <Panel className="p-4">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[11px] font-semibold text-[var(--hq-text)]">Diagnostics</span>
-        <CircleDot className="inline-block h-1.5 w-1.5" style={{ color: "var(--hq-up)" }} />
+        <CircleDot className="inline-block h-1.5 w-1.5" style={{ color: "var(--hq-up)" }} aria-hidden="true" />
       </div>
       <div className="space-y-1">
         {entries.map(([id, error]) => (

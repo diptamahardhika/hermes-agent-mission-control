@@ -48,7 +48,7 @@ export function MetricCard({
       {/* label row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          <span style={{ color: accent }} className="shrink-0 opacity-80">{icon}</span>
+          <span style={{ color: accent }} className="shrink-0 opacity-80" aria-hidden="true">{icon}</span>
           <span className="eyebrow truncate">{label}</span>
         </div>
         {hasDelta && (

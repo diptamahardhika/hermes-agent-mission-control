@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore, useState } from "react";
 import {
   dismissSearchHint as dismissSearchHintStore,
   searchHintServerSnapshot,
@@ -97,6 +97,7 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
     searchHintServerSnapshot,
   );
   const showSearchHint = !hintDismissed;
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -104,6 +105,16 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
       return () => cancelAnimationFrame(frame);
     }
   }, [pathname, setIsOpen]);
+
+  // Prefers-reduced-motion: ping animation
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mq) return;
+    const on = () => setReduceMotion(mq.matches);
+    on();
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
 
   const dismissSearchHint = () => {
     dismissSearchHintStore();
@@ -288,7 +299,7 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (op
         <div className={`px-4 py-4 border-t border-[var(--line)] transition-all duration-300 ${isOpen ? "" : "px-0 flex justify-center"}`}>
           <div className={`flex items-center gap-2 text-[var(--text-3)] text-[11.5px] transition-all duration-300 ${isOpen ? "" : "justify-center"}`}>
             <span className="relative flex w-1.5 h-1.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--up)] opacity-60 animate-ping" />
+              {!reduceMotion && <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--up)] opacity-60 animate-ping" />}
               <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-[var(--up)]" />
             </span>
             <span className={`transition-all duration-300 ${isOpen ? "opacity-100 w-auto" : "opacity-0 w-0 overflow-hidden pointer-events-none"}`}>
