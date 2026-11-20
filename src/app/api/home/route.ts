@@ -78,6 +78,55 @@ function classifyBinanceError(e: unknown): BinanceStatus {
 }
 const YT_API_KEY = process.env.YOUTUBE_API_KEY;
 const YT_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID || "";
+
+// YouTube: enumerate the channel's uploads playlist instead of search.list —
+// search draws on a separate daily "Search Queries" quota (100 units/call)
+// that 429s when exhausted; playlistItems costs 1 unit/page and has no cap.
+type YTPlaylistItem = {
+  snippet?: {
+    title?: string;
+    publishedAt?: string;
+    thumbnails?: { high?: { url?: string } };
+    resourceId?: { videoId?: string };
+  };
+};
+
+async function ytUploadsItems(maxPages: number): Promise<YTPlaylistItem[]> {
+  const chRes = await fetch(
+    `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${YT_CHANNEL_ID}&key=${YT_API_KEY}`,
+    { next: { revalidate: 86400 } },
+  );
+  if (!chRes.ok) throw new Error(`YouTube channels lookup failed (HTTP ${chRes.status})`);
+  const ch = await chRes.json();
+  const uploads: string | undefined = ch.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploads) throw new Error("YouTube channel has no uploads playlist");
+  const items: YTPlaylistItem[] = [];
+  let pageToken = "";
+  for (let page = 0; page < maxPages; page++) {
+    const url =
+      `https://www.googleapis.com/youtube/v3/playlistItems?playlistId=${uploads}&part=snippet&maxResults=50` +
+      (pageToken ? `&pageToken=${pageToken}` : "") + `&key=${YT_API_KEY}`;
+    const res = await fetch(url, { next: { revalidate: 3600 } });
+    if (!res.ok) throw new Error(`YouTube uploads list failed (HTTP ${res.status})`);
+    const j = await res.json();
+    items.push(...(j.items || []));
+    pageToken = j.nextPageToken || "";
+    if (!pageToken) break;
+  }
+  return items;
+}
+
+// Map playlistItems onto the search.list shape the consumers below already parse.
+function ytToSearchShape(i: YTPlaylistItem) {
+  return {
+    id: { videoId: i.snippet?.resourceId?.videoId },
+    snippet: {
+      title: i.snippet?.title,
+      thumbnails: i.snippet?.thumbnails,
+      publishedAt: i.snippet?.publishedAt,
+    },
+  };
+}
 const HERMES_KANBAN_BOARD = process.env.HERMES_BOARD || "default";
 
 // ─── Poll-interval aligned cache (R3 upgrade) ────────────────────────────────
@@ -197,7 +246,7 @@ async function getHomeData() {
   const DS_KEYS = [
     "x-account-stats", "pixel-ideas", "polymarket-pnl", "metric-snapshots",
     "homelab-monitor", "hermes-cost", "hermes-cost-history",
-    "omniroute-cost", "hermes-briefing",
+    "omniroute-cost", "hermes-briefing", "youtube-views-history",
   ];
   let store: Record<string, unknown> = {};
   try {
@@ -494,14 +543,34 @@ async function getHomeData() {
         : walletFailure;
       return { balance, assets, status };
     }, 60_000),
-    // YouTube: 5-minute in-route TTL cache (R3b) — 3 separate Google API calls
-    // per poll drop to one every 300s while warm.
-    ttlFetch(YT_CACHE, "yt-top", async () =>
-      fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${YT_CHANNEL_ID}&maxResults=5&order=viewCount&type=video&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
-    300_000),
-    ttlFetch(YT_CACHE, "yt-latest", async () =>
-      fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${YT_CHANNEL_ID}&maxResults=3&order=date&type=video&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
-    300_000),
+    // YouTube: 5-minute in-route TTL cache (R3b). Uploads-playlist based
+    // (no search.list — its daily Search Queries quota 429s when exhausted).
+    ttlFetch(YT_CACHE, "yt-top", async () => {
+      // Most-viewed: uploads playlist + videos.list stats, sorted desc.
+      const items = await ytUploadsItems(2);
+      const ids = items.map(i => i.snippet?.resourceId?.videoId).filter(Boolean) as string[];
+      const views = new Map<string, number>();
+      for (let i = 0; i < ids.length; i += 50) {
+        const res = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?id=${ids.slice(i, i + 50).join(",")}&part=statistics&key=${YT_API_KEY}`,
+          { next: { revalidate: 3600 } },
+        );
+        if (!res.ok) throw new Error(`YouTube stats failed (HTTP ${res.status})`);
+        const j = await res.json();
+        for (const v of j.items || []) views.set(v.id, parseInt(v.statistics?.viewCount || "0", 10));
+      }
+      const ranked = [...items].sort((a, b) =>
+        (views.get(b.snippet?.resourceId?.videoId || "") || 0) - (views.get(a.snippet?.resourceId?.videoId || "") || 0));
+      return {
+        items: ranked.slice(0, 5).map(ytToSearchShape),
+        totalViews: [...views.values()].reduce((a, b) => a + b, 0),
+      };
+    }, 300_000),
+    ttlFetch(YT_CACHE, "yt-latest", async () => {
+      // Uploads playlist is newest-first — same semantics as search order=date.
+      const items = await ytUploadsItems(1);
+      return { items: items.slice(0, 3).map(ytToSearchShape) };
+    }, 300_000),
     ttlFetch(YT_CACHE, "yt-channel", async () =>
       fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${YT_CHANNEL_ID}&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
     300_000),
@@ -849,6 +918,40 @@ let hlBalance = 0;
     update: { data: snapshots },
     create: { key: "metric-snapshots", data: snapshots },
   }).catch((e) => { console.warn("[home] snapshot upsert failed:", e); });
+  // ─── YouTube daily views history (CSV-seeded via scripts/seed-youtube-views-history.mjs,
+  // self-appending from the yt-top stats already fetched above — no extra API calls) ───
+  type ViewsPoint = { d: string; views: number; total: number };
+  let ytViewsHistory: { d: string; views: number }[] = [];
+  let ytViews28d = 0;
+  {
+    const raw = store["youtube-views-history"];
+    let hist: ViewsPoint[] = Array.isArray(raw) ? (raw as ViewsPoint[]) : [];
+    const totalViews = ytTopResult.status === "fulfilled"
+      ? (ytTopResult.value as { totalViews?: number }).totalViews
+      : undefined;
+    if (typeof totalViews === "number" && totalViews > 0) {
+      // Delta vs the last PRIOR day — re-polls today must not shrink the day's delta.
+      const prior = [...hist].reverse().find(p => p.d !== today);
+      const point: ViewsPoint = {
+        d: today,
+        // Clamp: deleted videos can shrink the cumulative total.
+        views: prior ? Math.max(0, totalViews - prior.total) : 0,
+        total: totalViews,
+      };
+      const idx = hist.findIndex(p => p.d === today);
+      if (idx >= 0) hist[idx] = point; else hist.push(point);
+      hist = hist.slice(-90);
+      await prisma.dataStore.upsert({
+        where: { key: "youtube-views-history" },
+        update: { data: hist },
+        create: { key: "youtube-views-history", data: hist },
+      }).catch((e) => { console.warn("[home] views-history upsert failed:", e); });
+    }
+    const cutoff = new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10);
+    const recent = hist.filter(p => p.d >= cutoff);
+    ytViewsHistory = recent.map(p => ({ d: p.d, views: p.views }));
+    ytViews28d = recent.reduce((s, p) => s + p.views, 0);
+  }
   // Binance PnL derivation (savings-style portfolio): today's PnL = wallet value
   // minus yesterday's snapshot; all-time = minus earliest snapshot.
   // PnL from snapshot history: wallet value change day-over-day / since first record.
@@ -1054,6 +1157,8 @@ let hlBalance = 0;
     // YouTube
     topVideo,
     latestVideo,
+    ytViewsHistory,
+    ytViews28d,
     ytSubscribers,
     ytGoal: 20000,
     // Trading, hard-coded for dashboard/demo display
