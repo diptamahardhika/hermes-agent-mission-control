@@ -382,6 +382,8 @@ export interface HomeData {
    topIdeas: BoardIdea[];
    topVideo: Video | null;
    latestVideo: Video | null;
+   ytViewsHistory?: { d: string; views: number }[];
+   ytViews28d?: number;
    ytSubscribers: number;
    ytGoal: number;
    polyBalance: number;

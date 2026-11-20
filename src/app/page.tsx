@@ -629,15 +629,15 @@ function YouTubeCard({ video, label }: { video: Video; label: string }) {
 }
 
 // ── YouTube: Top Performing vs Latest (tabbed) ────────────
-function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; latestVideo: Video | null }) {
+function YouTubeVideoTabs({ topVideo, latestVideo, viewsHistory, views28d }: { topVideo: Video | null; latestVideo: Video | null; viewsHistory?: { d: string; views: number }[]; views28d?: number }) {
   const [tab, setTab] = useState<"top" | "latest">("top");
   const [loading, setLoading] = useState(true);
   useEffect(() => { setLoading(false); }, []);
   const video = tab === "top" ? (topVideo ?? latestVideo) : (latestVideo ?? topVideo);
+  if (loading) return <YouTubeSkeleton />;
   if (!video) return null;
   return (
     <div className="panel flex flex-col overflow-hidden">
-      {loading && <YouTubeSkeleton />}
       <div className="flex items-center gap-1 p-2 border-b border-[var(--hq-hairline)]">
         <span className="eyebrow ml-2 mr-1" style={{ color: "#f87171" }}>YouTube</span>
         <button
@@ -653,6 +653,22 @@ function YouTubeVideoTabs({ topVideo, latestVideo }: { topVideo: Video | null; l
           Latest
         </button>
       </div>
+      {viewsHistory && viewsHistory.length >= 2 && (
+        <div className="px-4 pt-3 pb-2 border-b border-[var(--hq-hairline)]">
+          <div className="flex items-baseline justify-between mb-1">
+            <span className="eyebrow" style={{ color: "var(--hq-text-ghost)" }}>Views · 28d</span>
+            <span className="num text-[15px] font-semibold text-[var(--hq-text)]">{fmt(views28d ?? 0)}</span>
+          </div>
+          <Sparkline
+            data={viewsHistory.map(p => p.views)}
+            area
+            color="#f87171"
+            idSeed="yt-views"
+            aria-label="Daily channel views over the last 28 days, approximate from daily snapshots"
+            className="h-9"
+          />
+        </div>
+      )}
       <a href={video.url} target="_blank" rel="noreferrer" className="group block">
         {video.thumbnail && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -1424,12 +1440,23 @@ if (!mounted) return null;
         </Reveal>
         </ErrorBoundary>
 
+        {/* ── YouTube: top / latest video ─────────────────── */}
+        <ErrorBoundary name="YouTube">
+        <Reveal>
+        <div className="mt-14">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="hq-rise" style={rise(7)}><YouTubeVideoTabs topVideo={data.topVideo} latestVideo={data.latestVideo} viewsHistory={data.ytViewsHistory} views28d={data.ytViews28d} /></div>
+          </div>
+        </div>
+        </Reveal>
+        </ErrorBoundary>
+
         {/* ── X / Twitter stats — pinned to the very bottom ── */}
         <Reveal>
         <div className="mt-14">
           <SectionLabel>X · Twitter</SectionLabel>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-5 hq-rise" style={rise(7)}>
+            <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-5 hq-rise" style={rise(8)}>
               <MetricCard
                 label="X Followers" value={data.xFollowers} format={fmtExact}
                 delta={xd.delta} deltaPct={xd.deltaPct} deltaLabel={xd.label} trend={xd.series}
@@ -1438,7 +1465,7 @@ if (!mounted) return null;
               />
               <XAnalyticsPanel views={data.xViewsThisWeek} trend={xViewsSeries} totalTweets={data.totalTweets} bestDay={data.bestPostingDay} bestHour={data.bestPostingHourStr} />
             </div>
-            <div className="lg:col-span-2 hq-rise" style={rise(8)}><TopTweetsPanel tweets={data.topTweets} /></div>
+            <div className="lg:col-span-2 hq-rise" style={rise(9)}><TopTweetsPanel tweets={data.topTweets} /></div>
           </div>
         </div>
         </Reveal>
