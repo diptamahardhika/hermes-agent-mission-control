@@ -86,7 +86,8 @@ export default function YouTubePage() {
   // Performance tab state
   type PerfVideo = { id: string; title: string; thumbnail: string; publishedAt: string; views: number; likes: number; comments: number; url: string; isShort: boolean; durationSecs: number; };
   const [perfData, setPerfData] = useState<{ videos: PerfVideo[]; totalVideos: number; avgViews: number; avgEngagement: number } | null>(null);
-  const [perfLoading, setPerfLoading] = useState(false);
+  const [perfLoading, setPerfLoading] = useState(true);
+  const [perfError, setPerfError] = useState<string | null>(null);
   const [perfFilter, setPerfFilter] = useState<"all" | "30" | "90">("all");
   const [perfVideoType, setPerfVideoType] = useState<"all" | "longform" | "shorts">("all");
   const [perfSort, setPerfSort] = useState<"views" | "likes" | "comments" | "publishedAt">("views");
@@ -95,10 +96,19 @@ export default function YouTubePage() {
   const fetchPerformance = useCallback(async () => {
     if (perfData) return;
     setPerfLoading(true);
+    setPerfError(null);
     try {
-      const d = await (await fetch("/api/youtube/performance", { cache: "no-store" })).json();
-      setPerfData(d);
-    } catch { /* empty */ }
+      const res = await fetch("/api/youtube/performance", { cache: "no-store" });
+      const d = await res.json();
+      if (!res.ok || d.error) {
+        // Don't latch a failed payload — leave perfData null so tab re-entry/Retry refetches.
+        setPerfError(d.error || `Request failed (HTTP ${res.status})`);
+      } else {
+        setPerfData(d);
+      }
+    } catch {
+      setPerfError("Could not reach the dashboard API. Check that the dev server is running.");
+    }
     setPerfLoading(false);
   }, [perfData]);
 
@@ -901,7 +911,19 @@ export default function YouTubePage() {
               </>
             );
           })() : (
-            <EmptyState title="Failed to load performance data." />
+            <EmptyState
+              title="Couldn't load YouTube performance data."
+              hint={perfError ?? undefined}
+              action={
+                <button
+                  type="button"
+                  onClick={() => fetchPerformance()}
+                  className="text-xs px-4 py-2 rounded-[var(--r-md)] border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                >
+                  Retry
+                </button>
+              }
+            />
           )}
         </div>
       )}
